@@ -302,6 +302,13 @@ static TR_INLINE tr_bool tr_torrentAllowsPex( const tr_torrent * tor )
         && ( !tr_torrentIsPrivate( tor ) );
 }
 
+static TR_INLINE tr_bool tr_torrentAllowsTex( const tr_torrent * tor )
+{
+    /* BEP 28: check when TEX is allowed. The spec does not state anything about private torrents */
+    return ( tor != NULL )
+        && ( tor->session->isTexEnabled );
+}
+
 static TR_INLINE tr_bool tr_torrentAllowsDHT( const tr_torrent * tor )
 {
     return ( tor != NULL )
