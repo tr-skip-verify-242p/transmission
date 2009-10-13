@@ -23,11 +23,12 @@
  *****************************************************************************/
 
 #import "TorrentCell.h"
-#import "TorrentTableView.h"
 #import "GroupsController.h"
 #import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
 #import "ProgressGradients.h"
+#import "Torrent.h"
+#import "TorrentTableView.h"
 
 #define BAR_HEIGHT 12.0f
 
@@ -428,22 +429,22 @@
         [gradient release];
     }
     
-    //error image
     const BOOL error = [torrent isErrorOrWarning];
-    NSImage * errorImage = error ? [NSImage imageNamed: [NSApp isOnSnowLeopardOrBetter] ? NSImageNameCaution : @"Error.png"] : nil;
     
     //icon
     if (!minimal || !(!fTracking && fHoverAction)) //don't show in minimal mode when hovered over
     {
-        NSImage * icon = (minimal && error) ? errorImage : [torrent icon];
+        NSImage * icon = (minimal && error) ? [NSImage imageNamed: [NSApp isOnSnowLeopardOrBetter] ? NSImageNameCaution : @"Error.png"]
+                                            : [torrent icon];
         [self drawImage: icon inRect: iconRect];
     }
     
+    //error badge
     if (error && !minimal)
     {
         NSRect errorRect = NSMakeRect(NSMaxX(iconRect) - ERROR_IMAGE_SIZE, NSMaxY(iconRect) - ERROR_IMAGE_SIZE,
                                         ERROR_IMAGE_SIZE, ERROR_IMAGE_SIZE);
-        [self drawImage: errorImage inRect: errorRect];
+        [self drawImage: [NSImage imageNamed: [NSApp isOnSnowLeopardOrBetter] ? NSImageNameCaution : @"Error.png"] inRect: errorRect];
     }
     
     //text color
@@ -696,11 +697,11 @@
 
 - (NSRect) rectForMinimalStatusWithString: (NSAttributedString *) string inBounds: (NSRect) bounds
 {
-    NSRect result = bounds;
+    NSRect result;
     result.size = [string size];
     
-    result.origin.x += bounds.size.width - result.size.width - PADDING_HORIZONTAL;
-    result.origin.y += PADDING_ABOVE_MIN_STATUS;
+    result.origin.x = NSMaxX(bounds) - (NSWidth(result) + PADDING_HORIZONTAL);
+    result.origin.y = NSMinY(bounds) + PADDING_ABOVE_MIN_STATUS;
     
     return result;
 }
@@ -710,9 +711,10 @@
 {
     const BOOL minimal = [fDefaults boolForKey: @"SmallView"];
     
-    NSRect result = bounds;
-    result.origin.y += PADDING_ABOVE_TITLE;
-    result.origin.x += PADDING_HORIZONTAL + (minimal ? IMAGE_SIZE_MIN : IMAGE_SIZE_REG) + PADDING_BETWEEN_IMAGE_AND_TITLE;
+    NSRect result;
+    result.origin.y = NSMinY(bounds) + PADDING_ABOVE_TITLE;
+    result.origin.x = NSMinX(bounds) + PADDING_HORIZONTAL
+                        + (minimal ? IMAGE_SIZE_MIN : IMAGE_SIZE_REG) + PADDING_BETWEEN_IMAGE_AND_TITLE;
     
     result.size = [string size];
     result.size.width = MIN(result.size.width, NSMaxX(bounds) - result.origin.x - PADDING_HORIZONTAL
@@ -724,9 +726,9 @@
 
 - (NSRect) rectForProgressWithString: (NSAttributedString *) string inBounds: (NSRect) bounds
 {
-    NSRect result = bounds;
-    result.origin.y += PADDING_ABOVE_TITLE + HEIGHT_TITLE + PADDING_BETWEEN_TITLE_AND_PROGRESS;
-    result.origin.x += PADDING_HORIZONTAL + IMAGE_SIZE_REG + PADDING_BETWEEN_IMAGE_AND_TITLE;
+    NSRect result;
+    result.origin.y = NSMinY(bounds) + PADDING_ABOVE_TITLE + HEIGHT_TITLE + PADDING_BETWEEN_TITLE_AND_PROGRESS;
+    result.origin.x = NSMinX(bounds) + PADDING_HORIZONTAL + IMAGE_SIZE_REG + PADDING_BETWEEN_IMAGE_AND_TITLE;
     
     result.size = [string size];
     result.size.width = MIN(result.size.width, NSMaxX(bounds) - result.origin.x - PADDING_HORIZONTAL);
@@ -736,10 +738,10 @@
 
 - (NSRect) rectForStatusWithString: (NSAttributedString *) string inBounds: (NSRect) bounds
 {
-    NSRect result = bounds;
-    result.origin.y += PADDING_ABOVE_TITLE + HEIGHT_TITLE + PADDING_BETWEEN_TITLE_AND_PROGRESS + HEIGHT_STATUS
+    NSRect result;
+    result.origin.y = NSMinY(bounds) + PADDING_ABOVE_TITLE + HEIGHT_TITLE + PADDING_BETWEEN_TITLE_AND_PROGRESS + HEIGHT_STATUS
                         + PADDING_BETWEEN_PROGRESS_AND_BAR + BAR_HEIGHT + PADDING_BETWEEN_BAR_AND_STATUS;
-    result.origin.x += PADDING_HORIZONTAL + IMAGE_SIZE_REG + PADDING_BETWEEN_IMAGE_AND_TITLE;
+    result.origin.x = NSMinX(bounds) + PADDING_HORIZONTAL + IMAGE_SIZE_REG + PADDING_BETWEEN_IMAGE_AND_TITLE;
     
     result.size = [string size];
     result.size.width = MIN(result.size.width, NSMaxX(bounds) - result.origin.x - PADDING_HORIZONTAL);

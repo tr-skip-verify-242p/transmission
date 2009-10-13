@@ -2011,14 +2011,26 @@ tr_torrentGetMTimes( const tr_torrent * tor,
 ****
 ***/
 
-void
+tr_announce_list_err
 tr_torrentSetAnnounceList( tr_torrent *            tor,
                            const tr_tracker_info * trackers,
                            int                     trackerCount )
 {
+    int i, j;
     tr_benc metainfo;
 
     assert( tr_isTorrent( tor ) );
+
+    /* look for bad URLs */
+    for( i=0; i<trackerCount; ++i )
+        if( !tr_httpIsValidURL( trackers[i].announce ) )
+            return TR_ANNOUNCE_LIST_HAS_BAD;
+
+    /* look for duplicates */
+    for( i=0; i<trackerCount; ++i )
+        for( j=0; j<trackerCount; ++j )
+            if( ( i != j ) && ( !strcmp( trackers[i].announce, trackers[j].announce ) ) )
+                return TR_ANNOUNCE_LIST_HAS_DUPLICATES;
 
     /* save to the .torrent file */
     if( !tr_bencLoadFile( &metainfo, TR_FMT_BENC, tor->info.torrent ) )
@@ -2064,7 +2076,12 @@ tr_torrentSetAnnounceList( tr_torrent *            tor,
 
         /* cleanup */
         tr_bencFree( &metainfo );
+
+        /* tell the announcer to reload this torrent's tracker list */
+        tr_announcerResetTorrent( tor->session->announcer, tor );
     }
+
+    return TR_ANNOUNCE_LIST_OK;
 }
 
 /**
@@ -2317,7 +2334,8 @@ struct LocationData
 static void
 setLocation( void * vdata )
 {
-    int err = 0;
+    tr_bool err = FALSE;
+    tr_bool verify_needed = FALSE;
     struct LocationData * data = vdata;
     tr_torrent * tor = data->tor;
     const tr_bool do_move = data->move_from_old_location;
@@ -2355,10 +2373,15 @@ setLocation( void * vdata )
             {
                 errno = 0;
                 tr_torinf( tor, "moving \"%s\" to \"%s\"", oldpath, newpath );
-                if( tr_moveFile( oldpath, newpath ) ) {
-                    err = 1;
-                    tr_torerr( tor, "error moving \"%s\" to \"%s\": %s",
-                                    oldpath, newpath, tr_strerror( errno ) );
+                if( rename( oldpath, newpath ) )
+                {
+                    verify_needed = TRUE;
+                    if( tr_moveFile( oldpath, newpath ) )
+                    {
+                        err = TRUE;
+                        tr_torerr( tor, "error moving \"%s\" to \"%s\": %s",
+                                        oldpath, newpath, tr_strerror( errno ) );
+                    }
                 }
             }
             else if( !stat( newpath, &sb ) )
@@ -2379,12 +2402,13 @@ setLocation( void * vdata )
         if( !err )
         {
             /* blow away the leftover subdirectories in the old location */
-            if( do_move )
+            if( do_move && verify_needed )
                 tr_torrentDeleteLocalData( tor, remove );
 
             /* set the new location and reverify */
             tr_torrentSetDownloadDir( tor, location );
-            tr_torrentVerify( tor );
+            if( verify_needed )
+                tr_torrentVerify( tor );
         }
     }
 

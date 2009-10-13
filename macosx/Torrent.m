@@ -695,7 +695,7 @@ int trashDataFile(const char * filename)
     return trackers;
 }
 
-- (NSMutableArray *) allTrackersFlat
+- (NSArray *) allTrackersFlat
 {
     NSMutableArray * allTrackers = [NSMutableArray arrayWithCapacity: fInfo->trackerCount];
     
@@ -705,16 +705,12 @@ int trashDataFile(const char * filename)
     return allTrackers;
 }
 
-#warning check for duplicates?
 - (BOOL) addTrackerToNewTier: (NSString *) tracker
 {
     tracker = [tracker stringByTrimmingCharactersInSet: [NSCharacterSet whitespaceAndNewlineCharacterSet]];
     
     if ([tracker rangeOfString: @"://"].location == NSNotFound)
         tracker = [@"http://" stringByAppendingString: tracker];
-    
-    if (!tr_httpIsValidURL([tracker UTF8String]))
-        return NO;
     
     //recreate the tracker structure
     const int oldTrackerCount = fInfo->trackerCount;
@@ -725,13 +721,13 @@ int trashDataFile(const char * filename)
     trackerStructs[oldTrackerCount].announce = (char *)[tracker UTF8String];
     trackerStructs[oldTrackerCount].tier = trackerStructs[oldTrackerCount-1].tier + 1;
     
-    tr_torrentSetAnnounceList(fHandle, trackerStructs, oldTrackerCount+1);
+    const tr_announce_list_err result = tr_torrentSetAnnounceList(fHandle, trackerStructs, oldTrackerCount+1);
     tr_free(trackerStructs);
     
-    return YES;
+    return result == TR_ANNOUNCE_LIST_OK;
 }
 
-- (void) removeTrackersWithAnnounceAddresses: (NSArray *) trackers
+- (void) removeTrackersWithAnnounceAddresses: (NSSet *) trackers
 {
     //recreate the tracker structure
     const int oldTrackerCount = fInfo->trackerCount;
@@ -740,13 +736,15 @@ int trashDataFile(const char * filename)
     NSInteger newCount = 0;
     for (NSInteger oldIndex = 0; oldIndex < oldTrackerCount; ++newCount, ++oldIndex)
     {
-        if (![trackers containsObject: [NSString stringWithUTF8String: fInfo->trackers[oldIndex].announce]])
+        if (![trackers member: [NSString stringWithUTF8String: fInfo->trackers[oldIndex].announce]])
             trackerStructs[newCount] = fInfo->trackers[oldIndex];
         else
             --newCount;
     }
     
-    tr_torrentSetAnnounceList(fHandle, trackerStructs, newCount);
+    const tr_announce_list_err result = tr_torrentSetAnnounceList(fHandle, trackerStructs, newCount);
+    NSAssert1(result == TR_ANNOUNCE_LIST_OK, @"Removing tracker addresses resulted in error: %d", result);
+    
     tr_free(trackerStructs);
 }
 
@@ -1478,6 +1476,24 @@ int trashDataFile(const char * filename)
         return 1;
     else //downloading
         return 2;
+}
+
+- (NSString *) trackerSortKey
+{
+    int count;
+    tr_tracker_stat * stats = tr_torrentTrackers(fHandle, &count);
+    
+    NSString * best = nil;
+    
+    for (int i=0; i < count; ++i)
+    {
+        NSString * tracker = [NSString stringWithUTF8String: stats[i].host];
+        if (!best || [tracker localizedCaseInsensitiveCompare: best] == NSOrderedAscending)
+            best = tracker;
+    }
+    
+    tr_torrentTrackersFree(stats, count);
+    return best;
 }
 
 - (tr_torrent *) torrentStruct

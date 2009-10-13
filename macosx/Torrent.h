@@ -28,7 +28,8 @@
 
 @class FileListNode;
 
-@interface Torrent : NSObject <QLPreviewItem>
+#warning uncomment
+@interface Torrent : NSObject //<QLPreviewItem>
 {
     tr_torrent * fHandle;
     const tr_info * fInfo;
@@ -129,9 +130,9 @@
 - (uint64_t) sizeLeft;
 
 - (NSMutableArray *) allTrackerStats;
-- (NSMutableArray *) allTrackersFlat; //used by GroupRules
+- (NSArray *) allTrackersFlat; //used by GroupRules
 - (BOOL) addTrackerToNewTier: (NSString *) tracker;
-- (void) removeTrackersWithAnnounceAddresses: (NSArray *) trackers;
+- (void) removeTrackersWithAnnounceAddresses: (NSSet *) trackers;
 
 - (NSString *) comment;
 - (NSString *) creator;
@@ -225,6 +226,7 @@
 - (BOOL) isStalled;
 
 - (NSInteger) stateSortKey;
+- (NSString *) trackerSortKey;
 
 - (tr_torrent *) torrentStruct;
 

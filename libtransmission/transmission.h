@@ -1101,6 +1101,15 @@ typedef struct tr_tracker_info
 }
 tr_tracker_info;
 
+
+typedef enum
+{
+  TR_ANNOUNCE_LIST_OK,
+  TR_ANNOUNCE_LIST_HAS_DUPLICATES,
+  TR_ANNOUNCE_LIST_HAS_BAD
+}
+tr_announce_list_err;
+
 /**
  * @brief Modify a torrent's tracker list.
  *
@@ -1113,9 +1122,10 @@ tr_tracker_info;
  *                 libtransmission derives `scrape' from `announce'.
  * @param trackerCount size of the `trackers' array
  */
-void tr_torrentSetAnnounceList( tr_torrent *            torrent,
-                                const tr_tracker_info * trackers,
-                                int                     trackerCount );
+tr_announce_list_err
+tr_torrentSetAnnounceList( tr_torrent             * torrent,
+                           const tr_tracker_info  * trackers,
+                           int                      trackerCount );
 
 
 /**
@@ -1230,6 +1240,25 @@ void           tr_torrentPeersFree( tr_peer_stat * peerStats,
 ****  tr_tracker_stat
 ***/
 
+typedef enum
+{
+    /* we won't (announce,scrape) this torrent to this tracker because
+     * the torrent is stopped, or because of an error, or whatever */
+    TR_TRACKER_INACTIVE,
+
+    /* we will (announce,scrape) this torrent to this tracker, and are
+     * waiting for enough time to pass to satisfy the tracker's interval */
+    TR_TRACKER_WAITING,
+
+    /* it's time to (announce,scrape) this torrent, and we're waiting on a
+     * a free slot to open up in the announce manager */
+    TR_TRACKER_QUEUED,
+
+    /* we're (announcing,scraping) this torrent right now */
+    TR_TRACKER_ACTIVE
+}
+tr_tracker_state;
+
 typedef struct
 {
     /* how many downloads this tracker knows of (-1 means it does not know) */
@@ -1241,21 +1270,21 @@ typedef struct
     /* whether or not we've ever scraped to this tracker */
     tr_bool hasScraped;
 
-    /* ex: legaltorrents.com */
+    /* ex: http://www.legaltorrents.com:7070 */
     char host[1024];
 
     /* the full announce URL */
     char announce[1024];
 
-    /* true if we're trying to use this tracker.
-       Transmission typically uses one tracker per tier. */
-    tr_bool isActive;
+    /* Transmission uses one tracker per tier,
+     * and the others are kept as backups */
+    tr_bool isBackup;
 
-    /* true if we've sent an announce and waiting for the response */
-    tr_bool isAnnouncing;
+    /* is the tracker announcing, waiting, queued, etc */
+    tr_tracker_state announceState;
 
-    /* true if we've got a scrape request pending right now */
-    tr_bool isScraping;
+    /* is the tracker scraping, waiting, queued, etc */
+    tr_tracker_state scrapeState;
 
     /* number of peers the tracker told us about last time.
      * if "lastAnnounceSucceeded" is false, this field is undefined */
@@ -1297,11 +1326,11 @@ typedef struct
     int leecherCount;
 
     /* when the next periodic announce message will be sent out.
-       if "willAnnounce" is false, this field is undefined */
+       if announceState isn't TR_TRACKER_WAITING, this field is undefined */
     time_t nextAnnounceTime;
 
     /* when the next periodic scrape message will be sent out.
-       if "willScrape" is false, this field is undefined */
+       if scrapeState isn't TR_TRACKER_WAITING, this field is undefined */
     time_t nextScrapeTime;
 
     /* number of seeders this tracker knows of (-1 means it does not know) */
@@ -1309,12 +1338,6 @@ typedef struct
 
     /* which tier this tracker is in */
     int tier;
-
-    /* true if the torrent's not announcing now, but will at nextAnnounceTime */
-    tr_bool willAnnounce;
-
-    /* true if we're not scraping now but will at nextScrapeTime */
-    tr_bool willScrape;
 }
 tr_tracker_stat;
 

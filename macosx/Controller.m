@@ -32,8 +32,12 @@
 #import "TorrentTableView.h"
 #import "CreatorWindowController.h"
 #import "StatsWindowController.h"
+#import "InfoWindowController.h"
+#import "PrefsController.h"
 #import "GroupsController.h"
 #import "AboutWindowController.h"
+#import "AddWindowController.h"
+#import "MessageWindowController.h"
 #import "ButtonToolbarItem.h"
 #import "GroupToolbarItem.h"
 #import "ToolbarSegmentedCell.h"
@@ -41,6 +45,8 @@
 #import "StatusBarView.h"
 #import "FilterButton.h"
 #import "BonjourController.h"
+#import "Badger.h"
+#import "DragOverlayWindow.h"
 #import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
 #import "ExpandedPathToPathTransformer.h"
@@ -169,28 +175,41 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 + (void) initialize
 {
     //make sure another Transmission.app isn't running already
-    NSString * bundleIdentifier = [[NSBundle mainBundle] bundleIdentifier];
-    int processIdentifier = [[NSProcessInfo processInfo] processIdentifier];
-
-    for (NSDictionary * dic in [[NSWorkspace sharedWorkspace] launchedApplications])
+    BOOL othersRunning = NO;
+    
+    if ([NSApp isOnSnowLeopardOrBetter])
     {
-        if ([[dic objectForKey: @"NSApplicationBundleIdentifier"] isEqualToString: bundleIdentifier]
-            && [[dic objectForKey: @"NSApplicationProcessIdentifier"] intValue] != processIdentifier)
+        NSArray * apps = [NSRunningApplicationSL runningApplicationsWithBundleIdentifier: [[NSBundle mainBundle] bundleIdentifier]];
+        othersRunning = [apps count] > 1;
+    }
+    else
+    {
+        NSString * bundleIdentifier = [[NSBundle mainBundle] bundleIdentifier];
+        const int processIdentifier = [[NSProcessInfo processInfo] processIdentifier];
+
+        for (NSDictionary * dic in [[NSWorkspace sharedWorkspace] launchedApplications])
         {
-            NSAlert * alert = [[NSAlert alloc] init];
-            [alert addButtonWithTitle: NSLocalizedString(@"Quit", "Transmission already running alert -> button")];
-            [alert setMessageText: NSLocalizedString(@"Transmission is already running.",
-                                                    "Transmission already running alert -> title")];
-            [alert setInformativeText: NSLocalizedString(@"There is already a copy of Transmission running. "
-                "This copy cannot be opened until that instance is quit.", "Transmission already running alert -> message")];
-            [alert setAlertStyle: NSWarningAlertStyle];
-            
-            [alert runModal];
-            [alert release];
-            
-            //kill ourselves right away
-            exit(0);
+            if ([[dic objectForKey: @"NSApplicationBundleIdentifier"] isEqualToString: bundleIdentifier]
+                    && [[dic objectForKey: @"NSApplicationProcessIdentifier"] intValue] != processIdentifier)
+                othersRunning = YES;
         }
+    }
+    
+    if (othersRunning)
+    {
+        NSAlert * alert = [[NSAlert alloc] init];
+        [alert addButtonWithTitle: NSLocalizedString(@"Quit", "Transmission already running alert -> button")];
+        [alert setMessageText: NSLocalizedString(@"Transmission is already running.",
+                                                "Transmission already running alert -> title")];
+        [alert setInformativeText: NSLocalizedString(@"There is already a copy of Transmission running. "
+            "This copy cannot be opened until that instance is quit.", "Transmission already running alert -> message")];
+        [alert setAlertStyle: NSCriticalAlertStyle];
+        
+        [alert runModal];
+        [alert release];
+        
+        //kill ourselves right away
+        exit(0);
     }
     
     [[NSUserDefaults standardUserDefaults] registerDefaults: [NSDictionary dictionaryWithContentsOfFile:
@@ -202,6 +221,27 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     
     ExpandedPathToIconTransformer * iconTransformer = [[[ExpandedPathToIconTransformer alloc] init] autorelease];
     [NSValueTransformer setValueTransformer: iconTransformer forName: @"ExpandedPathToIconTransformer"];
+    
+    //cover our asses
+    if ([[NSUserDefaults standardUserDefaults] boolForKey: @"WarningLegal"])
+    {
+        NSAlert * alert = [[NSAlert alloc] init];
+        [alert addButtonWithTitle: NSLocalizedString(@"I Accept", "Legal alert -> button")];
+        [alert addButtonWithTitle: NSLocalizedString(@"Quit", "Legal alert -> button")];
+        [alert setMessageText: NSLocalizedString(@"Hear ye, hear ye!", "Legal alert -> title")];
+        [alert setInformativeText: [NSString stringWithFormat: @"%@\n\n%@",
+            NSLocalizedString(@"Transmission is a file-sharing program. When you run a torrent, its data will"
+            " be made available to others by means of upload."
+            " And of course, any content you choose to share is your sole responsibility.", "Legal alert -> message"),
+            NSLocalizedString(@"You probably knew this already, so we won't tell you again.", "Legal alert -> message")]];
+        [alert setAlertStyle: NSInformationalAlertStyle];
+        
+        if ([alert runModal] == NSAlertSecondButtonReturn)
+            exit(0);
+        [alert release];
+        
+        [[NSUserDefaults standardUserDefaults] setBool: NO forKey: @"WarningLegal"];
+    }
 }
 
 - (id) init
@@ -292,6 +332,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         [PrefsController setHandle: fLib];
         fPrefsController = [[PrefsController alloc] init];
         
+        fQuitting = NO;
         fSoundPlaying = NO;
         
         tr_sessionSetAltSpeedFunc(fLib, altSpeedToggledCallback, self);
@@ -581,7 +622,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 
 - (BOOL) applicationShouldHandleReopen: (NSApplication *) app hasVisibleWindows: (BOOL) visibleWindows
 {
-    if (![fWindow isVisible] && ![[fPrefsController window] isVisible])
+    if (!visibleWindows)
         [fWindow makeKeyAndOrderFront: nil];
     return NO;
 }
@@ -625,6 +666,8 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 
 - (void) applicationWillTerminate: (NSNotification *) notification
 {
+    fQuitting = YES;
+    
     //stop the Bonjour service
     [[BonjourController defaultController] stop];
 
@@ -661,19 +704,13 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     //remember window states and close all windows
     [fDefaults setBool: [[fInfoController window] isVisible] forKey: @"InfoVisible"];
     
-    const BOOL quickLookOpen = [NSApp isOnSnowLeopardOrBetter] && [QLPreviewPanel sharedPreviewPanelExists]
-                                && [[QLPreviewPanel sharedPreviewPanel] isVisible];
-    for (NSWindow * window in [NSApp windows])
-    {
-        if (!quickLookOpen || window != [QLPreviewPanel sharedPreviewPanel]) //hide quicklook window last to avoid animation
-            [window orderOut: nil];
-    }
-    
+    const BOOL quickLookOpen = [NSApp isOnSnowLeopardOrBetter] && [QLPreviewPanelSL sharedPreviewPanelExists]
+                                && [[QLPreviewPanelSL sharedPreviewPanel] isVisible];
     if (quickLookOpen)
-    {
-        [[QLPreviewPanel sharedPreviewPanel] updateController];
-        [[QLPreviewPanel sharedPreviewPanel] orderOut: nil];
-    }
+        [[QLPreviewPanelSL sharedPreviewPanel] updateController];
+    
+    for (NSWindow * window in [NSApp windows])
+        [window orderOut: nil];
     
     [self showStatusBar: NO animate: NO];
     [self showFilterBar: NO animate: NO];
@@ -695,6 +732,8 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     
     [fAutoImportedNames release];
     [fPendingTorrentDownloads release];
+    
+    [fPreviewPanel release];
     
     //complete cleanup
     tr_sessionClose(fLib);
@@ -1480,6 +1519,11 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     {
         [fInfoController updateInfoStats];
         [[fInfoController window] orderFront: nil];
+        
+        if ([fInfoController canQuickLook]
+            && [QLPreviewPanelSL sharedPreviewPanelExists] && [[QLPreviewPanelSL sharedPreviewPanel] isVisible])
+            [[QLPreviewPanelSL sharedPreviewPanel] reloadData];
+        
     }
 }
 
@@ -1487,8 +1531,9 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 {
     [fInfoController setInfoForTorrents: [fTableView selectedTorrents]];
     
-    if ([NSApp isOnSnowLeopardOrBetter] && [QLPreviewPanel sharedPreviewPanelExists] && [[QLPreviewPanel sharedPreviewPanel] isVisible])
-        [[QLPreviewPanel sharedPreviewPanel] reloadData];
+    if ([NSApp isOnSnowLeopardOrBetter] && [QLPreviewPanelSL sharedPreviewPanelExists]
+        && [[QLPreviewPanelSL sharedPreviewPanel] isVisible])
+        [[QLPreviewPanelSL sharedPreviewPanel] reloadData];
 }
 
 - (void) setInfoTab: (id) sender
@@ -1835,6 +1880,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
             sortType = SORT_ACTIVITY;
             break;
         default:
+            NSAssert1(NO, @"Unknown sort tag received: %d", [sender tag]);
             return;
     }
     
@@ -1902,7 +1948,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         }
         else if ([sortType isEqualToString: SORT_TRACKER])
         {
-            NSSortDescriptor * trackerDescriptor = [[[NSSortDescriptor alloc] initWithKey: @"trackerAddressAnnounce" ascending: asc
+            NSSortDescriptor * trackerDescriptor = [[[NSSortDescriptor alloc] initWithKey: @"trackerSortKey" ascending: asc
                                                     selector: @selector(localizedCaseInsensitiveCompare:)] autorelease];
             
             descriptors = [[NSArray alloc] initWithObjects: trackerDescriptor, nameDescriptor, nil];
@@ -2243,6 +2289,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
             statusLabel = STATUS_TRANSFER_SESSION;
             break;
         default:
+            NSAssert1(NO, @"Unknown status label tag received: %d", [sender tag]);
             return;
     }
     
@@ -3075,6 +3122,89 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         [self toggleFilterBar: self];
 }
 
+#warning change from id to QLPreviewPanel
+- (BOOL) acceptsPreviewPanelControl: (id) panel
+{
+    return !fQuitting;
+}
+
+- (void) beginPreviewPanelControl: (id) panel
+{
+    fPreviewPanel = [panel retain];
+    [fPreviewPanel setDelegate: self];
+    [fPreviewPanel setDataSource: self];
+}
+
+- (void) endPreviewPanelControl: (id) panel
+{
+    [fPreviewPanel release];
+    fPreviewPanel = nil;
+}
+
+- (NSArray *) quickLookableTorrents
+{
+    NSArray * selectedTorrents = [fTableView selectedTorrents];
+    NSMutableArray * qlArray = [NSMutableArray arrayWithCapacity: [selectedTorrents count]];
+    
+    for (Torrent * torrent in selectedTorrents)
+        if (([torrent isFolder] || [torrent isComplete]) && [[NSFileManager defaultManager] fileExistsAtPath: [torrent dataLocation]])
+            [qlArray addObject: torrent];
+    
+    return qlArray;
+}
+
+- (NSInteger) numberOfPreviewItemsInPreviewPanel: (id) panel
+{
+    if ([fInfoController canQuickLook])
+        return [[fInfoController quickLookURLs] count];
+    else
+        return [[self quickLookableTorrents] count];
+}
+
+- (id /*<QLPreviewItem>*/) previewPanel: (id) panel previewItemAtIndex: (NSInteger) index
+{
+    if ([fInfoController canQuickLook])
+        return [[fInfoController quickLookURLs] objectAtIndex: index];
+    else
+        return [[self quickLookableTorrents] objectAtIndex: index];
+}
+
+- (BOOL) previewPanel: (id) panel handleEvent: (NSEvent *) event
+{
+    /*if ([event type] == NSKeyDown)
+    {
+        [super keyDown: event];
+        return YES;
+    }*/
+    
+    return NO;
+}
+
+- (NSRect) previewPanel: (id) panel sourceFrameOnScreenForPreviewItem: (id /*<QLPreviewItem>*/) item
+{
+    if ([fInfoController canQuickLook])
+        return [fInfoController quickLookSourceFrameForPreviewItem: item];
+    else
+    {
+        if (![fWindow isVisible])
+            return NSZeroRect;
+        
+        const NSInteger row = [fTableView rowForItem: item];
+        if (row == -1)
+            return NSZeroRect;
+        
+        NSRect frame = [fTableView iconRectForRow: row];
+        
+        if (!NSIntersectsRect([fTableView visibleRect], frame))
+                return NSZeroRect;
+        
+        frame.origin = [fTableView convertPoint: frame.origin toView: nil];
+        frame.origin = [fWindow convertBaseToScreen: frame.origin];
+        frame.origin.y -= frame.size.height;
+        return frame;
+    }
+}
+
 - (ButtonToolbarItem *) standardToolbarButtonWithIdentifier: (NSString *) ident
 {
     ButtonToolbarItem * item = [[ButtonToolbarItem alloc] initWithItemIdentifier: ident];
@@ -3259,6 +3389,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     else if ([ident isEqualToString: TOOLBAR_QUICKLOOK])
     {
         ButtonToolbarItem * item = [self standardToolbarButtonWithIdentifier: ident];
+        [[(NSButton *)[item view] cell] setShowsStateBy: NSContentsCellMask]; //blue when enabled
         
         [item setLabel: NSLocalizedString(@"Quick Look", "QuickLook toolbar item -> label")];
         [item setPaletteLabel: NSLocalizedString(@"Quick Look", "QuickLook toolbar item -> palette label")];
@@ -3266,8 +3397,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         [item setImage: [NSImage imageNamed: NSImageNameQuickLookTemplate]];
         [item setTarget: self];
         [item setAction: @selector(toggleQuickLook:)];
-        [item setAutovalidates: NO];
-        [item setEnabled: [NSApp isOnSnowLeopardOrBetter]];
         
         return item;
     }
@@ -3382,6 +3511,14 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         [(NSButton *)[toolbarItem view] setState: ![fFilterBar isHidden]];
         return YES;
     }
+    
+    //set quick look image
+    if ([ident isEqualToString: TOOLBAR_QUICKLOOK])
+    {
+        [(NSButton *)[toolbarItem view] setState: [NSApp isOnSnowLeopardOrBetter] && [QLPreviewPanelSL sharedPreviewPanelExists]
+                                                    && [[QLPreviewPanelSL sharedPreviewPanel] isVisible]];
+        return [NSApp isOnSnowLeopardOrBetter];
+    }
 
     return YES;
 }
@@ -3429,6 +3566,10 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
                 break;
             case SORT_ACTIVITY_TAG:
                 sortType = SORT_ACTIVITY;
+                break;
+            default:
+                NSAssert1(NO, @"Unknown sort tag received: %d", [menuItem tag]);
+                return;
         }
         
         [menuItem setState: [sortType isEqualToString: [fDefaults stringForKey: @"Sort"]] ? NSOnState : NSOffState];
@@ -3452,6 +3593,8 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
                 break;
             case STATUS_TRANSFER_SESSION_TAG:
                 statusLabel = STATUS_TRANSFER_SESSION;
+            default:
+                NSAssert1(NO, @"Unknown status label tag received: %d", [menuItem tag]);
         }
         
         [menuItem setState: [statusLabel isEqualToString: [fDefaults stringForKey: @"StatusLabel"]] ? NSOnState : NSOffState];
@@ -3732,9 +3875,17 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         return YES;
     }
     
-    //quick look only works on 10.6
     if (action == @selector(toggleQuickLook:))
+    {
+        const BOOL visible = [NSApp isOnSnowLeopardOrBetter] && [QLPreviewPanelSL sharedPreviewPanelExists]
+                                && [[QLPreviewPanelSL sharedPreviewPanel] isVisible];
+        //text consistent with Finder
+        NSString * title = !visible ? NSLocalizedString(@"Quick Look", "View menu -> Quick Look")
+                                    : NSLocalizedString(@"Close Quick Look", "View menu -> Quick Look");
+        [menuItem setTitle: title];
+        
         return [NSApp isOnSnowLeopardOrBetter];
+    }
     
     return YES;
 }
@@ -3988,10 +4139,10 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     if (![NSApp isOnSnowLeopardOrBetter])
         return;
     
-    if ([[QLPreviewPanel sharedPreviewPanel] isVisible])
-        [[QLPreviewPanel sharedPreviewPanel] orderOut: nil];
+    if ([[QLPreviewPanelSL sharedPreviewPanel] isVisible])
+        [[QLPreviewPanelSL sharedPreviewPanel] orderOut: nil];
     else
-        [[QLPreviewPanel sharedPreviewPanel] makeKeyAndOrderFront: nil];
+        [[QLPreviewPanelSL sharedPreviewPanel] makeKeyAndOrderFront: nil];
 }
 
 - (void) linkHomepage: (id) sender
@@ -4063,7 +4214,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         
         if (!torrent)
         {
-            [pool release];
+            [pool drain];
             
             NSLog(@"No torrent found matching the given torrent struct from the RPC callback!");
             return;
@@ -4095,7 +4246,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
             break;
         
         default:
-            NSLog(@"Unknown RPC command received (%d)", type);
+            NSAssert1(NO, @"Unknown RPC command received: %d", type);
             [torrent release];
     }
     

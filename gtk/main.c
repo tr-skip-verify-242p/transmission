@@ -344,7 +344,7 @@ main( int argc, char ** argv )
 #ifdef STATUS_ICON_SUPPORTED
         { "minimized",  'm', 0, G_OPTION_ARG_NONE,
           &startminimized,
-          _( "Start minimized in system tray" ), NULL },
+          _( "Start minimized in notification area" ), NULL },
 #endif
         { "config-dir", 'g', 0, G_OPTION_ARG_FILENAME, &configDir,
           _( "Where to look for configuration files" ), NULL },
@@ -540,6 +540,28 @@ appsetup( TrWindow *      wind,
         gtk_window_iconify( wind );
         gtk_window_set_skip_taskbar_hint( cbdata->wind,
                                           cbdata->icon != NULL );
+    }
+
+    if( !pref_flag_get( PREF_KEY_USER_HAS_GIVEN_INFORMED_CONSENT ) )
+    {
+        GtkWidget * w = gtk_message_dialog_new( GTK_WINDOW( wind ),
+                                                GTK_DIALOG_DESTROY_WITH_PARENT,
+                                                GTK_MESSAGE_INFO,
+                                                GTK_BUTTONS_NONE,
+                                                "%s",
+            _( "Transmission is a file sharing program.  When you run a torrent, its data will be made available to others by means of upload.  And of course, any content you share is your sole responsibility.\n\nYou probably knew this, so we won't tell you again." ) );
+        gtk_dialog_add_button( GTK_DIALOG( w ), GTK_STOCK_QUIT, GTK_RESPONSE_REJECT );
+        gtk_dialog_add_button( GTK_DIALOG( w ), _( "I Accept" ), GTK_RESPONSE_ACCEPT );
+        gtk_dialog_set_default_response( GTK_DIALOG( w ), GTK_RESPONSE_ACCEPT );
+        switch( gtk_dialog_run( GTK_DIALOG( w ) ) ) {
+            case GTK_RESPONSE_ACCEPT:
+                /* only show it once */
+                pref_flag_set( PREF_KEY_USER_HAS_GIVEN_INFORMED_CONSENT, TRUE );
+                gtk_widget_destroy( w );
+                break;
+            default:
+                exit( 0 );
+        }
     }
 }
 
