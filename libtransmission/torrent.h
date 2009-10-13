@@ -121,6 +121,7 @@ void             tr_torrentSave( tr_torrent * tor );
 
 void             tr_torrentSetLocalError( tr_torrent * tor, const char * fmt, ... ) TR_GNUC_PRINTF( 2, 3 );
 
+uint8_t*         tr_torrentTEXCalculateHash( tr_torrent * tor);
 
 
 typedef enum
@@ -228,6 +229,8 @@ struct tr_torrent
     tr_ratiolimit              ratioLimitMode;
 
     uint64_t                   preVerifyTotal;
+    
+    uint8_t                    trackerListHash[SHA_DIGEST_LENGTH];
 };
 
 /* get the index of this piece's first block */
@@ -304,9 +307,9 @@ static TR_INLINE tr_bool tr_torrentAllowsPex( const tr_torrent * tor )
 
 static TR_INLINE tr_bool tr_torrentAllowsTex( const tr_torrent * tor )
 {
-    /* BEP 28: check when TEX is allowed. The spec does not state anything about private torrents */
     return ( tor != NULL )
-        && ( tor->session->isTexEnabled );
+        && ( tor->session->isTexEnabled )
+        && ( !tr_torrentIsPrivate( tor ) );
 }
 
 static TR_INLINE tr_bool tr_torrentAllowsDHT( const tr_torrent * tor )

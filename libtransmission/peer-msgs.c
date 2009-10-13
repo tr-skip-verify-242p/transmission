@@ -193,6 +193,9 @@ struct tr_peermsgs
        supplied a reqq argument, it's stored here.  otherwise the
        value is zero and should be ignored. */
     int64_t               reqq;
+    
+    uint8_t             * peerTexHash;
+    time_t                peerTexHashChangedAt;
 
     struct event          pexTimer;
     struct event          texTimer;
@@ -1013,7 +1016,7 @@ sendLtepHandshake( tr_peermsgs * msgs )
     if( tex )
     {
         tr_bencDictAddInt( m, "ut_tex", TR_LTEP_TEX );
-        /* BEP 28: should add a 'tr' string key to 'val' dict containing the calculated torrent list hash */
+        tr_bencDictAddStr( &val, "tr", (char*)tr_torrentTEXCalculateHash( msgs->torrent ));
     }
     buf = tr_bencToStr( &val, TR_FMT_BENC, &len );
 
@@ -1067,10 +1070,28 @@ parseLtepHandshake( tr_peermsgs *     msgs,
         }
         /* BEP 28: Tracker Exchange extension */
         if( tr_bencDictFindInt( sub, "ut_tex", &i ) ) {
+            const uint8_t *trackerHash;
+            size_t trackerHashLen;
+            
             msgs->ut_tex_id = (uint8_t) i;
             msgs->peerSupportsTex = msgs->ut_tex_id == 0 ? 0 : 1;
-            /* BEP 28: should store the peer 'tr' key */
             dbgmsg( msgs, "msgs->ut_tex is %d", (int)msgs->ut_tex_id );
+            
+            /* Parse the 'tr' key, and act accordingly */
+            if( tr_bencDictFindRaw( &val, "tr", &trackerHash, &trackerHashLen ) )
+            {
+                assert( trackerHashLen == SHA_DIGEST_LENGTH );
+                
+                if( memcmp( msgs->peerTexHash, trackerHash, SHA_DIGEST_LENGTH) != 0 )
+                {
+                    msgs->peerTexHash = tr_memdup( trackerHash, SHA_DIGEST_LENGTH );
+                    msgs->peerTexHashChangedAt = time( NULL );
+                }
+                else
+                    msgs->peerTexHashChangedAt = 0;
+            }
+            else
+                dbgmsg( msgs, "missing tr key" );
         }
     }
 
@@ -1150,7 +1171,7 @@ parseUtPex( tr_peermsgs * msgs, int msglen, struct evbuffer * inbuf )
 static void
 parseUtTex( tr_peermsgs * msgs, int msglen, struct evbuffer * inbuf )
 {
-    /* BEP 28 */
+    /* BEP 28 : TODO */
 }
 
 static void sendPex( tr_peermsgs * msgs );
@@ -2182,7 +2203,28 @@ sendTex( struct tr_peermsgs * msgs )
 {
     if( msgs->peerSupportsTex && tr_torrentAllowsTex( msgs->torrent ) )
     {
-        /* BEP 28 */
+        tr_benc val, *addedList;
+        char *benc;
+        int bencLen;
+        tr_peerIo       * io  = msgs->peer->io;
+        struct evbuffer * out = msgs->outMessages;
+        
+        tr_bencInitDict( &val, 2 );
+        addedList = tr_bencDictAddList( &val, "added", 2 );
+        while( 0 )
+        {
+            /* BEP 28 : TODO */
+        }
+        
+        /* write the pex message */
+/*        benc = tr_bencToStr( &val, TR_FMT_BENC, &bencLen );
+        tr_peerIoWriteUint32( io, out, 2 * sizeof( uint8_t ) + bencLen );
+        tr_peerIoWriteUint8 ( io, out, BT_LTEP );
+        tr_peerIoWriteUint8 ( io, out, msgs->ut_tex_id );
+        tr_peerIoWriteBytes ( io, out, benc, bencLen );
+        pokeBatchPeriod( msgs, HIGH_PRIORITY_INTERVAL_SECS );
+        dbgmsg( msgs, "sending a tex message; outMessage size is now %zu", EVBUFFER_LENGTH( out ) );
+        dbgOutMessageLen( msgs );*/
     }
 }
 

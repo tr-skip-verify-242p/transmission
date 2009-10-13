@@ -2483,3 +2483,35 @@ tr_torrentCheckSeedRatio( tr_torrent * tor )
         }
     }
 }
+
+uint8_t*
+tr_torrentTEXCalculateHash( tr_torrent * tor )
+{
+    if( tr_torrentAllowsTex( tor ) && tor->trackerListHash[0] == '\0' )
+    {
+        int trackerIndex = 0;
+        int trackerListLength = 0;
+        uint8_t * trackerList = NULL;
+        
+        while( trackerIndex < tor->info.trackerCount )
+        {
+            /* Fetch the tracker announce URL */
+            char * announceURL = tor->info.trackers[trackerIndex].announce;
+            size_t announceLen = strlen( announceURL ) + 1; /* for ending NULL */
+            
+            trackerList = realloc( trackerList, trackerListLength + announceLen );
+            
+            /* BEP 28 : Normalize */
+            tr_strlcpy((char *)trackerList + trackerListLength, announceURL, announceLen );
+            
+            trackerListLength += announceLen;
+            trackerIndex++;
+        }
+        
+        tr_sha1( tor->trackerListHash, trackerList, trackerListLength );
+        
+        free( trackerList );
+    }
+    
+    return tor->trackerListHash;
+}
