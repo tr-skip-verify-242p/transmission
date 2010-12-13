@@ -180,6 +180,15 @@ PrefsDialog :: createProxyTab( )
     myProxyWidgets << l << r;
     l = hig->addRow( tr( "Proxy &port:" ), r = spinBoxNew( Prefs::PROXY_PORT, 1, 65535, 1 ) );
     myProxyWidgets << l << r;
+    QComboBox *combo = new QComboBox;
+    const QIcon noIcon;
+    combo->addItem(  noIcon, "HTTP", QVariant( TR_PROXY_HTTP ) );
+    combo->addItem(  noIcon, "SOCKS4", QVariant( TR_PROXY_SOCKS4 ) );
+    combo->addItem(  noIcon, "SOCKS5", QVariant( TR_PROXY_SOCKS5 ) );
+    combo->setCurrentIndex( combo->findData( myPrefs.getInt( Prefs :: PROXY_TYPE ) ) );
+    connect( combo, SIGNAL(activated(int)), this, SLOT(proxyTypeEdited(int)) );
+    l = hig->addRow( tr( "Proxy &type:" ), combo );
+    myProxyWidgets << l << combo;
     hig->addWideControl( l = checkBoxNew( tr( "Use &authentication" ), Prefs::PROXY_AUTH_ENABLED ) );
     myProxyWidgets << l;
     l = hig->addRow( tr( "&Username:" ), r = lineEditNew( Prefs::PROXY_USERNAME ) );
@@ -236,6 +245,12 @@ PrefsDialog :: altSpeedDaysEdited( int i )
     setPref( Prefs::ALT_SPEED_LIMIT_TIME_DAY, value );
 }
 
+void
+PrefsDialog :: proxyTypeEdited( int i )
+{
+    const int value = qobject_cast<QComboBox*>(sender())->itemData(i).toInt();
+    setPref( Prefs::PROXY_TYPE, value );
+}
 
 QWidget *
 PrefsDialog :: createSpeedTab( )
