@@ -55,6 +55,7 @@ class PrefsDialog: public QDialog
         void onLocationSelected( const QString&, int key );
         void onPortTested( bool );
         void onPortTest( );
+        void proxyTypeEdited( int );
 
         void onUpdateBlocklistClicked( );
         void onUpdateBlocklistCancelled( );
