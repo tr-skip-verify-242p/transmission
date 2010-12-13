@@ -123,6 +123,14 @@ TrMainWindow :: TrMainWindow( Session& session, Prefs& prefs, TorrentModel& mode
     ui.action_Contents->setIcon( getStockIcon( "help-contents", QStyle::SP_DialogHelpButton ) );
     ui.action_About->setIcon( getStockIcon( "help-about" ) );
 
+    // ui version compatibility
+#if QT_VERSION >= 0x040600
+    ui.action_Start->setPriority(QAction::LowPriority);
+    ui.action_Pause->setPriority(QAction::LowPriority);
+    ui.action_Remove->setPriority(QAction::LowPriority);
+    ui.toolBar->setToolButtonStyle(QT::ToolButtonFollowStyle);
+#endif
+
     // ui signals
     connect( ui.action_Toolbar, SIGNAL(toggled(bool)), this, SLOT(setToolbarVisible(bool)));
     connect( ui.action_Filterbar, SIGNAL(toggled(bool)), this, SLOT(setFilterbarVisible(bool)));
