@@ -31,6 +31,7 @@
 #include "options.h"
 #include "prefs.h"
 #include "prefs-dialog.h"
+#include "qticonloader.h"
 #include "relocate.h"
 #include "session.h"
 #include "session-dialog.h"
@@ -48,7 +49,7 @@
 QIcon
 TrMainWindow :: getStockIcon( const QString& name, int fallback )
 {
-    QIcon icon = QIcon::fromTheme( name );
+    QIcon icon = QtIconLoader::icon( name );
 
     if( icon.isNull( ) && ( fallback >= 0 ) )
         icon = style()->standardIcon( QStyle::StandardPixmap( fallback ), 0, this );

@@ -50,6 +50,7 @@ SOURCES += about.cc \
            options.cc \
            prefs.cc \
            prefs-dialog.cc \
+           qticonloader.cc \
            relocate.cc \
            session.cc \
            session-dialog.cc \
