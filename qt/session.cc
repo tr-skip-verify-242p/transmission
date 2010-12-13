@@ -220,6 +220,35 @@ Session :: updatePref( int key )
                 tr_sessionSetRPCWhitelist( mySession, myPrefs.getString(key).toUtf8().constData() );
             break;
 
+        case Prefs :: PROXY_ENABLED:
+            if( mySession )
+                tr_sessionSetProxyEnabled( mySession, myPrefs.getBool(key) );
+            break;
+        case Prefs :: PROXY:
+            if( mySession )
+                tr_sessionSetProxy( mySession, myPrefs.getString(key).toUtf8().constData() );
+            break;
+        case Prefs :: PROXY_PORT:
+            if( mySession )
+                tr_sessionSetProxyPort( mySession, myPrefs.getInt(key) );
+            break;
+        case Prefs :: PROXY_TYPE:
+            if( mySession )
+                tr_sessionSetProxyType( mySession, (tr_proxy_type) myPrefs.getInt(key) );
+            break;
+        case Prefs :: PROXY_AUTH_ENABLED:
+            if( mySession )
+                tr_sessionSetProxyAuthEnabled( mySession, myPrefs.getBool(key) );
+            break;
+        case Prefs :: PROXY_USERNAME:
+            if( mySession )
+                tr_sessionSetProxyUsername( mySession, myPrefs.getString(key).toUtf8().constData() );
+            break;
+        case Prefs :: PROXY_PASSWORD:
+            if( mySession )
+                tr_sessionSetProxyPassword( mySession, myPrefs.getString(key).toUtf8().constData() );
+            break;
+
         default:
             std::cerr << "unhandled pref: " << key << std::endl;
     }
