@@ -169,7 +169,7 @@ PrefsDialog :: lineEditNew( int key, int echoMode )
 ***/
 
 QWidget *
-PrefsDialog :: createTrackerTab( )
+PrefsDialog :: createProxyTab( )
 {
     QWidget *l, *r;
     HIG * hig = new HIG( );
@@ -628,7 +628,7 @@ PrefsDialog :: PrefsDialog( Session& session, Prefs& prefs, QWidget * parent ):
     t->addTab( createNetworkTab( ),      tr( "Network" ) );
     t->addTab( createDesktopTab( ),      tr( "Desktop" ) );
     t->addTab( createWebTab( session ),  tr( "Web" ) );
-    t->addTab( createTrackerTab( ),      tr( "Trackers" ) );
+    t->addTab( createProxyTab( ),        tr( "Proxy" ) );
     myLayout->addWidget( t );
 
     QDialogButtonBox * buttons = new QDialogButtonBox( QDialogButtonBox::Close, Qt::Horizontal, this );

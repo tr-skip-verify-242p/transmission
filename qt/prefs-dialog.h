@@ -83,7 +83,7 @@ class PrefsDialog: public QDialog
         QWidget * createNetworkTab( );
         QWidget * createDesktopTab( );
         QWidget * createWebTab( Session& );
-        QWidget * createTrackerTab( );
+        QWidget * createProxyTab( );
 
     private:
         typedef QMap<int,QWidget*> key2widget_t;
