@@ -39,6 +39,8 @@
 
 
 #include "qticonloader.h"
+
+#if QT_VERSION < 0x040600
 #include <QtGui/QPixmapCache>
 
 #include <QtCore/QList>
@@ -87,6 +89,7 @@ private:
 
 Q_GLOBAL_STATIC(QtIconLoaderImplementation, iconLoaderInstance)
 #endif
+#endif //QT_VERSION < 0x040600
 
 /*!
 
@@ -117,9 +120,10 @@ QIcon QtIconLoader::icon(const QString &name, const QIcon &fallback)
         icon = fallback;
     Q_UNUSED(name);
     return icon;
-#endif // QT_VERSION >= 0x040600
+#endif //QT_VERSION >= 0x040600
 }
 
+#if QT_VERSION < 0x040600
 #ifdef Q_WS_X11
 
 QtIconLoaderImplementation::QtIconLoaderImplementation()
@@ -342,3 +346,4 @@ QPixmap QtIconLoaderImplementation::findIcon(int size, const QString &name) cons
     return pixmap;
 }
 #endif //Q_WS_X11
+#endif //QT_VERSION < 0x040600
