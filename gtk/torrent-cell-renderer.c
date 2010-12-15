@@ -283,6 +283,11 @@ getStatusString( const tr_torrent  * tor,
                     torStat->webseedsSendingToUs,
                     torStat->peersConnected +
                     torStat->webseedsSendingToUs );
+                g_string_append( gstr, " - " );
+                g_string_append_printf( gstr,
+                    _( "Swarm seeders/leechers: %d/%d" ),
+                    torStat->swarmSeeders,
+                    torStat->swarmLeechers );
             }
             else
             {
