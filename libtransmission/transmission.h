@@ -1798,6 +1798,18 @@ typedef struct tr_stat
     /** Number of webseeds that are sending data to us. */
     int    webseedsSendingToUs;
 
+    /** Reported number of seeders for this torrent as obtained
+        from the tracker. In case of multiple trackers, this
+        value will be the maximum of the reported seed counts
+        from all trackers. This value will also not be smaller
+        than the number of known seeds obtained from other sources
+        (DHT, PEX, etc.). */
+    int    swarmSeeders;
+
+    /** Reported number of leechers for this torrent. Same
+        caveats as with swarmSeeders. */
+    int    swarmLeechers;
+
     /** Byte count of all the piece data we'll have downloaded when we're done,
         whether or not we have it yet.  This may be less than tr_info.totalSize
         if only some of the torrent's files are wanted.

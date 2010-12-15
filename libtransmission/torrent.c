@@ -1100,6 +1100,9 @@ tr_torrentStat( tr_torrent * tor )
     uint64_t                seedRatioBytesGoal;
     tr_bool                 seedRatioApplies;
     uint16_t                seedIdleMinutes;
+    tr_tracker_stat *       tracker_stats;
+    int                     tracker_count;
+    int                     tracker_index;
 
     if( !tor )
         return NULL;
@@ -1134,6 +1137,17 @@ tr_torrentStat( tr_torrent * tor )
     s->pieceDownloadSpeed_KBps = toSpeedKBps( d + tr_bandwidthGetPieceSpeed_Bps( tor->bandwidth, now, TR_DOWN ) );
 
     usableSeeds += tor->info.webseedCount;
+
+    s->swarmSeeders = usableSeeds;
+    s->swarmLeechers = MAX(0, s->peersKnown - s->swarmSeeders);
+    tracker_stats = tr_torrentTrackers( tor, &tracker_count );
+    for( tracker_index = 0; tracker_index < tracker_count; ++tracker_index )
+    {
+        const tr_tracker_stat * st = &tracker_stats[tracker_index];
+        s->swarmSeeders = MAX( s->swarmSeeders, st->seederCount );
+        s->swarmLeechers = MAX( s->swarmLeechers, st->leecherCount );
+    }
+    tr_torrentTrackersFree( tracker_stats, tracker_count );
 
     s->percentComplete = tr_cpPercentComplete ( &tor->completion );
     s->metadataPercentComplete = tr_torrentGetMetadataPercent( tor );
