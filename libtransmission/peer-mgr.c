@@ -3374,7 +3374,10 @@ isPeerCandidate( const tr_torrent * tor, struct peer_atom * atom, const time_t n
 
     /* not if they're blocklisted */
     if( isAtomBlocklisted( tor->session, atom ) )
+    {
+        tr_torinf( tor, "Rejecting blocklisted peer \"%s\"", tr_atomAddrStr( atom ) );
         return FALSE;
+    }
 
     /* not if they're banned... */
     if( atom->myflags & MYFLAG_BANNED )
