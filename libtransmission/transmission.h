@@ -1802,7 +1802,8 @@ typedef struct tr_stat
         from the tracker. In case of multiple trackers, this
         value will be the maximum of the reported seed counts
         from all trackers. This value will also not be smaller
-        than the number of currently connected seeds. */
+        than the number of currently connected seeds. Webseeds
+        are not included. */
     int    swarmSeeders;
 
     /** Reported number of leechers for this torrent. Same
