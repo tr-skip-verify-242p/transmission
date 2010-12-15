@@ -1136,10 +1136,8 @@ tr_torrentStat( tr_torrent * tor )
     s->rawDownloadSpeed_KBps   = toSpeedKBps( d + tr_bandwidthGetRawSpeed_Bps  ( tor->bandwidth, now, TR_DOWN ) );
     s->pieceDownloadSpeed_KBps = toSpeedKBps( d + tr_bandwidthGetPieceSpeed_Bps( tor->bandwidth, now, TR_DOWN ) );
 
-    usableSeeds += tor->info.webseedCount;
-
-    s->swarmSeeders = usableSeeds;
-    s->swarmLeechers = MAX(0, s->peersKnown - s->swarmSeeders);
+    s->swarmSeeders = 0;
+    s->swarmLeechers = 0;
     tracker_stats = tr_torrentTrackers( tor, &tracker_count );
     for( tracker_index = 0; tracker_index < tracker_count; ++tracker_index )
     {
@@ -1148,6 +1146,10 @@ tr_torrentStat( tr_torrent * tor )
         s->swarmLeechers = MAX( s->swarmLeechers, st->leecherCount );
     }
     tr_torrentTrackersFree( tracker_stats, tracker_count );
+    s->swarmSeeders = MAX( s->swarmSeeders, usableSeeds );
+    s->swarmLeechers = MAX( s->swarmLeechers, s->peersConnected - usableSeeds );
+
+    usableSeeds += tor->info.webseedCount;
 
     s->percentComplete = tr_cpPercentComplete ( &tor->completion );
     s->metadataPercentComplete = tr_torrentGetMetadataPercent( tor );
