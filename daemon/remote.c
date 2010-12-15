@@ -243,6 +243,7 @@ static tr_option opts[] =
     { 'g', "get",                    "Mark files for download", "g",  1, "<files>" },
     { 'G', "no-get",                 "Mark files for not downloading", "G",  1, "<files>" },
     { 'i', "info",                   "Show the current torrent(s)' details", "i",  0, NULL },
+    { 'j', "json",                   "Output response in JSON format", "j",  0, NULL },
     { 940, "info-files",             "List the current torrent(s)' files", "if",  0, NULL },
     { 941, "info-peers",             "List the current torrent(s)' peers", "ip",  0, NULL },
     { 942, "info-pieces",            "List the current torrent(s)' pieces", "ic",  0, NULL },
@@ -349,6 +350,7 @@ getOptMode( int val )
         case TR_OPT_UNK:
         case 'a': /* add torrent */
         case 'b': /* debug */
+        case 'j': /* output json */
         case 'n': /* auth */
         case 'N': /* netrc */
         case 't': /* set current torrent */
@@ -466,6 +468,7 @@ getOptMode( int val )
 }
 
 static tr_bool debug = 0;
+static tr_bool output_json = 0;
 static char * auth = NULL;
 static char * netrc = NULL;
 static char * sessionId = NULL;
@@ -1594,7 +1597,11 @@ processResponse( const char * host, int port, const void * response, size_t len 
         fprintf( stderr, "got response (len %d):\n--------\n%*.*s\n--------\n",
                  (int)len, (int)len, (int)len, (const char*) response );
 
-    if( tr_jsonParse( NULL, response, len, &top, NULL ) )
+    if( output_json )
+    {
+        printf( "%s", (const char*) response );
+    }
+    else if( tr_jsonParse( NULL, response, len, &top, NULL ) )
     {
         tr_nerr( MY_NAME, "Unable to parse response \"%*.*s\"", (int)len,
                  (int)len, (char*)response );
@@ -1813,6 +1820,10 @@ processArgs( const char * host, int port, int argc, const char ** argv )
 
                 case 'b': /* debug */
                     debug = TRUE;
+                    break;
+
+                case 'j': /* output json */
+                    output_json = TRUE;
                     break;
 
                 case 'n': /* auth */
