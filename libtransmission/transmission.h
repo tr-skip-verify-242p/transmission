@@ -1839,6 +1839,13 @@ typedef struct tr_stat
     /** Number of peers that we're connected to */
     int    peersConnected;
 
+    /** Number of seeding peers that we're connected to.
+        Does not include webseeds. */
+    int    seedersConnected;
+
+    /** Number of non-seed peers that we're connected to. */
+    int    leechersConnected;
+
     /** How many peers we found out about from the tracker, or from pex,
         or from incoming connections, or from our resume file. */
     int    peersFrom[TR_PEER_FROM__MAX];
@@ -1851,6 +1858,18 @@ typedef struct tr_stat
 
     /** Number of webseeds that are sending data to us. */
     int    webseedsSendingToUs;
+
+    /** Reported number of seeders for this torrent as obtained
+        from the tracker. In case of multiple trackers, this
+        value will be the maximum of the reported seed counts
+        from all trackers. This value will also not be smaller
+        than the number of currently connected seeds.
+        Does not include webseeds. */
+    int    swarmSeeders;
+
+    /** Reported number of leechers for this torrent. Same
+        caveats as with swarmSeeders for multiple trackers. */
+    int    swarmLeechers;
 
     /** Byte count of all the piece data we'll have downloaded when we're done,
         whether or not we have it yet.  This may be less than tr_info.totalSize

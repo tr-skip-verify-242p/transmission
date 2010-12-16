@@ -1100,6 +1100,9 @@ tr_torrentStat( tr_torrent * tor )
     uint64_t                seedRatioBytesGoal;
     tr_bool                 seedRatioApplies;
     uint16_t                seedIdleMinutes;
+    tr_tracker_stat *       tracker_stats;
+    int                     tracker_count;
+    int                     tracker_index;
 
     if( !tor )
         return NULL;
@@ -1120,11 +1123,13 @@ tr_torrentStat( tr_torrent * tor )
     tr_peerMgrTorrentStats( tor,
                             &s->peersKnown,
                             &s->peersConnected,
-                            &usableSeeds,
+                            &s->seedersConnected,
                             &s->webseedsSendingToUs,
                             &s->peersSendingToUs,
                             &s->peersGettingFromUs,
                             s->peersFrom );
+    usableSeeds = s->seedersConnected;
+    s->leechersConnected = s->peersConnected - s->seedersConnected;
 
     now = tr_time_msec( );
     d = tr_peerMgrGetWebseedSpeed_Bps( tor, now );
@@ -1132,6 +1137,19 @@ tr_torrentStat( tr_torrent * tor )
     s->pieceUploadSpeed_KBps   = toSpeedKBps( tr_bandwidthGetPieceSpeed_Bps( tor->bandwidth, now, TR_UP ) );
     s->rawDownloadSpeed_KBps   = toSpeedKBps( d + tr_bandwidthGetRawSpeed_Bps  ( tor->bandwidth, now, TR_DOWN ) );
     s->pieceDownloadSpeed_KBps = toSpeedKBps( d + tr_bandwidthGetPieceSpeed_Bps( tor->bandwidth, now, TR_DOWN ) );
+
+    s->swarmSeeders = 0;
+    s->swarmLeechers = 0;
+    tracker_stats = tr_torrentTrackers( tor, &tracker_count );
+    for( tracker_index = 0; tracker_index < tracker_count; ++tracker_index )
+    {
+        const tr_tracker_stat * st = &tracker_stats[tracker_index];
+        s->swarmSeeders = MAX( s->swarmSeeders, st->seederCount );
+        s->swarmLeechers = MAX( s->swarmLeechers, st->leecherCount );
+    }
+    tr_torrentTrackersFree( tracker_stats, tracker_count );
+    s->swarmSeeders = MAX( s->swarmSeeders, usableSeeds );
+    s->swarmLeechers = MAX( s->swarmLeechers, s->peersConnected - usableSeeds );
 
     usableSeeds += tor->info.webseedCount;
 
