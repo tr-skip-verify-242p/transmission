@@ -1123,11 +1123,13 @@ tr_torrentStat( tr_torrent * tor )
     tr_peerMgrTorrentStats( tor,
                             &s->peersKnown,
                             &s->peersConnected,
-                            &usableSeeds,
+                            &s->seedersConnected,
                             &s->webseedsSendingToUs,
                             &s->peersSendingToUs,
                             &s->peersGettingFromUs,
                             s->peersFrom );
+    usableSeeds = s->seedersConnected;
+    s->leechersConnected = s->peersConnected - s->seedersConnected;
 
     now = tr_time_msec( );
     d = tr_peerMgrGetWebseedSpeed_Bps( tor, now );

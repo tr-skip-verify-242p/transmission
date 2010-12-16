@@ -222,11 +222,14 @@ getShortStatusString( const tr_torrent  * tor,
         case TR_STATUS_SEED:
         {
             char buf[512];
-            /* 1==seeder symbol, 2==seeder count, 3==leecher symbol, 4==leecher count */
-            g_string_append_printf( gstr, _( "%1$s %2$d  %3$s %4$d" ),
+            /* 1==seeder symbol, 2==seeders connected, 3==seeder count,
+               4==leecher symbol, 5==leechers connected, 6==leecher count */
+            g_string_append_printf( gstr, _( "%1$s %2$d/%3$d  %4$s %5$d/%6$d" ),
                                     gtr_get_unicode_string( GTR_UNICODE_SEEDER ),
+                                    torStat->seedersConnected,
                                     torStat->swarmSeeders,
                                     gtr_get_unicode_string( GTR_UNICODE_LEECHER ),
+                                    torStat->leechersConnected,
                                     torStat->swarmLeechers );
             g_string_append( gstr, " - " );
 

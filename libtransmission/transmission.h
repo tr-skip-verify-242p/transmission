@@ -1785,6 +1785,12 @@ typedef struct tr_stat
     /** Number of peers that we're connected to */
     int    peersConnected;
 
+    /** Number of seeding peers that we're connected to */
+    int    seedersConnected;
+
+    /** Number of non-seed peers that we're connected to */
+    int    leechersConnected;
+
     /** How many peers we found out about from the tracker, or from pex,
         or from incoming connections, or from our resume file. */
     int    peersFrom[TR_PEER_FROM__MAX];
