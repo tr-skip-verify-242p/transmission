@@ -222,6 +222,14 @@ getShortStatusString( const tr_torrent  * tor,
         case TR_STATUS_SEED:
         {
             char buf[512];
+            /* 1==seeder symbol, 2==seeder count, 3==leecher symbol, 4==leecher count */
+            g_string_append_printf( gstr, _( "%1$s %2$d  %3$s %4$d" ),
+                                    gtr_get_unicode_string( GTR_UNICODE_SEEDER ),
+                                    torStat->swarmSeeders,
+                                    gtr_get_unicode_string( GTR_UNICODE_LEECHER ),
+                                    torStat->swarmLeechers );
+            g_string_append( gstr, " - " );
+
             if( torStat->activity != TR_STATUS_DOWNLOAD )
             {
                 tr_strlratio( buf, torStat->ratio, sizeof( buf ) );
@@ -285,7 +293,7 @@ getStatusString( const tr_torrent  * tor,
                     torStat->webseedsSendingToUs );
                 g_string_append( gstr, " - " );
                 g_string_append_printf( gstr,
-                    _( "Swarm seeders/leechers: %d/%d" ),
+                    _( "Swarm has %d seeders, %d leechers" ),
                     torStat->swarmSeeders,
                     torStat->swarmLeechers );
             }
