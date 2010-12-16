@@ -226,8 +226,10 @@ getShortStatusString( const tr_torrent  * tor,
                4==leecher symbol, 5==leechers connected, 6==leecher count */
             g_string_append_printf( gstr, _( "%1$s %2$d/%3$d  %4$s %5$d/%6$d" ),
                                     gtr_get_unicode_string( GTR_UNICODE_SEEDER ),
-                                    torStat->seedersConnected,
-                                    torStat->swarmSeeders,
+                                    torStat->seedersConnected +
+                                    torStat->webseedsSendingToUs,
+                                    torStat->swarmSeeders +
+                                    torStat->webseedsSendingToUs,
                                     gtr_get_unicode_string( GTR_UNICODE_LEECHER ),
                                     torStat->leechersConnected,
                                     torStat->swarmLeechers );
@@ -297,7 +299,8 @@ getStatusString( const tr_torrent  * tor,
                 g_string_append( gstr, " - " );
                 g_string_append_printf( gstr,
                     _( "Swarm has %d seeders, %d leechers" ),
-                    torStat->swarmSeeders,
+                    torStat->swarmSeeders +
+                    torStat->webseedsSendingToUs,
                     torStat->swarmLeechers );
             }
             else
