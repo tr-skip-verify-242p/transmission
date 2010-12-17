@@ -41,6 +41,7 @@ libtransmission_a_SOURCES = \
     peer-io.c \
     peer-mgr.c \
     peer-msgs.c \
+    peer-proxy.c \
     platform.c \
     port-forwarding.c \
     ptrarray.c \
@@ -92,6 +93,7 @@ noinst_HEADERS = \
     peer-io.h \
     peer-mgr.h \
     peer-msgs.h \
+    peer-proxy.h \
     platform.h \
     port-forwarding.h \
     ptrarray.h \

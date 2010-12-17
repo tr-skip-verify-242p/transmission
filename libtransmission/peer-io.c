@@ -378,6 +378,31 @@ maybeSetCongestionAlgorithm( int socket, const char * algorithm )
     }
 }
 
+static int
+openOutgoingPeerSocket( tr_session        * session,
+                        const tr_address  * addr,
+                        tr_port             port,
+                        tr_bool             clientIsSeed,
+                        tr_bool             useProxy)
+{
+    int fd = -1;
+    if( useProxy )
+    {
+        tr_address proxy_addr;
+        if( tr_pton( tr_sessionGetPeerProxy( session ), &proxy_addr ) )
+        {
+            tr_port proxy_port = tr_sessionGetPeerProxyPort( session );
+            fd = tr_netOpenPeerSocket( session, &proxy_addr, proxy_port, clientIsSeed );
+        }
+    }
+    else
+    {
+        fd = tr_netOpenPeerSocket( session, addr, port, clientIsSeed );
+    }
+
+    return fd;
+}
+
 static tr_peerIo*
 tr_peerIoNew( tr_session       * session,
               tr_bandwidth     * parent,
@@ -419,6 +444,9 @@ tr_peerIoNew( tr_session       * session,
     tr_bandwidthSetPeer( &io->bandwidth, io );
     dbgmsg( io, "bandwidth is %p; its parent is %p", &io->bandwidth, parent );
 
+    if( tr_sessionIsPeerProxyEnabled( session ) && !io->isIncoming )
+        io->isProxied = TRUE;
+
     event_set( &io->event_read, io->socket, EV_READ, event_read_cb, io );
     event_set( &io->event_write, io->socket, EV_WRITE, event_write_cb, io );
 
@@ -453,8 +481,9 @@ tr_peerIoNewOutgoing( tr_session        * session,
     assert( tr_isAddress( addr ) );
     assert( torrentHash );
 
-    fd = tr_netOpenPeerSocket( session, addr, port, isSeed );
-    dbgmsg( NULL, "tr_netOpenPeerSocket returned fd %d", fd );
+    fd = openOutgoingPeerSocket( session, addr, port, isSeed,
+                                 tr_sessionIsPeerProxyEnabled( session ) );
+    dbgmsg( NULL, "openOutgoingPeerSocket returned fd %d", fd );
 
     return fd < 0 ? NULL
                   : tr_peerIoNew( session, parent, addr, port, torrentHash, FALSE, isSeed, fd );
@@ -661,7 +690,8 @@ tr_peerIoReconnect( tr_peerIo * io )
     if( io->socket >= 0 )
         tr_netClose( session, io->socket );
 
-    io->socket = tr_netOpenPeerSocket( session, &io->addr, io->port, io->isSeed );
+    io->socket = openOutgoingPeerSocket( session, &io->addr, io->port,
+                                         io->isSeed, io->isProxied );
     event_set( &io->event_read, io->socket, EV_READ, event_read_cb, io );
     event_set( &io->event_write, io->socket, EV_WRITE, event_write_cb, io );
 

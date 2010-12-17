@@ -70,6 +70,7 @@ typedef struct tr_peerIo
     tr_bool               extendedProtocolSupported;
     tr_bool               fastExtensionSupported;
     tr_bool               dhtSupported;
+    tr_bool               isProxied;
 
     /* we create the socket in a nonblocking way, so this flag is initially
      * false and then set to true when libevent says that the socket is ready
@@ -209,6 +210,11 @@ int                  tr_peerIoReconnect( tr_peerIo * io );
 static inline tr_bool tr_peerIoIsIncoming( const tr_peerIo * io )
 {
     return io->isIncoming;
+}
+
+static inline tr_bool tr_peerIoIsProxied( const tr_peerIo * io )
+{
+    return io->isProxied;
 }
 
 static inline int    tr_peerIoGetAge( const tr_peerIo * io )
