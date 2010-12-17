@@ -74,7 +74,9 @@ writeProxyRequestHTTP( tr_peerIo * io )
                        "CONNECT %s:%d HTTP/1.%d\015\012%s%s\015\012",
                        peer, peerPort, http_minor_version,
                        host_hdr, auth_hdr );
+
     tr_peerIoWrite( io, buf, len, FALSE );
+    io->proxyStatus = PEER_PROXY_CONNECT;
 }
 
 static void
@@ -103,19 +105,35 @@ writeProxyRequestSOCKS4( tr_peerIo * io )
         size_t len = strlen( username );
         tr_peerIoWrite( io, username, len, FALSE );
     }
+
     tr_peerIoWrite( io, &null, 1, FALSE );
+    io->proxyStatus = PEER_PROXY_CONNECT;
 }
 
 static void
 writeProxyRequestSOCKS5( tr_peerIo * io )
 {
+    const tr_session * session = tr_peerIoGetSession( io );
+
+    if ( tr_sessionIsPeerProxyAuthEnabled( session ) )
+    {
+        uint8_t packet[4] = { 5, 2, 0x00, 0x02 };
+        tr_peerIoWrite( io, packet, sizeof(packet), FALSE );
+    }
+    else
+    {
+        uint8_t packet[3] = { 5, 1, 0x00 };
+        tr_peerIoWrite( io, packet, sizeof(packet), FALSE );
+    }
+
+    io->proxyStatus = PEER_PROXY_INIT;
 }
 
 void
 tr_peerIoWriteProxyRequest( tr_peerIo * io )
 {
     assert( io->isIncoming == FALSE );
-    assert( io->isProxied == TRUE );
+    assert( tr_peerIoIsProxied( io ) == TRUE );
     assert( io->session != NULL );
     assert( io->encryptionMode == PEER_ENCRYPTION_NONE );
 
@@ -152,7 +170,13 @@ readProxyResponseHTTP( tr_peerIo * io, struct evbuffer * inbuf )
     tr_free( line );
     evbuffer_drain( inbuf, EVBUFFER_LENGTH( inbuf ) );
 
-    return success ? READ_NOW : READ_ERR;
+    if (success)
+    {
+        io->proxyStatus = PEER_PROXY_ESTABLISHED;
+        return READ_NOW;
+    }
+
+    return READ_ERR;
 }
 
 static int
@@ -163,12 +187,141 @@ readProxyResponseSOCKS4( tr_peerIo * io, struct evbuffer * inbuf )
     if( EVBUFFER_DATA( inbuf )[1] != 90 )
         return READ_ERR;
     evbuffer_drain( inbuf, 8 );
+    io->proxyStatus = PEER_PROXY_ESTABLISHED;
+    return READ_NOW;
+}
+
+static void
+writeSOCKS5ConnectCommand( tr_peerIo * io )
+{
+    const tr_address * addr;
+    tr_port port;
+    uint8_t version, command, reserved, address_type;
+
+    addr = tr_peerIoGetAddress( io, &port );
+
+    version = 5;
+    command = 1;
+    reserved = 0;
+    tr_peerIoWrite( io, &version, 1, FALSE );
+    tr_peerIoWrite( io, &command, 1, FALSE );
+    tr_peerIoWrite( io, &reserved, 1, FALSE );
+
+    if( addr->type == TR_AF_INET6 )
+    {
+        address_type = 4;
+        tr_peerIoWrite( io, &address_type, 1, FALSE );
+        tr_peerIoWrite( io, &addr->addr.addr6, 16, FALSE );
+    }
+    else
+    {
+        assert( addr->type == TR_AF_INET );
+        address_type = 1;
+        tr_peerIoWrite( io, &address_type, 1, FALSE );
+        tr_peerIoWrite( io, &addr->addr.addr4.s_addr, 4, FALSE );
+    }
+    tr_peerIoWrite( io, &port, 2, FALSE );
+
+    io->proxyStatus = PEER_PROXY_CONNECT;
+}
+
+static int
+processSOCKS5Greeting( tr_peerIo * io, struct evbuffer * inbuf )
+{
+    const tr_session * session = tr_peerIoGetSession( io );
+    const tr_bool auth_enabled = tr_sessionIsPeerProxyAuthEnabled( session );
+    uint8_t auth_method;
+
+    if( EVBUFFER_LENGTH( inbuf ) < 2 )
+        return READ_LATER;
+
+    auth_method = EVBUFFER_DATA( inbuf )[1];
+    evbuffer_drain( inbuf, 2 );
+
+    if( auth_method != 0x00 && auth_method != 0x02 )
+        return READ_ERR;
+    if( auth_method == 0x02 && !auth_enabled )
+        return READ_ERR;
+
+    if( auth_method == 0x02 )
+    {
+        uint8_t version, length;
+        const char *username = tr_sessionGetPeerProxyUsername( session );
+        const char *password = tr_sessionGetPeerProxyPassword( session );
+        version = 5;
+        tr_peerIoWrite( io, &version, 1, FALSE );
+        length = MAX( strlen( username ), 255 );
+        tr_peerIoWrite( io, &length, 1, FALSE );
+        tr_peerIoWrite( io, username, length, FALSE );
+        length = MAX( strlen( password ), 255 );
+        tr_peerIoWrite( io, &length, 1, FALSE );
+        tr_peerIoWrite( io, password, length, FALSE );
+
+        io->proxyStatus = PEER_PROXY_AUTH;
+        return READ_LATER;
+    }
+
+    writeSOCKS5ConnectCommand( io );
+    return READ_LATER;
+}
+
+static int
+processSOCKS5AuthResponse( tr_peerIo * io, struct evbuffer * inbuf )
+{
+    uint8_t status;
+    if( EVBUFFER_LENGTH( inbuf ) < 2 )
+        return READ_LATER;
+
+    status = EVBUFFER_DATA( inbuf )[1];
+    evbuffer_drain( inbuf, 2 );
+
+    if( status != 0 )
+        return READ_ERR;
+
+    writeSOCKS5ConnectCommand( io );
+    return READ_LATER;
+}
+
+static int
+processSOCKS5CmdResponse( tr_peerIo * io, struct evbuffer * inbuf )
+{
+    uint8_t status, address_type;
+
+    if( EVBUFFER_LENGTH( inbuf ) < 4 )
+        return READ_LATER;
+
+    status = EVBUFFER_DATA( inbuf )[1];
+    address_type = EVBUFFER_DATA( inbuf )[3];
+    evbuffer_drain( inbuf, 4 );
+
+    if( status != 0 )
+        return READ_ERR;
+
+    if( address_type == 1 )
+        evbuffer_drain( inbuf, 4 + 2 );
+    else if( address_type == 4 )
+        evbuffer_drain( inbuf, 16 + 2 );
+    else
+        return READ_ERR;
+
+    io->proxyStatus = PEER_PROXY_ESTABLISHED;
     return READ_NOW;
 }
 
 static int
 readProxyResponseSOCKS5( tr_peerIo * io, struct evbuffer * inbuf )
 {
+    switch( io->proxyStatus )
+    {
+        case PEER_PROXY_INIT:
+            return processSOCKS5Greeting( io, inbuf );
+        case PEER_PROXY_AUTH:
+            return processSOCKS5AuthResponse( io, inbuf );
+        case PEER_PROXY_CONNECT:
+            return processSOCKS5CmdResponse( io, inbuf );
+        default:
+            break;
+    }
     return READ_ERR;
 }
 
@@ -184,7 +337,7 @@ int
 tr_peerIoReadProxyResponse( tr_peerIo * io, struct evbuffer * inbuf )
 {
     assert( io->isIncoming == FALSE );
-    assert( io->isProxied == TRUE );
+    assert( tr_peerIoIsProxied( io ) == TRUE );
     assert( io->session != NULL );
     assert( io->encryptionMode == PEER_ENCRYPTION_NONE );
 

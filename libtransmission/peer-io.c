@@ -447,7 +447,7 @@ tr_peerIoNew( tr_session       * session,
     dbgmsg( io, "bandwidth is %p; its parent is %p", &io->bandwidth, parent );
 
     if( tr_sessionIsPeerProxyEnabled( session ) && !io->isIncoming )
-        io->isProxied = TRUE;
+        io->proxyStatus = PEER_PROXY_INIT;
 
     event_set( &io->event_read, io->socket, EV_READ, event_read_cb, io );
     event_set( &io->event_write, io->socket, EV_WRITE, event_write_cb, io );
@@ -680,6 +680,7 @@ tr_peerIoReconnect( tr_peerIo * io )
 {
     short int pendingEvents;
     tr_session * session;
+    tr_bool isProxied;
 
     assert( tr_isPeerIo( io ) );
     assert( !tr_peerIoIsIncoming( io ) );
@@ -692,8 +693,11 @@ tr_peerIoReconnect( tr_peerIo * io )
     if( io->socket >= 0 )
         tr_netClose( session, io->socket );
 
+    isProxied = tr_peerIoIsProxied( io );
     io->socket = openOutgoingPeerSocket( session, &io->addr, io->port,
-                                         io->isSeed, io->isProxied );
+                                         io->isSeed, isProxied );
+    if( isProxied )
+        io->proxyStatus = PEER_PROXY_INIT;
     event_set( &io->event_read, io->socket, EV_READ, event_read_cb, io );
     event_set( &io->event_write, io->socket, EV_WRITE, event_write_cb, io );
 
