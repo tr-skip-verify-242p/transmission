@@ -80,6 +80,30 @@ writeProxyRequestHTTP( tr_peerIo * io )
 static void
 writeProxyRequestSOCKS4( tr_peerIo * io )
 {
+    const tr_session * session = tr_peerIoGetSession( io );
+    uint8_t version, command, null;
+    tr_port port;
+    const tr_address * addr;
+
+    version = 4;
+    command = 1;
+    addr = tr_peerIoGetAddress( io, &port );
+    null = 0;
+
+    assert( addr->type == TR_AF_INET );
+
+    tr_peerIoWrite( io, &version, 1, FALSE );
+    tr_peerIoWrite( io, &command, 1, FALSE );
+    tr_peerIoWrite( io, &port, 2, FALSE );
+    tr_peerIoWrite( io, &addr->addr.addr4.s_addr, 4, FALSE );
+
+    if( tr_sessionIsPeerProxyAuthEnabled( session ) )
+    {
+        const char * username = tr_sessionGetPeerProxyUsername( session );
+        size_t len = strlen( username );
+        tr_peerIoWrite( io, username, len, FALSE );
+    }
+    tr_peerIoWrite( io, &null, 1, FALSE );
 }
 
 static void
@@ -134,7 +158,12 @@ readProxyResponseHTTP( tr_peerIo * io, struct evbuffer * inbuf )
 static int
 readProxyResponseSOCKS4( tr_peerIo * io, struct evbuffer * inbuf )
 {
-    return READ_ERR;
+    if( EVBUFFER_LENGTH( inbuf ) < 8 )
+        return READ_LATER;
+    if( EVBUFFER_DATA( inbuf )[1] != 90 )
+        return READ_ERR;
+    evbuffer_drain( inbuf, 8 );
+    return READ_NOW;
 }
 
 static int

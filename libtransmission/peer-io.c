@@ -385,22 +385,24 @@ openOutgoingPeerSocket( tr_session        * session,
                         tr_bool             clientIsSeed,
                         tr_bool             useProxy)
 {
-    int fd = -1;
     if( useProxy )
     {
         tr_address proxy_addr;
+
+        if( tr_sessionGetPeerProxyType( session ) == TR_PROXY_SOCKS4
+          && addr->type != TR_AF_INET )
+            return -1;
+
         if( tr_pton( tr_sessionGetPeerProxy( session ), &proxy_addr ) )
         {
             tr_port proxy_port = tr_sessionGetPeerProxyPort( session );
-            fd = tr_netOpenPeerSocket( session, &proxy_addr, proxy_port, clientIsSeed );
+            return tr_netOpenPeerSocket( session, &proxy_addr, proxy_port, clientIsSeed );
         }
-    }
-    else
-    {
-        fd = tr_netOpenPeerSocket( session, addr, port, clientIsSeed );
+
+        return -1;
     }
 
-    return fd;
+    return tr_netOpenPeerSocket( session, addr, port, clientIsSeed );
 }
 
 static tr_peerIo*
