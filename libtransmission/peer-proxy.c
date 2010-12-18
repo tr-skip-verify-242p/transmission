@@ -60,15 +60,23 @@ tr_peerProxyNew( const tr_session * session,
     tr_peerProxy *   proxy;
     tr_address       addr;
     tr_proxy_type    type;
+    const char *     proxyIP;
 
     assert( session != NULL );
 
-    if( !tr_pton( tr_sessionGetPeerProxy( session ), &addr ) )
+    proxyIP = tr_sessionGetPeerProxy( session );
+    if( !tr_pton( proxyIP, &addr ) )
+    {
+        tr_nerr( "Proxy", "Invalid peer proxy address: %s", proxyIP );
         return NULL;
+    }
 
     type = tr_sessionGetPeerProxyType( session );
     if( type == TR_PROXY_SOCKS4 && peerAddr->type != TR_AF_INET )
+    {
+        tr_nerr( "Proxy", "SOCKS4 Proxy does not support IPv6 peers" );
         return NULL;
+    }
 
     proxy = tr_new0( tr_peerProxy, 1 );
     proxy->address = addr;
@@ -134,27 +142,90 @@ tr_peerProxyGetPassword( const tr_peerProxy * proxy )
 void
 tr_peerProxyResetConnectionState( tr_peerProxy * proxy )
 {
+    assert( proxy != NULL );
     proxy->state = PEER_PROXY_INIT;
 }
 
 tr_bool
 tr_peerProxyIsAuthEnabled( const tr_peerProxy * proxy )
 {
+    assert( proxy != NULL );
     return proxy->auth;
 }
 
 tr_proxy_type
 tr_peerProxyGetType( const tr_peerProxy * proxy )
 {
+    assert( proxy != NULL );
     return proxy->type;
 }
 
 static inline void
 tr_peerProxySetState( tr_peerProxy * proxy, PeerProxyState state )
 {
+    assert( proxy != NULL );
     proxy->state = state;
 }
 
+
+enum
+{
+    /* SOCKS 4 Protocol Constants */
+    SOCKS4_VERSION = 4,
+
+    SOCKS4_CMD_CONNECT = 1,
+
+    SOCKS4_REQUEST_GRANTED = 90,
+    SOCKS4_REQUEST_FAILED = 91,
+    SOCKS4_REQUEST_REJECTED_IDENTD = 92,
+    SOCKS4_REQUEST_REJECTED_USERID = 93,
+
+    /* SOCKS 5 Protocol Constants */
+    SOCKS5_VERSION = 5,
+
+    SOCKS5_ADDR_IPV4 = 1,
+    SOCKS5_ADDR_IPV6 = 4,
+
+    SOCKS5_CMD_CONNECT = 1,
+
+    SOCKS5_AUTH_NONE = 0,
+    SOCKS5_AUTH_USERPASS = 2,
+    SOCKS5_AUTH_INVALID = 255,
+
+    SOCKS5_REPLY_SUCCESS = 0,
+    SOCKS5_REPLY_GENERAL_FAILURE = 1,
+    SOCKS5_REPLY_CONN_NOT_ALLOWED = 2,
+    SOCKS5_REPLY_NETWORK_UNREACHABLE = 3,
+    SOCKS5_REPLY_HOST_UNREACHABLE = 4,
+    SOCKS5_REPLY_CONN_REFUSED = 5,
+    SOCKS5_REPLY_TTL_EXPIRED = 6,
+    SOCKS5_REPLY_CMD_NOT_SUPPORTED = 7,
+    SOCKS5_REPLY_ADDR_NOT_SUPPORTED = 8,
+};
+
+static const char *
+socksReplyStr( uint8_t code )
+{
+    switch( code )
+    {
+        case SOCKS4_REQUEST_GRANTED:           return "Granted";
+        case SOCKS4_REQUEST_FAILED:            return "Failed";
+        case SOCKS4_REQUEST_REJECTED_IDENTD:   return "Client IDENT server unreachable";
+        case SOCKS4_REQUEST_REJECTED_USERID:   return "IDENT user-id mismatch";
+
+        case SOCKS5_REPLY_SUCCESS:             return "Success";
+        case SOCKS5_REPLY_GENERAL_FAILURE:     return "General failure";
+        case SOCKS5_REPLY_CONN_NOT_ALLOWED:    return "Not allowed";
+        case SOCKS5_REPLY_NETWORK_UNREACHABLE: return "Network unreachable";
+        case SOCKS5_REPLY_HOST_UNREACHABLE:    return "Host unreachable";
+        case SOCKS5_REPLY_CONN_REFUSED:        return "Connection refused";
+        case SOCKS5_REPLY_TTL_EXPIRED:         return "TTL expired";
+        case SOCKS5_REPLY_CMD_NOT_SUPPORTED:   return "Command not supported";
+        case SOCKS5_REPLY_ADDR_NOT_SUPPORTED:  return "Address not supported";
+        default: break;
+    }
+    return "(unknown)";
+}
 
 static void
 writeProxyRequestHTTP( tr_peerIo * io )
@@ -214,8 +285,8 @@ writeProxyRequestSOCKS4( tr_peerIo * io )
     tr_port port;
     const tr_address * addr;
 
-    version = 4;
-    command = 1;
+    version = SOCKS4_VERSION;
+    command = SOCKS4_CMD_CONNECT;
     addr = tr_peerIoGetAddress( io, &port );
     null = 0;
 
@@ -243,12 +314,12 @@ writeProxyRequestSOCKS5( tr_peerIo * io )
 
     if( tr_peerProxyIsAuthEnabled( proxy ) )
     {
-        uint8_t packet[4] = { 5, 2, 0x00, 0x02 };
+        uint8_t packet[4] = { SOCKS5_VERSION, 2, SOCKS5_AUTH_NONE, SOCKS5_AUTH_USERPASS };
         tr_peerIoWrite( io, packet, sizeof(packet), FALSE );
     }
     else
     {
-        uint8_t packet[3] = { 5, 1, 0x00 };
+        uint8_t packet[3] = { SOCKS5_VERSION, 1, SOCKS5_AUTH_NONE };
         tr_peerIoWrite( io, packet, sizeof(packet), FALSE );
     }
 
@@ -292,8 +363,14 @@ readProxyResponseHTTP( tr_peerIo * io, struct evbuffer * inbuf )
 
     line = evbuffer_readline( inbuf );
     if( line == NULL )
+    {
+        /* Unlikely, but just in case. */
+        tr_nerr( "Proxy", "HTTP peer proxy sent malformed response" );
         return READ_ERR;
+    }
     success = ( strstr( line, " 200 " ) != NULL );
+    if( !success )
+        tr_nerr( "Proxy", "HTTP request rejected: %s", line );
     tr_free( line );
     evbuffer_drain( inbuf, EVBUFFER_LENGTH( inbuf ) );
 
@@ -309,10 +386,15 @@ readProxyResponseHTTP( tr_peerIo * io, struct evbuffer * inbuf )
 static int
 readProxyResponseSOCKS4( tr_peerIo * io, struct evbuffer * inbuf )
 {
+    uint8_t reply;
     if( EVBUFFER_LENGTH( inbuf ) < 8 )
         return READ_LATER;
-    if( EVBUFFER_DATA( inbuf )[1] != 90 )
+    reply = EVBUFFER_DATA( inbuf )[1];
+    if( reply != SOCKS4_REQUEST_GRANTED )
+    {
+        tr_nerr( "Proxy", "SOCKS4 request rejected: %s", socksReplyStr( reply ) );
         return READ_ERR;
+    }
     evbuffer_drain( inbuf, 8 );
     tr_peerProxySetState( io->proxy, PEER_PROXY_ESTABLISHED );
     return READ_NOW;
@@ -327,8 +409,8 @@ writeSOCKS5ConnectCommand( tr_peerIo * io )
 
     addr = tr_peerIoGetAddress( io, &port );
 
-    version = 5;
-    command = 1;
+    version = SOCKS5_VERSION;
+    command = SOCKS5_CMD_CONNECT;
     reserved = 0;
     tr_peerIoWrite( io, &version, 1, FALSE );
     tr_peerIoWrite( io, &command, 1, FALSE );
@@ -336,14 +418,14 @@ writeSOCKS5ConnectCommand( tr_peerIo * io )
 
     if( addr->type == TR_AF_INET6 )
     {
-        address_type = 4;
+        address_type = SOCKS5_ADDR_IPV6;
         tr_peerIoWrite( io, &address_type, 1, FALSE );
         tr_peerIoWrite( io, &addr->addr.addr6, 16, FALSE );
     }
     else
     {
         assert( addr->type == TR_AF_INET );
-        address_type = 1;
+        address_type = SOCKS5_ADDR_IPV4;
         tr_peerIoWrite( io, &address_type, 1, FALSE );
         tr_peerIoWrite( io, &addr->addr.addr4.s_addr, 4, FALSE );
     }
@@ -364,17 +446,23 @@ processSOCKS5Greeting( tr_peerIo * io, struct evbuffer * inbuf )
     method = EVBUFFER_DATA( inbuf )[1];
     evbuffer_drain( inbuf, 2 );
 
-    if( method != 0x00 && method != 0x02 )
+    if( method == SOCKS5_AUTH_INVALID )
+    {
+        tr_nerr( "Proxy", "SOCKS5 authentication method rejected" );
         return READ_ERR;
-    if( method == 0x02 && !tr_peerProxyIsAuthEnabled( proxy ) )
+    }
+    if( method == SOCKS5_AUTH_USERPASS && !tr_peerProxyIsAuthEnabled( proxy ) )
+    {
+        tr_nerr( "Proxy", "SOCKS5 authentication required" );
         return READ_ERR;
+    }
 
-    if( method == 0x02 )
+    if( method == SOCKS5_AUTH_USERPASS )
     {
         uint8_t version, length;
         const char *username = tr_peerProxyGetUsername( proxy );
         const char *password = tr_peerProxyGetPassword( proxy );
-        version = 5;
+        version = SOCKS5_VERSION;
         tr_peerIoWrite( io, &version, 1, FALSE );
         length = MAX( strlen( username ), 255 );
         tr_peerIoWrite( io, &length, 1, FALSE );
@@ -401,8 +489,11 @@ processSOCKS5AuthResponse( tr_peerIo * io, struct evbuffer * inbuf )
     status = EVBUFFER_DATA( inbuf )[1];
     evbuffer_drain( inbuf, 2 );
 
-    if( status != 0 )
+    if( status != SOCKS5_REPLY_SUCCESS )
+    {
+        tr_nerr( "Proxy", "SOCKS5 authentication failed: %s", socksReplyStr( status ) );
         return READ_ERR;
+    }
 
     writeSOCKS5ConnectCommand( io );
     return READ_LATER;
@@ -420,15 +511,22 @@ processSOCKS5CmdResponse( tr_peerIo * io, struct evbuffer * inbuf )
     address_type = EVBUFFER_DATA( inbuf )[3];
     evbuffer_drain( inbuf, 4 );
 
-    if( status != 0 )
+    if( status != SOCKS5_REPLY_SUCCESS )
+    {
+        tr_nerr( "Proxy", "SOCKS5 connect request rejected: %s", socksReplyStr( status ) );
         return READ_ERR;
+    }
 
-    if( address_type == 1 )
+    if( address_type == SOCKS5_ADDR_IPV4 )
         evbuffer_drain( inbuf, 4 + 2 );
-    else if( address_type == 4 )
+    else if( address_type == SOCKS5_ADDR_IPV6 )
         evbuffer_drain( inbuf, 16 + 2 );
     else
+    {
+        /* Unlikely, but just in case. */
+        tr_nerr( "Proxy", "SOCKS5 unsupported address type %d", address_type );
         return READ_ERR;
+    }
 
     tr_peerProxySetState( io->proxy, PEER_PROXY_ESTABLISHED );
     return READ_NOW;
