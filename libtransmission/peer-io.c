@@ -424,7 +424,7 @@ tr_peerIoNew( tr_session       * session,
     io->magicNumber = MAGIC_NUMBER;
     io->refCount = 1;
     io->crypto = tr_cryptoNew( torrentHash, isIncoming );
-    io->proxy = proxy;
+    io->proxy = proxy; /* Pointer ownership is transferred. */
     io->session = session;
     io->addr = *addr;
     io->isSeed = isSeed;
@@ -585,6 +585,7 @@ io_dtor( void * vio )
     evbuffer_free( io->inbuf );
     tr_netClose( io->session, io->socket );
     tr_cryptoFree( io->crypto );
+    tr_peerProxyFree( io->proxy );
     tr_list_free( &io->outbuf_datatypes, tr_free );
 
     memset( io, ~0, sizeof( tr_peerIo ) );
