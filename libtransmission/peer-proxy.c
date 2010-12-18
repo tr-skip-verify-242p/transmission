@@ -32,57 +32,184 @@ THE SOFTWARE.
 #include "utils.h"
 
 
+typedef enum
+{
+    PEER_PROXY_INIT,
+    PEER_PROXY_AUTH,
+    PEER_PROXY_CONNECT,
+    PEER_PROXY_ESTABLISHED
+} PeerProxyState;
+
+struct tr_peerProxy
+{
+    tr_address       address;
+    tr_port          port;
+    tr_proxy_type    type;
+    tr_bool          auth;
+    char *           username;
+    char *           password;
+    PeerProxyState   state;
+};
+
+
+tr_peerProxy *
+tr_peerProxyNew( const tr_session * session,
+                 const tr_address * peerAddr,
+                 tr_port            peerPort)
+{
+    tr_peerProxy *   proxy;
+    tr_address       addr;
+    tr_proxy_type    type;
+
+    assert( session != NULL );
+
+    if( !tr_pton( tr_sessionGetPeerProxy( session ), &addr ) )
+        return NULL;
+
+    type = tr_sessionGetPeerProxyType( session );
+    if( type == TR_PROXY_SOCKS4 && peerAddr->type != TR_AF_INET )
+        return NULL;
+
+    proxy = tr_new0( tr_peerProxy, 1 );
+    proxy->address = addr;
+    proxy->port = htons( tr_sessionGetPeerProxyPort( session ) );
+    proxy->type = type;
+    if( tr_sessionIsPeerProxyAuthEnabled( session ) )
+    {
+        proxy->auth = TRUE;
+        proxy->username = tr_strdup( tr_sessionGetPeerProxyUsername( session ) );
+        proxy->password = tr_strdup( tr_sessionGetPeerProxyPassword( session ) );
+    }
+    proxy->state = PEER_PROXY_INIT;
+
+    return proxy;
+}
+
+void
+tr_peerProxyFree( tr_peerProxy * proxy )
+{
+    if( proxy == NULL )
+        return;
+    if( proxy->username != NULL )
+    {
+        tr_free( proxy->username );
+        proxy->username = NULL;
+    }
+    if( proxy->password != NULL )
+    {
+        tr_free( proxy->password );
+        proxy->password = NULL;
+    }
+    tr_free( proxy );
+}
+
+const tr_address *
+tr_peerProxyGetAddress( const tr_peerProxy * proxy )
+{
+    assert( proxy != NULL );
+    return &proxy->address;
+}
+
+tr_port
+tr_peerProxyGetPort( const tr_peerProxy * proxy )
+{
+    assert( proxy != NULL );
+    return proxy->port;
+}
+
+const char *
+tr_peerProxyGetUsername( const tr_peerProxy * proxy )
+{
+    assert( proxy != NULL );
+    return proxy->username;
+}
+
+const char *
+tr_peerProxyGetPassword( const tr_peerProxy * proxy )
+{
+    assert( proxy != NULL );
+    return proxy->password;
+}
+
+void
+tr_peerProxyResetConnectionState( tr_peerProxy * proxy )
+{
+    proxy->state = PEER_PROXY_INIT;
+}
+
+tr_bool
+tr_peerProxyIsAuthEnabled( const tr_peerProxy * proxy )
+{
+    return proxy->auth;
+}
+
+tr_proxy_type
+tr_peerProxyGetType( const tr_peerProxy * proxy )
+{
+    return proxy->type;
+}
+
+static inline void
+tr_peerProxySetState( tr_peerProxy * proxy, PeerProxyState state )
+{
+    proxy->state = state;
+}
+
+
 static void
 writeProxyRequestHTTP( tr_peerIo * io )
 {
     static const int http_minor_version = 1;
-    const tr_session * session = tr_peerIoGetSession( io );
-    char buf[1024], host_hdr[256], auth_hdr[256], peer[64];
+
+    tr_peerProxy * proxy = tr_peerIoGetProxy( io );
+    char buf[1024], hostHdr[256], authHdr[256], peerHost[64];
     const tr_address * peerAddr;
     tr_port peerPort;
     int len;
 
     if( http_minor_version > 0 )
     {
-        const char *proxy = tr_sessionGetPeerProxy( session );
-        int proxyPort = tr_sessionGetPeerProxyPort( session );
-        tr_snprintf( host_hdr, sizeof( host_hdr ), "Host: %s:%d\015\012",
-                     proxy, proxyPort );
+        char proxyHost[64];
+        int proxyPort;
+        tr_ntop( tr_peerProxyGetAddress( proxy ), proxyHost, sizeof( proxyHost ) );
+        proxyPort = ntohs( tr_peerProxyGetPort( proxy ) );
+        tr_snprintf( hostHdr, sizeof( hostHdr ), "Host: %s:%d\015\012",
+                     proxyHost, proxyPort );
     }
     else
-        host_hdr[0] = '\0';
+        hostHdr[0] = '\0';
 
-    if( tr_sessionIsPeerProxyAuthEnabled( session ) )
+    if( tr_peerProxyIsAuthEnabled( proxy ) )
     {
         char auth[128], *enc;
         tr_snprintf( auth, sizeof( auth ), "%s:%s",
-                     tr_sessionGetPeerProxyUsername( session ),
-                     tr_sessionGetPeerProxyPassword( session ) );
+                     tr_peerProxyGetUsername( proxy ),
+                     tr_peerProxyGetPassword( proxy ) );
         enc = tr_base64_encode( auth, -1, NULL );
-        tr_snprintf( auth_hdr, sizeof( auth_hdr ),
+        tr_snprintf( authHdr, sizeof( authHdr ),
                      "Proxy-Authorization: Basic %s\015\012",
                      enc );
         tr_free( enc );
     }
     else
-        auth_hdr[0] = '\0';
+        authHdr[0] = '\0';
 
     peerAddr = tr_peerIoGetAddress( io, &peerPort );
-    tr_ntop( peerAddr, peer, sizeof( peer ) );
+    tr_ntop( peerAddr, peerHost, sizeof( peerHost ) );
 
     len = tr_snprintf( buf, sizeof( buf ),
                        "CONNECT %s:%d HTTP/1.%d\015\012%s%s\015\012",
-                       peer, peerPort, http_minor_version,
-                       host_hdr, auth_hdr );
+                       peerHost, peerPort, http_minor_version,
+                       hostHdr, authHdr );
 
     tr_peerIoWrite( io, buf, len, FALSE );
-    io->proxyStatus = PEER_PROXY_CONNECT;
+    tr_peerProxySetState( proxy, PEER_PROXY_CONNECT );
 }
 
 static void
 writeProxyRequestSOCKS4( tr_peerIo * io )
 {
-    const tr_session * session = tr_peerIoGetSession( io );
+    tr_peerProxy * proxy = tr_peerIoGetProxy( io );
     uint8_t version, command, null;
     tr_port port;
     const tr_address * addr;
@@ -99,23 +226,22 @@ writeProxyRequestSOCKS4( tr_peerIo * io )
     tr_peerIoWrite( io, &port, 2, FALSE );
     tr_peerIoWrite( io, &addr->addr.addr4.s_addr, 4, FALSE );
 
-    if( tr_sessionIsPeerProxyAuthEnabled( session ) )
+    if( tr_peerProxyIsAuthEnabled( proxy ) )
     {
-        const char * username = tr_sessionGetPeerProxyUsername( session );
+        const char * username = tr_peerProxyGetUsername( proxy );
         size_t len = strlen( username );
         tr_peerIoWrite( io, username, len, FALSE );
     }
-
     tr_peerIoWrite( io, &null, 1, FALSE );
-    io->proxyStatus = PEER_PROXY_CONNECT;
+    tr_peerProxySetState( proxy, PEER_PROXY_CONNECT );
 }
 
 static void
 writeProxyRequestSOCKS5( tr_peerIo * io )
 {
-    const tr_session * session = tr_peerIoGetSession( io );
+    tr_peerProxy * proxy = tr_peerIoGetProxy( io );
 
-    if ( tr_sessionIsPeerProxyAuthEnabled( session ) )
+    if( tr_peerProxyIsAuthEnabled( proxy ) )
     {
         uint8_t packet[4] = { 5, 2, 0x00, 0x02 };
         tr_peerIoWrite( io, packet, sizeof(packet), FALSE );
@@ -126,18 +252,19 @@ writeProxyRequestSOCKS5( tr_peerIo * io )
         tr_peerIoWrite( io, packet, sizeof(packet), FALSE );
     }
 
-    io->proxyStatus = PEER_PROXY_INIT;
+    tr_peerProxySetState( proxy, PEER_PROXY_INIT );
 }
 
 void
 tr_peerIoWriteProxyRequest( tr_peerIo * io )
 {
+    tr_peerProxy * proxy = tr_peerIoGetProxy( io );
+
+    assert( proxy != NULL );
     assert( io->isIncoming == FALSE );
-    assert( tr_peerIoIsProxied( io ) == TRUE );
-    assert( io->session != NULL );
     assert( io->encryptionMode == PEER_ENCRYPTION_NONE );
 
-    switch( tr_sessionGetPeerProxyType( io->session ) )
+    switch( tr_peerProxyGetType( proxy ) )
     {
         case TR_PROXY_HTTP:
             writeProxyRequestHTTP( io );
@@ -172,7 +299,7 @@ readProxyResponseHTTP( tr_peerIo * io, struct evbuffer * inbuf )
 
     if (success)
     {
-        io->proxyStatus = PEER_PROXY_ESTABLISHED;
+        tr_peerProxySetState( io->proxy, PEER_PROXY_ESTABLISHED );
         return READ_NOW;
     }
 
@@ -187,7 +314,7 @@ readProxyResponseSOCKS4( tr_peerIo * io, struct evbuffer * inbuf )
     if( EVBUFFER_DATA( inbuf )[1] != 90 )
         return READ_ERR;
     evbuffer_drain( inbuf, 8 );
-    io->proxyStatus = PEER_PROXY_ESTABLISHED;
+    tr_peerProxySetState( io->proxy, PEER_PROXY_ESTABLISHED );
     return READ_NOW;
 }
 
@@ -222,32 +349,31 @@ writeSOCKS5ConnectCommand( tr_peerIo * io )
     }
     tr_peerIoWrite( io, &port, 2, FALSE );
 
-    io->proxyStatus = PEER_PROXY_CONNECT;
+    tr_peerProxySetState( io->proxy, PEER_PROXY_CONNECT );
 }
 
 static int
 processSOCKS5Greeting( tr_peerIo * io, struct evbuffer * inbuf )
 {
-    const tr_session * session = tr_peerIoGetSession( io );
-    const tr_bool auth_enabled = tr_sessionIsPeerProxyAuthEnabled( session );
-    uint8_t auth_method;
+    tr_peerProxy * proxy = tr_peerIoGetProxy( io );
+    uint8_t method;
 
     if( EVBUFFER_LENGTH( inbuf ) < 2 )
         return READ_LATER;
 
-    auth_method = EVBUFFER_DATA( inbuf )[1];
+    method = EVBUFFER_DATA( inbuf )[1];
     evbuffer_drain( inbuf, 2 );
 
-    if( auth_method != 0x00 && auth_method != 0x02 )
+    if( method != 0x00 && method != 0x02 )
         return READ_ERR;
-    if( auth_method == 0x02 && !auth_enabled )
+    if( method == 0x02 && !tr_peerProxyIsAuthEnabled( proxy ) )
         return READ_ERR;
 
-    if( auth_method == 0x02 )
+    if( method == 0x02 )
     {
         uint8_t version, length;
-        const char *username = tr_sessionGetPeerProxyUsername( session );
-        const char *password = tr_sessionGetPeerProxyPassword( session );
+        const char *username = tr_peerProxyGetUsername( proxy );
+        const char *password = tr_peerProxyGetPassword( proxy );
         version = 5;
         tr_peerIoWrite( io, &version, 1, FALSE );
         length = MAX( strlen( username ), 255 );
@@ -257,7 +383,7 @@ processSOCKS5Greeting( tr_peerIo * io, struct evbuffer * inbuf )
         tr_peerIoWrite( io, &length, 1, FALSE );
         tr_peerIoWrite( io, password, length, FALSE );
 
-        io->proxyStatus = PEER_PROXY_AUTH;
+        tr_peerProxySetState( proxy, PEER_PROXY_AUTH );
         return READ_LATER;
     }
 
@@ -304,14 +430,14 @@ processSOCKS5CmdResponse( tr_peerIo * io, struct evbuffer * inbuf )
     else
         return READ_ERR;
 
-    io->proxyStatus = PEER_PROXY_ESTABLISHED;
+    tr_peerProxySetState( io->proxy, PEER_PROXY_ESTABLISHED );
     return READ_NOW;
 }
 
 static int
 readProxyResponseSOCKS5( tr_peerIo * io, struct evbuffer * inbuf )
 {
-    switch( io->proxyStatus )
+    switch( io->proxy->state )
     {
         case PEER_PROXY_INIT:
             return processSOCKS5Greeting( io, inbuf );
@@ -336,12 +462,11 @@ readProxyResponseSOCKS5( tr_peerIo * io, struct evbuffer * inbuf )
 int
 tr_peerIoReadProxyResponse( tr_peerIo * io, struct evbuffer * inbuf )
 {
+    assert( io->proxy != NULL );
     assert( io->isIncoming == FALSE );
-    assert( tr_peerIoIsProxied( io ) == TRUE );
-    assert( io->session != NULL );
     assert( io->encryptionMode == PEER_ENCRYPTION_NONE );
 
-    switch( tr_sessionGetPeerProxyType( io->session ) )
+    switch( tr_peerProxyGetType( io->proxy ) )
     {
         case TR_PROXY_HTTP:
             return readProxyResponseHTTP( io, inbuf );

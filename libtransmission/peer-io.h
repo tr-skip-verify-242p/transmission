@@ -62,14 +62,7 @@ typedef void      ( *tr_net_error_cb )( struct tr_peerIo * io,
                                         short              what,
                                         void             * userData );
 
-typedef enum
-{
-    PEER_PROXY_DISABLED,
-    PEER_PROXY_INIT,
-    PEER_PROXY_AUTH,
-    PEER_PROXY_CONNECT,
-    PEER_PROXY_ESTABLISHED
-} PeerProxyStatus;
+struct tr_peerProxy;
 
 typedef struct tr_peerIo
 {
@@ -79,7 +72,6 @@ typedef struct tr_peerIo
     tr_bool               extendedProtocolSupported;
     tr_bool               fastExtensionSupported;
     tr_bool               dhtSupported;
-    PeerProxyStatus       proxyStatus;
 
     /* we create the socket in a nonblocking way, so this flag is initially
      * false and then set to true when libevent says that the socket is ready
@@ -114,6 +106,7 @@ typedef struct tr_peerIo
 
     struct tr_bandwidth   bandwidth;
     struct tr_crypto    * crypto;
+    struct tr_peerProxy * proxy;
 
     struct evbuffer     * inbuf;
     struct evbuffer     * outbuf;
@@ -219,11 +212,6 @@ int                  tr_peerIoReconnect( tr_peerIo * io );
 static inline tr_bool tr_peerIoIsIncoming( const tr_peerIo * io )
 {
     return io->isIncoming;
-}
-
-static inline tr_bool tr_peerIoIsProxied( const tr_peerIo * io )
-{
-    return io->proxyStatus != PEER_PROXY_DISABLED;
 }
 
 static inline int    tr_peerIoGetAge( const tr_peerIo * io )

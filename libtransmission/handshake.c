@@ -365,7 +365,7 @@ sendYa( tr_handshake * handshake )
 }
 
 static void
-sendFirst( tr_handshake * handshake )
+sendInitialBittorrentMessage( tr_handshake * handshake )
 {
     if( handshake->encryptionMode != TR_CLEAR_PREFERRED
       && !handshake->encryptionFailed )
@@ -636,9 +636,7 @@ readProxy( tr_handshake *    handshake,
 
     ret = tr_peerIoReadProxyResponse ( handshake->io, inbuf );
     if( ret == READ_NOW )
-    {
-        sendFirst( handshake );
-    }
+        sendInitialBittorrentMessage( handshake );
     return ret;
 }
 
@@ -1274,7 +1272,7 @@ tr_handshakeNew( tr_peerIo *        io,
     else if( tr_peerIoIsProxied( handshake->io ) )
         sendProxyRequest( handshake );
     else
-        sendFirst( handshake );
+        sendInitialBittorrentMessage( handshake );
 
     return handshake;
 }

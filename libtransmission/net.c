@@ -278,12 +278,12 @@ setup_sockaddr( const tr_address        * addr,
     }
 }
 
-int
-tr_netOpenPeerSocket( tr_session        * session,
-                      const tr_address  * addr,
-                      tr_port             port,
-                      tr_bool             clientIsSeed,
-                      tr_bool             isProxy)
+static int
+netOpenPeerSocket( tr_session        * session,
+                   const tr_address  * addr,
+                   tr_port             port,
+                   tr_bool             clientIsSeed,
+                   tr_bool             isPeerProxy)
 {
     static const int domains[NUM_TR_AF_INET_TYPES] = { AF_INET, AF_INET6 };
     int                     s;
@@ -295,8 +295,8 @@ tr_netOpenPeerSocket( tr_session        * session,
 
     assert( tr_isAddress( addr ) );
 
-    if( ( isProxy && !tr_isValidPeerProxyAddress( addr, port ) )
-      || ( !isProxy && !tr_isValidPeerAddress( addr, port ) ) )
+    if( ( isPeerProxy && !tr_isValidPeerProxyAddress( addr, port ) )
+      || ( !isPeerProxy && !tr_isValidPeerAddress( addr, port ) ) )
         return -EINVAL;
 
     s = tr_fdSocketCreate( session, domains[addr->type], SOCK_STREAM );
@@ -346,10 +346,28 @@ tr_netOpenPeerSocket( tr_session        * session,
         s = -tmperrno;
     }
 
-    tr_deepLog( __FILE__, __LINE__, NULL, "New OUTGOING connection %d (%s)",
-               s, tr_peerIoAddrStr( addr, port ) );
+    tr_deepLog( __FILE__, __LINE__, NULL, "New OUTGOING %s connection %d (%s)",
+               isPeerProxy ? "proxy" : "peer", s, tr_peerIoAddrStr( addr, port ) );
 
     return s;
+}
+
+int
+tr_netOpenPeerProxySocket( tr_session        * session,
+                           const tr_address  * proxy_addr,
+                           tr_port             proxy_port,
+                           tr_bool             clientIsSeed)
+{
+    return netOpenPeerSocket( session, proxy_addr, proxy_port, clientIsSeed, TRUE );
+}
+
+int
+tr_netOpenPeerSocket( tr_session        * session,
+                      const tr_address  * addr,
+                      tr_port             port,
+                      tr_bool             clientIsSeed)
+{
+    return netOpenPeerSocket( session, addr, port, clientIsSeed, FALSE );
 }
 
 static int

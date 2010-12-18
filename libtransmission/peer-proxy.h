@@ -39,6 +39,39 @@ struct evbuffer;
  * @{
  */
 
+typedef struct tr_peerProxy tr_peerProxy;
+
+tr_peerProxy * tr_peerProxyNew( const tr_session * session,
+                                const tr_address * peerAddr,
+                                tr_port            peerPort);
+
+void tr_peerProxyFree( tr_peerProxy * proxy );
+
+const tr_address * tr_peerProxyGetAddress( const tr_peerProxy * proxy );
+
+tr_port tr_peerProxyGetPort( const tr_peerProxy * proxy );
+
+const char * tr_peerProxyGetUsername( const tr_peerProxy * proxy );
+
+const char * tr_peerProxyGetPassword( const tr_peerProxy * proxy );
+
+void tr_peerProxyResetConnectionState( tr_peerProxy * proxy );
+
+tr_bool tr_peerProxyIsAuthEnabled( const tr_peerProxy * proxy );
+
+tr_proxy_type tr_peerProxyGetType( const tr_peerProxy * proxy );
+
+
+static inline tr_peerProxy * tr_peerIoGetProxy( const tr_peerIo * io )
+{
+    return io->proxy;
+}
+
+static inline tr_bool tr_peerIoIsProxied( const tr_peerIo * io )
+{
+    return io->proxy != NULL;
+}
+
 void   tr_peerIoWriteProxyRequest( tr_peerIo * io );
 
 int    tr_peerIoReadProxyResponse( tr_peerIo * io,
