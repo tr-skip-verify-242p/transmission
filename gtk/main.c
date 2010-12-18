@@ -1318,6 +1318,34 @@ prefschanged( TrCore * core UNUSED, const char * key, gpointer data )
     {
         tr_sessionSetProxyPort( tr, pref_int_get( key ) );
     }
+    else if( !strcmp( key, TR_PREFS_KEY_PEER_PROXY ) )
+    {
+        tr_sessionSetPeerProxy( tr, pref_string_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_PEER_PROXY_TYPE ) )
+    {
+        tr_sessionSetPeerProxyType( tr, pref_int_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_PEER_PROXY_ENABLED ) )
+    {
+        tr_sessionSetPeerProxyEnabled( tr, pref_flag_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_PEER_PROXY_AUTH_ENABLED ) )
+    {
+        tr_sessionSetPeerProxyAuthEnabled( tr, pref_flag_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_PEER_PROXY_USERNAME ) )
+    {
+        tr_sessionSetPeerProxyUsername( tr, pref_string_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_PEER_PROXY_PASSWORD ) )
+    {
+        tr_sessionSetPeerProxyPassword( tr, pref_string_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_PEER_PROXY_PORT ) )
+    {
+        tr_sessionSetPeerProxyPort( tr, pref_int_get( key ) );
+    }
     else if( !strcmp( key, TR_PREFS_KEY_ALT_SPEED_UP_KBps ) )
     {
         tr_sessionSetAltSpeed_KBps( tr, TR_UP, pref_int_get( key ) );
