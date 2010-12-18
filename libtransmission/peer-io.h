@@ -62,6 +62,8 @@ typedef void      ( *tr_net_error_cb )( struct tr_peerIo * io,
                                         short              what,
                                         void             * userData );
 
+struct tr_peerProxy;
+
 typedef struct tr_peerIo
 {
     tr_bool               isEncrypted;
@@ -104,6 +106,7 @@ typedef struct tr_peerIo
 
     struct tr_bandwidth   bandwidth;
     struct tr_crypto    * crypto;
+    struct tr_peerProxy * proxy;
 
     struct evbuffer     * inbuf;
     struct evbuffer     * outbuf;

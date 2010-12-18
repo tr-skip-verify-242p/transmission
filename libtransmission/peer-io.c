@@ -33,6 +33,7 @@
 #include "net.h"
 #include "peer-common.h" /* MAX_BLOCK_SIZE */
 #include "peer-io.h"
+#include "peer-proxy.h"
 #include "trevent.h" /* tr_runInEventThread() */
 #include "utils.h"
 
@@ -378,6 +379,23 @@ maybeSetCongestionAlgorithm( int socket, const char * algorithm )
     }
 }
 
+static int
+openOutgoingPeerSocket( tr_session        * session,
+                        const tr_address  * addr,
+                        tr_port             port,
+                        tr_bool             clientIsSeed,
+                        tr_peerProxy      * proxy )
+{
+    if( proxy )
+    {
+        tr_peerProxyResetConnectionState( proxy );
+        return tr_netOpenPeerProxySocket( session, tr_peerProxyGetAddress( proxy ),
+                                          tr_peerProxyGetPort( proxy ), clientIsSeed );
+    }
+
+    return tr_netOpenPeerSocket( session, addr, port, clientIsSeed );
+}
+
 static tr_peerIo*
 tr_peerIoNew( tr_session       * session,
               tr_bandwidth     * parent,
@@ -386,7 +404,8 @@ tr_peerIoNew( tr_session       * session,
               const uint8_t    * torrentHash,
               tr_bool            isIncoming,
               tr_bool            isSeed,
-              int                socket )
+              int                socket,
+              tr_peerProxy     * proxy )
 {
     tr_peerIo * io;
 
@@ -405,6 +424,7 @@ tr_peerIoNew( tr_session       * session,
     io->magicNumber = MAGIC_NUMBER;
     io->refCount = 1;
     io->crypto = tr_cryptoNew( torrentHash, isIncoming );
+    io->proxy = proxy; /* Pointer ownership is transferred. */
     io->session = session;
     io->addr = *addr;
     io->isSeed = isSeed;
@@ -436,7 +456,7 @@ tr_peerIoNewIncoming( tr_session        * session,
     assert( tr_isAddress( addr ) );
     assert( fd >= 0 );
 
-    return tr_peerIoNew( session, parent, addr, port, NULL, TRUE, FALSE, fd );
+    return tr_peerIoNew( session, parent, addr, port, NULL, TRUE, FALSE, fd, NULL );
 }
 
 tr_peerIo*
@@ -447,17 +467,29 @@ tr_peerIoNewOutgoing( tr_session        * session,
                       const uint8_t     * torrentHash,
                       tr_bool             isSeed )
 {
+    tr_peerProxy * proxy = NULL;
     int fd;
 
     assert( session );
     assert( tr_isAddress( addr ) );
     assert( torrentHash );
 
-    fd = tr_netOpenPeerSocket( session, addr, port, isSeed );
-    dbgmsg( NULL, "tr_netOpenPeerSocket returned fd %d", fd );
+    if( tr_sessionIsPeerProxyEnabled( session ) ) {
+        proxy = tr_peerProxyNew( session, addr, port );
+        if( proxy == NULL )
+            return NULL;
+    }
 
-    return fd < 0 ? NULL
-                  : tr_peerIoNew( session, parent, addr, port, torrentHash, FALSE, isSeed, fd );
+    fd = openOutgoingPeerSocket( session, addr, port, isSeed, proxy );
+    dbgmsg( NULL, "openOutgoingPeerSocket returned fd %d", fd );
+
+    if( fd < 0 )
+    {
+        tr_peerProxyFree( proxy );
+        return NULL;
+    }
+
+    return tr_peerIoNew( session, parent, addr, port, torrentHash, FALSE, isSeed, fd, proxy );
 }
 
 /***
@@ -553,6 +585,7 @@ io_dtor( void * vio )
     evbuffer_free( io->inbuf );
     tr_netClose( io->session, io->socket );
     tr_cryptoFree( io->crypto );
+    tr_peerProxyFree( io->proxy );
     tr_list_free( &io->outbuf_datatypes, tr_free );
 
     memset( io, ~0, sizeof( tr_peerIo ) );
@@ -661,7 +694,8 @@ tr_peerIoReconnect( tr_peerIo * io )
     if( io->socket >= 0 )
         tr_netClose( session, io->socket );
 
-    io->socket = tr_netOpenPeerSocket( session, &io->addr, io->port, io->isSeed );
+    io->socket = openOutgoingPeerSocket( session, &io->addr, io->port,
+                                         io->isSeed, io->proxy );
     event_set( &io->event_read, io->socket, EV_READ, event_read_cb, io );
     event_set( &io->event_write, io->socket, EV_WRITE, event_write_cb, io );
 

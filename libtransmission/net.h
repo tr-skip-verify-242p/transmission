@@ -89,6 +89,7 @@ int tr_compareAddresses( const tr_address * a,
                          const tr_address * b);
 
 tr_bool tr_isValidPeerAddress( const tr_address * addr, tr_port port );
+tr_bool tr_isValidPeerProxyAddress( const tr_address * addr, tr_port port );
 
 static inline tr_bool tr_isAddress( const tr_address * a ) { return ( a != NULL ) && ( a->type==TR_AF_INET || a->type==TR_AF_INET6 ); }
 
@@ -101,6 +102,11 @@ int  tr_netOpenPeerSocket( tr_session       * session,
                            const tr_address * addr,
                            tr_port            port,
                            tr_bool            clientIsSeed );
+
+int  tr_netOpenPeerProxySocket( tr_session       * session,
+                                const tr_address * proxy_addr,
+                                tr_port            proxy_port,
+                                tr_bool            clientIsSeed );
 
 int  tr_netBindTCP( const tr_address * addr,
                     tr_port            port,

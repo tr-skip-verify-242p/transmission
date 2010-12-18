@@ -25,6 +25,7 @@
 #include "crypto.h"
 #include "handshake.h"
 #include "peer-io.h"
+#include "peer-proxy.h"
 #include "peer-mgr.h"
 #include "session.h"
 #include "torrent.h"
@@ -112,6 +113,7 @@ struct tr_handshake
     uint8_t               mySecret[KEY_LEN];
     handshake_state_t     state;
     tr_encryption_mode    encryptionMode;
+    tr_bool               encryptionFailed;
     uint16_t              pad_c_len;
     uint16_t              pad_d_len;
     uint16_t              ia_len;
@@ -144,6 +146,9 @@ enum
     AWAITING_VC,
     AWAITING_CRYPTO_SELECT,
     AWAITING_PAD_D,
+
+    /* outgoing via proxy */
+    AWAITING_PROXY_RESPONSE,
 };
 
 /**
@@ -195,6 +200,9 @@ getStateName( const handshake_state_t state )
 
         case AWAITING_PAD_D:
             str = "awaiting pad d"; break;
+
+        case AWAITING_PROXY_RESPONSE:
+            str = "awaiting proxy response"; break;
     }
     return str;
 }
@@ -324,6 +332,13 @@ parseHandshake( tr_handshake *    handshake,
 ****
 ***/
 
+static void
+sendProxyRequest( tr_handshake * handshake )
+{
+    setReadState( handshake, AWAITING_PROXY_RESPONSE );
+    tr_peerIoWriteProxyRequest( handshake->io );
+}
+
 /* 1 A->B: Diffie Hellman Ya, PadA */
 static void
 sendYa( tr_handshake * handshake )
@@ -347,6 +362,25 @@ sendYa( tr_handshake * handshake )
     /* send it */
     setReadState( handshake, AWAITING_YB );
     tr_peerIoWrite( handshake->io, outbuf, walk - outbuf, FALSE );
+}
+
+static void
+sendInitialMessage( tr_handshake * handshake )
+{
+    if( handshake->encryptionMode != TR_CLEAR_PREFERRED
+      && !handshake->encryptionFailed )
+    {
+        sendYa( handshake );
+    }
+    else
+    {
+        uint8_t msg[HANDSHAKE_SIZE];
+        buildHandshakeMessage( handshake, msg );
+
+        handshake->haveSentBitTorrentHandshake = 1;
+        setReadState( handshake, AWAITING_HANDSHAKE );
+        tr_peerIoWrite( handshake->io, msg, sizeof( msg ), FALSE );
+    }
 }
 
 static uint32_t
@@ -593,6 +627,19 @@ readPadD( tr_handshake *    handshake,
     setState( handshake, AWAITING_HANDSHAKE );
     return READ_NOW;
 }
+
+static int
+readProxy( tr_handshake *    handshake,
+           struct evbuffer * inbuf )
+{
+    int ret;
+
+    ret = tr_peerIoReadProxyResponse ( handshake->io, inbuf );
+    if( ret == READ_NOW )
+        sendInitialMessage( handshake );
+    return ret;
+}
+
 
 /***
 ****
@@ -1078,6 +1125,9 @@ canRead( struct tr_peerIo * io, void * arg, size_t * piece )
             case AWAITING_PAD_D:
                 ret = readPadD         ( handshake, inbuf ); break;
 
+            case AWAITING_PROXY_RESPONSE:
+                ret = readProxy        ( handshake, inbuf ); break;
+
             default:
                 assert( 0 );
         }
@@ -1160,13 +1210,21 @@ gotError( tr_peerIo  * io UNUSED,
       && ( handshake->encryptionMode != TR_ENCRYPTION_REQUIRED )
       && ( !tr_peerIoReconnect( handshake->io ) ) )
     {
-        uint8_t msg[HANDSHAKE_SIZE];
-
         dbgmsg( handshake, "handshake failed, trying plaintext..." );
-        buildHandshakeMessage( handshake, msg );
-        handshake->haveSentBitTorrentHandshake = 1;
-        setReadState( handshake, AWAITING_HANDSHAKE );
-        tr_peerIoWrite( handshake->io, msg, sizeof( msg ), FALSE );
+        handshake->encryptionFailed = TRUE;
+        if (tr_peerIoIsProxied( handshake->io ))
+        {
+            sendProxyRequest( handshake );
+        }
+        else
+        {
+            uint8_t msg[HANDSHAKE_SIZE];
+
+            buildHandshakeMessage( handshake, msg );
+            handshake->haveSentBitTorrentHandshake = 1;
+            setReadState( handshake, AWAITING_HANDSHAKE );
+            tr_peerIoWrite( handshake->io, msg, sizeof( msg ), FALSE );
+        }
     }
     else
     {
@@ -1211,17 +1269,10 @@ tr_handshakeNew( tr_peerIo *        io,
 
     if( tr_peerIoIsIncoming( handshake->io ) )
         setReadState( handshake, AWAITING_HANDSHAKE );
-    else if( encryptionMode != TR_CLEAR_PREFERRED )
-        sendYa( handshake );
+    else if( tr_peerIoIsProxied( handshake->io ) )
+        sendProxyRequest( handshake );
     else
-    {
-        uint8_t msg[HANDSHAKE_SIZE];
-        buildHandshakeMessage( handshake, msg );
-
-        handshake->haveSentBitTorrentHandshake = 1;
-        setReadState( handshake, AWAITING_HANDSHAKE );
-        tr_peerIoWrite( handshake->io, msg, sizeof( msg ), FALSE );
-    }
+        sendInitialMessage( handshake );
 
     return handshake;
 }
