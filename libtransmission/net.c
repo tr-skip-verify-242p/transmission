@@ -282,7 +282,8 @@ int
 tr_netOpenPeerSocket( tr_session        * session,
                       const tr_address  * addr,
                       tr_port             port,
-                      tr_bool             clientIsSeed )
+                      tr_bool             clientIsSeed,
+                      tr_bool             isProxy)
 {
     static const int domains[NUM_TR_AF_INET_TYPES] = { AF_INET, AF_INET6 };
     int                     s;
@@ -294,7 +295,8 @@ tr_netOpenPeerSocket( tr_session        * session,
 
     assert( tr_isAddress( addr ) );
 
-    if( !tr_isValidPeerAddress( addr, port ) )
+    if( ( isProxy && !tr_isValidPeerProxyAddress( addr, port ) )
+      || ( !isProxy && !tr_isValidPeerAddress( addr, port ) ) )
         return -EINVAL;
 
     s = tr_fdSocketCreate( session, domains[addr->type], SOCK_STREAM );
@@ -690,4 +692,11 @@ tr_isValidPeerAddress( const tr_address * addr, tr_port port )
         && ( !isIPv6LinkLocalAddress( addr ) )
         && ( !isIPv4MappedAddress( addr ) )
         && ( !isMartianAddr( addr ) );
+}
+
+tr_bool
+tr_isValidPeerProxyAddress( const tr_address * addr, tr_port port )
+{
+    return ( port != 0 )
+        && ( tr_isAddress( addr ) );
 }

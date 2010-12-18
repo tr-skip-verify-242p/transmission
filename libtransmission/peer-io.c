@@ -396,13 +396,13 @@ openOutgoingPeerSocket( tr_session        * session,
         if( tr_pton( tr_sessionGetPeerProxy( session ), &proxy_addr ) )
         {
             tr_port proxy_port = tr_sessionGetPeerProxyPort( session );
-            return tr_netOpenPeerSocket( session, &proxy_addr, proxy_port, clientIsSeed );
+            return tr_netOpenPeerSocket( session, &proxy_addr, proxy_port, clientIsSeed, TRUE );
         }
 
         return -1;
     }
 
-    return tr_netOpenPeerSocket( session, addr, port, clientIsSeed );
+    return tr_netOpenPeerSocket( session, addr, port, clientIsSeed, FALSE );
 }
 
 static tr_peerIo*
