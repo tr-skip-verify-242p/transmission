@@ -599,7 +599,7 @@ void          tr_sessionSetPeerProxyType( tr_session    * session,
                                           tr_proxy_type   proxy_type );
 
 void          tr_sessionSetPeerProxyUsername( tr_session * session,
-                                          const char * username );
+                                              const char * username );
 
 void          tr_sessionSetPeerProxyPassword( tr_session * session,
                                               const char * password );

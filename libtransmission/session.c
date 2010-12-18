@@ -358,7 +358,7 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PROXY_PORT,               s->proxyPort );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PROXY_TYPE,               s->proxyType );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_PROXY_USERNAME,           s->proxyUsername );
-    tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_PROXY,               s->proxy );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_PROXY,               s->peerProxy );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PEER_PROXY_AUTH_ENABLED,  s->isPeerProxyAuthEnabled );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PEER_PROXY_ENABLED,       s->isPeerProxyEnabled );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_PROXY_PASSWORD,      s->peerProxyPassword );
@@ -1822,6 +1822,9 @@ tr_sessionClose( tr_session * session )
     tr_free( session->proxy );
     tr_free( session->proxyUsername );
     tr_free( session->proxyPassword );
+    tr_free( session->peerProxy );
+    tr_free( session->peerProxyUsername );
+    tr_free( session->peerProxyPassword );
     tr_free( session->blocklist_url );
     tr_free( session->peer_congestion_algorithm );
     tr_free( session );
