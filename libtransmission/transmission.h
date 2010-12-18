@@ -540,7 +540,7 @@ tr_bool       tr_sessionIsProxyAuthEnabled( const tr_session * );
 
 const char*   tr_sessionGetProxy( const tr_session * );
 
-tr_port       tr_sessionGetProxyPort( const tr_session * );
+int           tr_sessionGetProxyPort( const tr_session * );
 
 tr_proxy_type tr_sessionGetProxyType( const tr_session * );
 
@@ -558,7 +558,7 @@ void          tr_sessionSetProxy( tr_session * session,
                                   const char * proxy );
 
 void          tr_sessionSetProxyPort( tr_session * session,
-                                      tr_port      port );
+                                      int          port );
 
 void          tr_sessionSetProxyType( tr_session    * session,
                                       tr_proxy_type   proxy_type );
@@ -575,7 +575,7 @@ tr_bool       tr_sessionIsPeerProxyAuthEnabled( const tr_session * );
 
 const char*   tr_sessionGetPeerProxy( const tr_session * );
 
-tr_port       tr_sessionGetPeerProxyPort( const tr_session * );
+int           tr_sessionGetPeerProxyPort( const tr_session * );
 
 tr_proxy_type tr_sessionGetPeerProxyType( const tr_session * );
 
@@ -593,7 +593,7 @@ void          tr_sessionSetPeerProxy( tr_session * session,
                                       const char * proxy );
 
 void          tr_sessionSetPeerProxyPort( tr_session * session,
-                                          tr_port      port );
+                                          int          port );
 
 void          tr_sessionSetPeerProxyType( tr_session    * session,
                                           tr_proxy_type   proxy_type );

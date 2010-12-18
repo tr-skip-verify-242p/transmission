@@ -2539,7 +2539,7 @@ tr_sessionGetProxy( const tr_session * session )
     return session->proxy;
 }
 
-tr_port
+int
 tr_sessionGetProxyPort( const tr_session * session )
 {
     assert( tr_isSession( session ) );
@@ -2562,7 +2562,7 @@ tr_sessionSetProxy( tr_session * session,
 
 void
 tr_sessionSetProxyPort( tr_session * session,
-                        tr_port      port )
+                        int          port )
 {
     assert( tr_isSession( session ) );
 
@@ -2672,7 +2672,7 @@ tr_sessionGetPeerProxy( const tr_session * session )
     return session->peerProxy;
 }
 
-tr_port
+int
 tr_sessionGetPeerProxyPort( const tr_session * session )
 {
     assert( tr_isSession( session ) );
@@ -2695,7 +2695,7 @@ tr_sessionSetPeerProxy( tr_session * session,
 
 void
 tr_sessionSetPeerProxyPort( tr_session * session,
-                            tr_port      port )
+                            int          port )
 {
     assert( tr_isSession( session ) );
 

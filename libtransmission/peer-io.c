@@ -395,7 +395,7 @@ openOutgoingPeerSocket( tr_session        * session,
 
         if( tr_pton( tr_sessionGetPeerProxy( session ), &proxy_addr ) )
         {
-            tr_port proxy_port = tr_sessionGetPeerProxyPort( session );
+            tr_port proxy_port = htons( tr_sessionGetPeerProxyPort( session ) );
             return tr_netOpenPeerSocket( session, &proxy_addr, proxy_port, clientIsSeed, TRUE );
         }
 
