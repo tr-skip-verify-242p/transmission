@@ -55,7 +55,7 @@ struct tr_peerProxy
 tr_peerProxy *
 tr_peerProxyNew( const tr_session * session,
                  const tr_address * peerAddr,
-                 tr_port            peerPort)
+                 tr_port            peerPort )
 {
     tr_peerProxy *   proxy;
     tr_address       addr;
@@ -315,12 +315,12 @@ writeProxyRequestSOCKS5( tr_peerIo * io )
     if( tr_peerProxyIsAuthEnabled( proxy ) )
     {
         uint8_t packet[4] = { SOCKS5_VERSION, 2, SOCKS5_AUTH_NONE, SOCKS5_AUTH_USERPASS };
-        tr_peerIoWrite( io, packet, sizeof(packet), FALSE );
+        tr_peerIoWrite( io, packet, sizeof( packet ), FALSE );
     }
     else
     {
         uint8_t packet[3] = { SOCKS5_VERSION, 1, SOCKS5_AUTH_NONE };
-        tr_peerIoWrite( io, packet, sizeof(packet), FALSE );
+        tr_peerIoWrite( io, packet, sizeof( packet ), FALSE );
     }
 
     tr_peerProxySetState( proxy, PEER_PROXY_INIT );
@@ -374,7 +374,7 @@ readProxyResponseHTTP( tr_peerIo * io, struct evbuffer * inbuf )
     tr_free( line );
     evbuffer_drain( inbuf, EVBUFFER_LENGTH( inbuf ) );
 
-    if (success)
+    if( success )
     {
         tr_peerProxySetState( io->proxy, PEER_PROXY_ESTABLISHED );
         return READ_NOW;
@@ -491,7 +491,7 @@ processSOCKS5AuthResponse( tr_peerIo * io, struct evbuffer * inbuf )
 
     if( status != SOCKS5_REPLY_SUCCESS )
     {
-        tr_nerr( "Proxy", "SOCKS5 authentication failed: %s", socksReplyStr( status ) );
+        tr_nerr( "Proxy", "SOCKS5 authentication failed" );
         return READ_ERR;
     }
 
@@ -513,7 +513,7 @@ processSOCKS5CmdResponse( tr_peerIo * io, struct evbuffer * inbuf )
 
     if( status != SOCKS5_REPLY_SUCCESS )
     {
-        tr_nerr( "Proxy", "SOCKS5 connect request rejected: %s", socksReplyStr( status ) );
+        tr_nerr( "Proxy", "SOCKS5 request rejected: %s", socksReplyStr( status ) );
         return READ_ERR;
     }
 
@@ -552,10 +552,9 @@ readProxyResponseSOCKS5( tr_peerIo * io, struct evbuffer * inbuf )
 /**
  * @brief Reads and removes the proxy response from the buffer
  * @return Returns READ_NOW if the proxy request succeeded and
- * and the connection is now ready to be used for peer communication,
- * READ_LATER if the buffer does not yet contain the complete
- * response, or READ_ERR if an error occured.
- * @note The proxy's complete response is removed from the buffer.
+ * the connection is now ready to be used for peer communication,
+ * READ_LATER if more data is expected to be read from the proxy,
+ * or READ_ERR if an error occured.
  */
 int
 tr_peerIoReadProxyResponse( tr_peerIo * io, struct evbuffer * inbuf )

@@ -101,12 +101,12 @@ tr_bool tr_net_hasIPv6( tr_port );
 int  tr_netOpenPeerSocket( tr_session       * session,
                            const tr_address * addr,
                            tr_port            port,
-                           tr_bool            clientIsSeed);
+                           tr_bool            clientIsSeed );
 
 int  tr_netOpenPeerProxySocket( tr_session       * session,
                                 const tr_address * proxy_addr,
                                 tr_port            proxy_port,
-                                tr_bool            clientIsSeed);
+                                tr_bool            clientIsSeed );
 
 int  tr_netBindTCP( const tr_address * addr,
                     tr_port            port,

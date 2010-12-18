@@ -384,7 +384,7 @@ openOutgoingPeerSocket( tr_session        * session,
                         const tr_address  * addr,
                         tr_port             port,
                         tr_bool             clientIsSeed,
-                        tr_peerProxy      * proxy)
+                        tr_peerProxy      * proxy )
 {
     if( proxy )
     {
