@@ -221,18 +221,30 @@ getShortStatusString( const tr_torrent  * tor,
         case TR_STATUS_DOWNLOAD:
         case TR_STATUS_SEED:
         {
+            const tr_info * info = tr_torrentInfo( tor );
             char buf[512];
-            /* 1==seeder symbol, 2==seeders connected, 3==seeder count,
-               4==leecher symbol, 5==leechers connected, 6==leecher count */
-            g_string_append_printf( gstr, _( "%1$s %2$d/%3$d  %4$s %5$d/%6$d" ),
-                                    gtr_get_unicode_string( GTR_UNICODE_SEEDER ),
-                                    torStat->seedersConnected +
-                                    torStat->webseedsSendingToUs,
-                                    torStat->swarmSeeders +
-                                    torStat->webseedsSendingToUs,
-                                    gtr_get_unicode_string( GTR_UNICODE_LEECHER ),
-                                    torStat->leechersConnected,
-                                    torStat->swarmLeechers );
+            if( info->trackerCount <= 0 )
+            {
+                /* 1==seeder symbol, 2==seeders connected,
+                   3==leecher symbol, 4==leechers connected */
+                g_string_append_printf( gstr, _( "%1$s %2$d/?  %3$s %4$d/?" ),
+                    gtr_get_unicode_string( GTR_UNICODE_SEEDER ),
+                    torStat->seedersConnected + torStat->webseedsSendingToUs,
+                    gtr_get_unicode_string( GTR_UNICODE_LEECHER ),
+                    torStat->leechersConnected );
+            }
+            else
+            {
+                /* 1==seeder symbol, 2==seeders connected, 3==seeder count,
+                   4==leecher symbol, 5==leechers connected, 6==leecher count */
+                g_string_append_printf( gstr, _( "%1$s %2$d/%3$d  %4$s %5$d/%6$d" ),
+                    gtr_get_unicode_string( GTR_UNICODE_SEEDER ),
+                    torStat->seedersConnected + torStat->webseedsSendingToUs,
+                    torStat->swarmSeeders + torStat->webseedsSendingToUs,
+                    gtr_get_unicode_string( GTR_UNICODE_LEECHER ),
+                    torStat->leechersConnected,
+                    torStat->swarmLeechers );
+            }
             g_string_append( gstr, " - " );
 
             if( torStat->activity != TR_STATUS_DOWNLOAD )
@@ -288,6 +300,7 @@ getStatusString( const tr_torrent  * tor,
         {
             if( tr_torrentHasMetadata( tor ) )
             {
+                const tr_info * info = tr_torrentInfo( tor );
                 g_string_append_printf( gstr,
                     gtr_ngettext( "Downloading from %1$'d of %2$'d connected peer",
                                   "Downloading from %1$'d of %2$'d connected peers",
@@ -297,11 +310,20 @@ getStatusString( const tr_torrent  * tor,
                     torStat->peersConnected +
                     torStat->webseedsSendingToUs );
                 g_string_append( gstr, " - " );
-                g_string_append_printf( gstr,
-                    _( "Swarm has %d seeders, %d leechers" ),
-                    torStat->swarmSeeders +
-                    torStat->webseedsSendingToUs,
-                    torStat->swarmLeechers );
+                if( info->trackerCount <= 0 )
+                {
+                    g_string_append_printf( gstr, "Swarm size unknown" );
+                }
+                else
+                {
+                    const char * fmt = info->trackerCount == 1
+                        ? _( "Swarm has %d seeders and %d leechers" )
+                        : _( "Swarm has at least %d seeders and %d leechers" );
+                    g_string_append_printf( gstr, fmt,
+                        torStat->swarmSeeders +
+                        torStat->webseedsSendingToUs,
+                        torStat->swarmLeechers );
+                }
             }
             else
             {
