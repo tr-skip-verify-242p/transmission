@@ -845,13 +845,22 @@ shouldConfirmBeforeExiting( struct cbdata * data )
 }
 
 static void
+maybeaskquit_response( gpointer vdata, int response )
+{
+  struct cbdata * cbdata = vdata;
+  cbdata->quit_dialog = NULL;
+  if( response == GTK_RESPONSE_ACCEPT )
+    wannaquit( cbdata );
+}
+
+static void
 maybeaskquit( struct cbdata * cbdata )
 {
     if( !shouldConfirmBeforeExiting( cbdata ) )
         wannaquit( cbdata );
     else {
         if( cbdata->quit_dialog == NULL )
-            cbdata->quit_dialog = askquit( cbdata->core, cbdata->wind, wannaquit, cbdata );
+            cbdata->quit_dialog = askquit( cbdata->core, cbdata->wind, maybeaskquit_response, cbdata );
         gtk_window_present( GTK_WINDOW( cbdata->quit_dialog ) );
     }
 }
