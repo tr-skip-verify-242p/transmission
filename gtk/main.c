@@ -838,11 +838,16 @@ shouldConfirmBeforeExiting( struct cbdata * data )
 {
     if( !pref_flag_get( PREF_KEY_ASKQUIT ) )
         return FALSE;
-    else {
-        struct counts_data counts;
-        getTorrentCounts( data, &counts );
-        return counts.activeCount > 0;
-    }
+    return tr_core_get_active_torrent_count( data->core ) > 0;
+}
+
+static void
+maybeaskquit_response( gpointer vdata, int response )
+{
+  struct cbdata * cbdata = vdata;
+  cbdata->quit_dialog = NULL;
+  if( response == GTK_RESPONSE_ACCEPT )
+    wannaquit( cbdata );
 }
 
 static void
@@ -852,7 +857,7 @@ maybeaskquit( struct cbdata * cbdata )
         wannaquit( cbdata );
     else {
         if( cbdata->quit_dialog == NULL )
-            cbdata->quit_dialog = askquit( cbdata->core, cbdata->wind, wannaquit, cbdata );
+            cbdata->quit_dialog = askquit( cbdata->core, cbdata->wind, maybeaskquit_response, cbdata );
         gtk_window_present( GTK_WINDOW( cbdata->quit_dialog ) );
     }
 }
@@ -1011,6 +1016,9 @@ wannaquit( gpointer vdata )
 {
     GtkWidget *r, *p, *b, *w, *c;
     struct cbdata *cbdata = vdata;
+
+    if( pref_flag_get( PREF_KEY_QUIT_FAST ) )
+        exit( 0 );
 
     /* stop the update timer */
     if( cbdata->timer )

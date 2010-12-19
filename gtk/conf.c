@@ -197,6 +197,7 @@ tr_prefs_init_defaults( tr_benc * d )
     tr_bencDictAddStr( d, TR_PREFS_KEY_DOWNLOAD_DIR, str );
 
     tr_bencDictAddBool( d, PREF_KEY_ASKQUIT, TRUE );
+    tr_bencDictAddBool( d, PREF_KEY_QUIT_FAST, FALSE );
 
     tr_bencDictAddStr( d, PREF_KEY_SORT_MODE, "sort-by-name" );
     tr_bencDictAddBool( d, PREF_KEY_SORT_REVERSED, FALSE );

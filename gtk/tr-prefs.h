@@ -34,6 +34,7 @@ GtkWidget * tr_prefs_dialog_new( GObject *   core,
 #define PREF_KEY_SHOW_MORE_PEER_INFO               "show-extra-peer-details"
 #define PREF_KEY_SHOW_BACKUP_TRACKERS              "show-backup-trackers"
 #define PREF_KEY_ASKQUIT                           "prompt-before-exit"
+#define PREF_KEY_QUIT_FAST                         "quit-fast"
 #define PREF_KEY_SORT_MODE                         "sort-mode"
 #define PREF_KEY_SORT_REVERSED                     "sort-reversed"
 #define PREF_KEY_COMPACT_VIEW                      "compact-view"
