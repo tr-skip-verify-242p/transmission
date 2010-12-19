@@ -1844,7 +1844,7 @@ announceMore( tr_announcer * announcer )
         /* build a list of tiers that need to be announced */
         while(( tor = tr_torrentNext( announcer->session, tor ))) {
             if( tor->tiers ) {
-                const tr_bool paused = ( tr_torrentGetActivity( tor ) == TR_STATUS_STOPPED );
+                const tr_bool paused = !tor->isRunning;
                 const tr_bool scrapePaused = tr_sessionGetScrapePaused( announcer-> session );
                 n = tr_ptrArraySize( &tor->tiers->tiers );
                 for( i=0; i<n; ++i ) {

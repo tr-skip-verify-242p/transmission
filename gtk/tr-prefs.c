@@ -315,7 +315,7 @@ torrentPage( GObject * core )
     g_signal_connect( l, "toggled", G_CALLBACK( target_cb ), w );
     hig_workarea_add_row_w( t, &row, l, w, NULL );
 
-    s = _( "Scrape trackers when torrent is paused" );
+    s = _( "S_crape trackers when torrent is paused" );
     w = new_check_button( s, TR_PREFS_KEY_SCRAPE_PAUSED_TORRENTS, core );
     hig_workarea_add_wide_control( t, &row, w );
 
