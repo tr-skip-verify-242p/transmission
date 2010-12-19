@@ -838,10 +838,7 @@ shouldConfirmBeforeExiting( struct cbdata * data )
 {
     if( !pref_flag_get( PREF_KEY_ASKQUIT ) )
         return FALSE;
-    else {
-        const int active = tr_core_get_active_torrent_count( data->core );
-        return active > 0;
-    }
+    return tr_core_get_active_torrent_count( data->core ) > 0;
 }
 
 static void
