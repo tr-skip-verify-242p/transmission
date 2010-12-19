@@ -1012,19 +1012,9 @@ do_exit_cb( GtkWidget *w  UNUSED,
 }
 
 static void
-always_quit_toggle_cb( GtkWidget * w,
-                       gpointer vdata )
-{
-    struct cbdata *cbdata = vdata;
-    gboolean b = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( w ) );
-    pref_flag_set( PREF_KEY_QUIT_FAST, b );
-    pref_save( tr_core_session( cbdata->core ) );
-}
-
-static void
 wannaquit( gpointer vdata )
 {
-    GtkWidget *r, *p, *b, *w, *c, *hbox;
+    GtkWidget *r, *p, *b, *w, *c;
     struct cbdata *cbdata = vdata;
 
     if( pref_flag_get( PREF_KEY_QUIT_FAST ) )
@@ -1059,18 +1049,10 @@ wannaquit( gpointer vdata )
     gtk_misc_set_alignment( GTK_MISC( w ), 0.0, 0.5 );
     gtk_table_attach_defaults( GTK_TABLE( p ), w, 1, 2, 1, 2 );
 
-    hbox = gtk_hbox_new( FALSE, 10 );
-
+    b = gtk_alignment_new( 0.0, 1.0, 0.01, 0.01 );
     w = gtk_button_new_with_mnemonic( _( "_Quit Now" ) );
     g_signal_connect( w, "clicked", G_CALLBACK( do_exit_cb ), NULL );
-    gtk_container_add( GTK_CONTAINER( hbox ), w );
-
-    w = gtk_check_button_new_with_mnemonic( _( "Never wait for network" ) );
-    g_signal_connect( G_OBJECT( w ), "toggled", G_CALLBACK( always_quit_toggle_cb ), cbdata );
-    gtk_container_add( GTK_CONTAINER( hbox ), w );
-
-    b = gtk_alignment_new( 0.0, 1.0, 0.01, 0.01 );
-    gtk_container_add( GTK_CONTAINER( b ), hbox );
+    gtk_container_add( GTK_CONTAINER( b ), w );
     gtk_table_attach( GTK_TABLE( p ), b, 1, 2, 2, 3, GTK_FILL, GTK_FILL, 0, 10 );
 
     gtk_widget_show_all( r );
