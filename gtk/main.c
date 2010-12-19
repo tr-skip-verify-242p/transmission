@@ -1344,7 +1344,7 @@ prefschanged( TrCore * core UNUSED, const char * key, gpointer data )
     {
         tr_sessionSetPaused( tr, !pref_flag_get( key ) );
     }
-    else if( !strcmp( key, TR_PREFS_KEY_SCRIPT_TORRENT_DONE_ENABLED ) )
+    else if( !strcmp( key, TR_PREFS_KEY_SCRAPE_PAUSED_TORRENTS ) )
     {
         tr_sessionSetScrapePaused( tr, pref_flag_get( key ) );
     }
