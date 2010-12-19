@@ -839,9 +839,8 @@ shouldConfirmBeforeExiting( struct cbdata * data )
     if( !pref_flag_get( PREF_KEY_ASKQUIT ) )
         return FALSE;
     else {
-        struct counts_data counts;
-        getTorrentCounts( data, &counts );
-        return counts.activeCount > 0;
+        const int active = tr_core_get_active_torrent_count( data->core );
+        return active > 0;
     }
 }
 
