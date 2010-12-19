@@ -1060,7 +1060,7 @@ wannaquit( gpointer vdata )
     g_signal_connect( w, "clicked", G_CALLBACK( do_exit_cb ), NULL );
     gtk_container_add( GTK_CONTAINER( hbox ), w );
 
-    w = gtk_check_button_new_with_mnemonic( _( "Always quit immediately" ) );
+    w = gtk_check_button_new_with_mnemonic( _( "Never wait for network" ) );
     g_signal_connect( G_OBJECT( w ), "toggled", G_CALLBACK( always_quit_toggle_cb ), cbdata );
     gtk_container_add( GTK_CONTAINER( hbox ), w );
 
