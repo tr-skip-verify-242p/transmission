@@ -1845,7 +1845,7 @@ announceMore( tr_announcer * announcer )
         while(( tor = tr_torrentNext( announcer->session, tor ))) {
             if( tor->tiers ) {
                 const tr_bool paused = !tor->isRunning;
-                const tr_bool scrapePaused = tr_sessionGetScrapePaused( announcer-> session );
+                const tr_bool scrapePaused = tr_sessionGetScrapePaused( announcer->session );
                 n = tr_ptrArraySize( &tor->tiers->tiers );
                 for( i=0; i<n; ++i ) {
                     tr_tier * tier = tr_ptrArrayNth( &tor->tiers->tiers, i );
