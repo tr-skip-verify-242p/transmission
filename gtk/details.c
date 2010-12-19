@@ -1856,6 +1856,8 @@ buildTrackerSummary( const char * key, const tr_tracker_stat * st, gboolean show
             switch( st->scrapeState )
             {
                 case TR_TRACKER_INACTIVE:
+                    g_string_append_c( gstr, '\n' );
+                    g_string_append( gstr, _( "No scrape scheduled" ) );
                     break;
                 case TR_TRACKER_WAITING:
                     g_string_append_c( gstr, '\n' );

@@ -314,6 +314,7 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddStr ( d, TR_PREFS_KEY_BIND_ADDRESS_IPV4,        TR_DEFAULT_BIND_ADDRESS_IPV4 );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_BIND_ADDRESS_IPV6,        TR_DEFAULT_BIND_ADDRESS_IPV6 );
     tr_bencDictAddBool( d, TR_PREFS_KEY_START,                    TRUE );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_SCRAPE_PAUSED_TORRENTS,   TRUE );
     tr_bencDictAddBool( d, TR_PREFS_KEY_TRASH_ORIGINAL,           FALSE );
 }
 
@@ -392,6 +393,7 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddStr ( d, TR_PREFS_KEY_BIND_ADDRESS_IPV4,        tr_ntop_non_ts( &s->public_ipv4->addr ) );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_BIND_ADDRESS_IPV6,        tr_ntop_non_ts( &s->public_ipv6->addr ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_START,                    !tr_sessionGetPaused( s ) );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_SCRAPE_PAUSED_TORRENTS,   tr_sessionGetScrapePaused( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_TRASH_ORIGINAL,           tr_sessionGetDeleteSource( s ) );
 }
 
@@ -721,6 +723,8 @@ sessionSetImpl( void * vdata )
         tr_blocklistSetURL( session, str );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_START, &boolVal ) )
         tr_sessionSetPaused( session, !boolVal );
+    if( tr_bencDictFindBool( settings, TR_PREFS_KEY_SCRAPE_PAUSED_TORRENTS, &boolVal ) )
+        tr_sessionSetScrapePaused( session, boolVal );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_TRASH_ORIGINAL, &boolVal) )
         tr_sessionSetDeleteSource( session, boolVal );
 
@@ -1619,6 +1623,22 @@ tr_sessionGetPaused( const tr_session * session )
     assert( tr_isSession( session ) );
 
     return session->pauseAddedTorrent;
+}
+
+void
+tr_sessionSetScrapePaused( tr_session * session, tr_bool enable )
+{
+    assert( tr_isSession( session ) );
+
+    session->scrapePausedTorrents = enable;
+}
+
+tr_bool
+tr_sessionGetScrapePaused( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+
+    return session->scrapePausedTorrents;
 }
 
 void

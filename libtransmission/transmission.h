@@ -223,6 +223,7 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_UMASK                         "umask"
 #define TR_PREFS_KEY_UPLOAD_SLOTS_PER_TORRENT      "upload-slots-per-torrent"
 #define TR_PREFS_KEY_START                         "start-added-torrents"
+#define TR_PREFS_KEY_SCRAPE_PAUSED_TORRENTS        "scrape-paused-torrents"
 #define TR_PREFS_KEY_TRASH_ORIGINAL                "trash-original-torrent-files"
 
 
@@ -785,6 +786,9 @@ void            tr_torrentSetPriority( tr_torrent *, tr_priority_t );
 
 void       tr_sessionSetPaused        ( tr_session *, tr_bool isPaused );
 tr_bool    tr_sessionGetPaused        ( const tr_session * );
+
+void       tr_sessionSetScrapePaused  ( tr_session *, tr_bool enable );
+tr_bool    tr_sessionGetScrapePaused  ( const tr_session * );
 
 void       tr_sessionSetDeleteSource  ( tr_session *, tr_bool deleteSource );
 tr_bool    tr_sessionGetDeleteSource  ( const tr_session * );

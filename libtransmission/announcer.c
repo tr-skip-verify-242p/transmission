@@ -1844,12 +1844,14 @@ announceMore( tr_announcer * announcer )
         /* build a list of tiers that need to be announced */
         while(( tor = tr_torrentNext( announcer->session, tor ))) {
             if( tor->tiers ) {
+                const tr_bool paused = ( tr_torrentGetActivity( tor ) == TR_STATUS_STOPPED );
+                const tr_bool scrapePaused = tr_sessionGetScrapePaused( announcer-> session );
                 n = tr_ptrArraySize( &tor->tiers->tiers );
                 for( i=0; i<n; ++i ) {
                     tr_tier * tier = tr_ptrArrayNth( &tor->tiers->tiers, i );
                     if( tierNeedsToAnnounce( tier, now ) )
                         tr_ptrArrayAppend( &announceMe, tier );
-                    else if( tierNeedsToScrape( tier, now ) )
+                    else if( tierNeedsToScrape( tier, now ) && ( !paused || scrapePaused ) )
                         tr_ptrArrayAppend( &scrapeMe, tier );
                 }
             }
@@ -1959,6 +1961,7 @@ tr_announcerStats( const tr_torrent * torrent,
     int tierCount;
     tr_tracker_stat * ret;
     const time_t now = tr_time( );
+    tr_bool scrapePaused;
 
     assert( tr_isTorrent( torrent ) );
 
@@ -1971,6 +1974,8 @@ tr_announcerStats( const tr_torrent * torrent,
     /* alloc the stats */
     *setmeTrackerCount = n;
     ret = tr_new0( tr_tracker_stat, n );
+
+    scrapePaused = tr_sessionGetScrapePaused( torrent->session );
 
     /* populate the stats */
     for( i=0, tierCount=tr_ptrArraySize( &torrent->tiers->tiers ); i<tierCount; ++i )
@@ -2016,7 +2021,7 @@ tr_announcerStats( const tr_torrent * torrent,
 
                 if( tier->isScraping )
                     st->scrapeState = TR_TRACKER_ACTIVE;
-                else if( !tier->scrapeAt )
+                else if( !tier->scrapeAt || ( !torrent->isRunning && !scrapePaused ) )
                     st->scrapeState = TR_TRACKER_INACTIVE;
                 else if( tier->scrapeAt > now )
                 {
