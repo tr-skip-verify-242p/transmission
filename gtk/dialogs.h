@@ -30,10 +30,10 @@
 #include "util.h"
 
 
-/* used for a callback function with data parameter and response */
-typedef void ( *callbackfunc_t )( gpointer, int );
+/* used for a callback function with a data parameter */
+typedef void ( *callbackfunc_t )( gpointer );
 
-/* prompt if the user wants to quit, calls func with cbdata and the response */
+/* prompt if the user wants to quit, calls func with cbdata if they do */
 GtkWidget *  askquit( TrCore          * core,
                       GtkWindow       * parent,
                       callbackfunc_t    func,

@@ -40,6 +40,7 @@
 #define MY_NAME "transmission-remote"
 #define DEFAULT_HOST "localhost"
 #define DEFAULT_PORT atoi(TR_DEFAULT_RPC_PORT_STR)
+#define DEFAULT_URL TR_DEFAULT_RPC_URL_STR "rpc/"
 
 #define ARGUMENTS "arguments"
 
@@ -207,6 +208,8 @@ getUsage( void )
         MY_NAME " [port] [options]\n"
                 "       "
         MY_NAME " [host:port] [options]\n"
+                "       "
+        MY_NAME " [http://host:port/transmission/] [options]\n"
                 "\n"
                 "See the man page for detailed explanations and many examples.";
 }
@@ -256,6 +259,7 @@ static tr_option opts[] =
     { 'm', "portmap",                "Enable portmapping via NAT-PMP or UPnP", "m",  0, NULL },
     { 'M', "no-portmap",             "Disable portmapping", "M",  0, NULL },
     { 'n', "auth",                   "Set username and password", "n",  1, "<user:pw>" },
+    { 810, "authenv",                "Set authentication info from the TR_AUTH environment variable (user:pw)", "ne", 0, NULL },
     { 'N', "netrc",                  "Set authentication info from a .netrc file", "N",  1, "<file>" },
     { 'o', "dht",                    "Enable distributed hash tables (DHT)", "o", 0, NULL },
     { 'O', "no-dht",                 "Disable distributed hash tables (DHT)", "O", 0, NULL },
@@ -268,6 +272,7 @@ static tr_option opts[] =
     { 700, "bandwidth-high",         "Give this torrent first chance at available bandwidth", "Bh", 0, NULL },
     { 701, "bandwidth-normal",       "Give this torrent bandwidth left over by high priority torrents", "Bn", 0, NULL },
     { 702, "bandwidth-low",          "Give this torrent bandwidth left over by high and normal priority torrents", "Bl", 0, NULL },
+    { 600, "reannounce",             "Reannounce the current torrent(s)", NULL,  0, NULL },
     { 'r', "remove",                 "Remove the current torrent(s)", "r",  0, NULL },
     { 930, "peers",                  "Set the maximum number of peers for the current torrent(s) or globally", "pr", 1, "<max>" },
     { 'R', "remove-and-delete",      "Remove the current torrent(s) and delete local data", NULL, 0, NULL },
@@ -352,6 +357,7 @@ getOptMode( int val )
         case 'b': /* debug */
         case 'j': /* output json */
         case 'n': /* auth */
+        case 810: /* authenv */
         case 'N': /* netrc */
         case 't': /* set current torrent */
         case 'V': /* show version number */
@@ -449,6 +455,9 @@ getOptMode( int val )
 
         case 'v': /* verify */
             return MODE_TORRENT_VERIFY;
+
+        case 600: /* reannounce */
+            return MODE_TORRENT_REANNOUNCE;
 
         case 962: /* port-test */
             return MODE_PORT_TEST;
@@ -1003,7 +1012,7 @@ printDetails( tr_benc * top )
             if (tr_bencDictFindInt (t, "bandwidthPriority", &i))
                 printf ("  Bandwidth Priority: %s\n",
                         bandwidthPriorityNames[(i + 1) & 3]);
-   
+
             printf( "\n" );
         }
     }
@@ -1588,7 +1597,7 @@ printSessionStats( tr_benc * top )
 static char id[4096];
 
 static int
-processResponse( const char * host, int port, const void * response, size_t len )
+processResponse( const char * rpcurl, const void * response, size_t len )
 {
     tr_benc top;
     int status = EXIT_SUCCESS;
@@ -1655,7 +1664,7 @@ processResponse( const char * host, int port, const void * response, size_t len 
                 if( !tr_bencDictFindStr( &top, "result", &str ) )
                     status |= EXIT_FAILURE;
                 else {
-                    printf( "%s:%d responded: \"%s\"\n", host, port, str );
+                    printf( "%s responded: \"%s\"\n", rpcurl, str );
                     if( strcmp( str, "success") )
                         status |= EXIT_FAILURE;
                 }
@@ -1694,17 +1703,16 @@ tr_curl_easy_init( struct evbuffer * writebuf )
 }
 
 static int
-flush( const char * host, int port, tr_benc ** benc )
+flush( const char * rpcurl, tr_benc ** benc )
 {
     CURLcode res;
     CURL * curl;
     int status = EXIT_SUCCESS;
     struct evbuffer * buf = evbuffer_new( );
     char * json = tr_bencToStr( *benc, TR_FMT_JSON_LEAN, NULL );
-    char * url = tr_strdup_printf( "http://%s:%d/transmission/rpc", host, port );
 
     curl = tr_curl_easy_init( buf );
-    curl_easy_setopt( curl, CURLOPT_URL, url );
+    curl_easy_setopt( curl, CURLOPT_URL, rpcurl );
     curl_easy_setopt( curl, CURLOPT_POSTFIELDS, json );
     curl_easy_setopt( curl, CURLOPT_TIMEOUT, getTimeoutSecs( json ) );
 
@@ -1713,7 +1721,7 @@ flush( const char * host, int port, tr_benc ** benc )
 
     if(( res = curl_easy_perform( curl )))
     {
-        tr_nerr( MY_NAME, "(%s) %s", url, curl_easy_strerror( res ) );
+        tr_nerr( MY_NAME, "(%s) %s", rpcurl, curl_easy_strerror( res ) );
         status |= EXIT_FAILURE;
     }
     else
@@ -1722,7 +1730,7 @@ flush( const char * host, int port, tr_benc ** benc )
         curl_easy_getinfo( curl, CURLINFO_RESPONSE_CODE, &response );
         switch( response ) {
             case 200:
-                status |= processResponse( host, port, EVBUFFER_DATA(buf), EVBUFFER_LENGTH(buf) );
+                status |= processResponse( rpcurl, EVBUFFER_DATA(buf), EVBUFFER_LENGTH(buf) );
                 break;
             case 409:
                 /* session id failed.  our curl header func has already
@@ -1730,7 +1738,7 @@ flush( const char * host, int port, tr_benc ** benc )
                 * build a new CURL* and try again */
                 curl_easy_cleanup( curl );
                 curl = NULL;
-                flush( host, port, benc );
+                flush( rpcurl, benc );
                 benc = NULL;
                 break;
             default:
@@ -1741,7 +1749,6 @@ flush( const char * host, int port, tr_benc ** benc )
     }
 
     /* cleanup */
-    tr_free( url );
     tr_free( json );
     evbuffer_free( buf );
     if( curl != 0 )
@@ -1788,7 +1795,7 @@ ensure_tset( tr_benc ** tset )
 }
 
 static int
-processArgs( const char * host, int port, int argc, const char ** argv )
+processArgs( const char * rpcurl, int argc, const char ** argv )
 {
     int c;
     int status = EXIT_SUCCESS;
@@ -1808,9 +1815,9 @@ processArgs( const char * host, int port, int argc, const char ** argv )
             switch( c )
             {
                 case 'a': /* add torrent */
-                    if( sset != 0 ) status |= flush( host, port, &sset );
-                    if( tadd != 0 ) status |= flush( host, port, &tadd );
-                    if( tset != 0 ) { addIdArg( tr_bencDictFind( tset, ARGUMENTS ), id ); status |= flush( host, port, &tset ); }
+                    if( sset != 0 ) status |= flush( rpcurl, &sset );
+                    if( tadd != 0 ) status |= flush( rpcurl, &tadd );
+                    if( tset != 0 ) { addIdArg( tr_bencDictFind( tset, ARGUMENTS ), id ); status |= flush( rpcurl, &tset ); }
                     tadd = tr_new0( tr_benc, 1 );
                     tr_bencInitDict( tadd, 3 );
                     tr_bencDictAddStr( tadd, "method", "torrent-add" );
@@ -1830,13 +1837,24 @@ processArgs( const char * host, int port, int argc, const char ** argv )
                     auth = tr_strdup( optarg );
                     break;
 
+                case 810: /* authenv */
+                    {
+                        char *authenv = getenv("TR_AUTH");
+                        if( !authenv ) {
+                            fprintf( stderr, "The TR_AUTH environment variable is not set\n" );
+                            exit( 0 );
+                        }
+                        auth = tr_strdup( authenv );
+                    }
+                    break;
+
                 case 'N': /* netrc */
                     netrc = tr_strdup( optarg );
                     break;
 
                 case 't': /* set current torrent */
-                    if( tadd != 0 ) status |= flush( host, port, &tadd );
-                    if( tset != 0 ) { addIdArg( tr_bencDictFind( tset, ARGUMENTS ), id ); status |= flush( host, port, &tset ); }
+                    if( tadd != 0 ) status |= flush( rpcurl, &tadd );
+                    if( tset != 0 ) { addIdArg( tr_bencDictFind( tset, ARGUMENTS ), id ); status |= flush( rpcurl, &tset ); }
                     tr_strlcpy( id, optarg, sizeof( id ) );
                     break;
 
@@ -1878,7 +1896,7 @@ processArgs( const char * host, int port, int argc, const char ** argv )
             args = tr_bencDictAddDict( top, ARGUMENTS, 0 );
             fields = tr_bencDictAddList( args, "fields", 0 );
 
-            if( tset != 0 ) { addIdArg( tr_bencDictFind( tset, ARGUMENTS ), id ); status |= flush( host, port, &tset ); }
+            if( tset != 0 ) { addIdArg( tr_bencDictFind( tset, ARGUMENTS ), id ); status |= flush( rpcurl, &tset ); }
             
             switch( c )
             {
@@ -1912,7 +1930,7 @@ processArgs( const char * host, int port, int argc, const char ** argv )
                 default:  assert( "unhandled value" && 0 );
             }
 
-            status |= flush( host, port, &top );
+            status |= flush( rpcurl, &top );
         }
         else if( stepMode == MODE_SESSION_SET )
         {
@@ -2002,7 +2020,7 @@ processArgs( const char * host, int port, int argc, const char ** argv )
                 targs = ensure_tset( &tset );
             else
                 sargs = ensure_sset( &sset );
-            
+
             switch( c )
             {
                 case 'd': if( targs ) {
@@ -2071,9 +2089,9 @@ processArgs( const char * host, int port, int argc, const char ** argv )
                 args = tr_bencDictFind( tadd, ARGUMENTS );
             else
                 args = ensure_tset( &tset );
-       
+
             switch( c )
-            {         
+            {
                 case 'g': addFiles( args, "files-wanted", optarg );
                           break;
                 case 'G': addFiles( args, "files-unwanted", optarg );
@@ -2113,7 +2131,7 @@ processArgs( const char * host, int port, int argc, const char ** argv )
                 tr_bencDictAddStr( args, "location", optarg );
                 tr_bencDictAddBool( args, "move", FALSE );
                 addIdArg( args, id );
-                status |= flush( host, port, &top );
+                status |= flush( rpcurl, &top );
                 break;
             }
         }
@@ -2125,7 +2143,7 @@ processArgs( const char * host, int port, int argc, const char ** argv )
                 tr_bencInitDict( top, 2 );
                 tr_bencDictAddStr( top, "method", "session-get" );
                 tr_bencDictAddInt( top, "tag", TAG_SESSION );
-                status |= flush( host, port, &top );
+                status |= flush( rpcurl, &top );
                 break;
             }
             case 's': /* start */
@@ -2137,7 +2155,7 @@ processArgs( const char * host, int port, int argc, const char ** argv )
                     tr_bencInitDict( top, 2 );
                     tr_bencDictAddStr( top, "method", "torrent-start" );
                     addIdArg( tr_bencDictAddDict( top, ARGUMENTS, 1 ), id );
-                    status |= flush( host, port, &top );
+                    status |= flush( rpcurl, &top );
                 }
                 break;
             }
@@ -2150,7 +2168,7 @@ processArgs( const char * host, int port, int argc, const char ** argv )
                     tr_bencInitDict( top, 2 );
                     tr_bencDictAddStr( top, "method", "torrent-stop" );
                     addIdArg( tr_bencDictAddDict( top, ARGUMENTS, 1 ), id );
-                    status |= flush( host, port, &top );
+                    status |= flush( rpcurl, &top );
                 }
                 break;
             }
@@ -2171,7 +2189,7 @@ processArgs( const char * host, int port, int argc, const char ** argv )
                 tr_benc * top = tr_new0( tr_benc, 1 );
                 tr_bencInitDict( top, 1 );
                 tr_bencDictAddStr( top, "method", "blocklist-update" );
-                status |= flush( host, port, &top );
+                status |= flush( rpcurl, &top );
                 break;
             }
             case 921:
@@ -2180,7 +2198,7 @@ processArgs( const char * host, int port, int argc, const char ** argv )
                 tr_bencInitDict( top, 2 );
                 tr_bencDictAddStr( top, "method", "session-stats" );
                 tr_bencDictAddInt( top, "tag", TAG_STATS );
-                status |= flush( host, port, &top );
+                status |= flush( rpcurl, &top );
                 break;
             }
             case 962:
@@ -2189,18 +2207,29 @@ processArgs( const char * host, int port, int argc, const char ** argv )
                 tr_bencInitDict( top, 2 );
                 tr_bencDictAddStr( top, "method", "port-test" );
                 tr_bencDictAddInt( top, "tag", TAG_PORTTEST );
-                status |= flush( host, port, &top );
+                status |= flush( rpcurl, &top );
+                break;
+            }
+            case 600:
+            {
+                tr_benc * top;
+                if( tset != 0 ) { addIdArg( tr_bencDictFind( tset, ARGUMENTS ), id ); status |= flush( rpcurl, &tset ); }
+                top = tr_new0( tr_benc, 1 );
+                tr_bencInitDict( top, 2 );
+                tr_bencDictAddStr( top, "method", "torrent-reannounce" );
+                addIdArg( tr_bencDictAddDict( top, ARGUMENTS, 1 ), id );
+                status |= flush( rpcurl, &top );
                 break;
             }
             case 'v':
             {
                 tr_benc * top;
-                if( tset != 0 ) { addIdArg( tr_bencDictFind( tset, ARGUMENTS ), id ); status |= flush( host, port, &tset ); }
+                if( tset != 0 ) { addIdArg( tr_bencDictFind( tset, ARGUMENTS ), id ); status |= flush( rpcurl, &tset ); }
                 top = tr_new0( tr_benc, 1 );
                 tr_bencInitDict( top, 2 );
                 tr_bencDictAddStr( top, "method", "torrent-verify" );
                 addIdArg( tr_bencDictAddDict( top, ARGUMENTS, 1 ), id );
-                status |= flush( host, port, &top );
+                status |= flush( rpcurl, &top );
                 break;
             }
             case 'r':
@@ -2213,7 +2242,7 @@ processArgs( const char * host, int port, int argc, const char ** argv )
                 args = tr_bencDictAddDict( top, ARGUMENTS, 2 );
                 tr_bencDictAddBool( args, "delete-local-data", c=='R' );
                 addIdArg( args, id );
-                status |= flush( host, port, &top );
+                status |= flush( rpcurl, &top );
                 break;
             }
             case 960:
@@ -2226,7 +2255,7 @@ processArgs( const char * host, int port, int argc, const char ** argv )
                 tr_bencDictAddStr( args, "location", optarg );
                 tr_bencDictAddBool( args, "move", TRUE );
                 addIdArg( args, id );
-                status |= flush( host, port, &top );
+                status |= flush( rpcurl, &top );
                 break;
             }
             default:
@@ -2238,22 +2267,27 @@ processArgs( const char * host, int port, int argc, const char ** argv )
         }
     }
 
-    if( tadd != 0 ) status |= flush( host, port, &tadd );
-    if( tset != 0 ) { addIdArg( tr_bencDictFind( tset, ARGUMENTS ), id ); status |= flush( host, port, &tset ); }
-    if( sset != 0 ) status |= flush( host, port, &sset );
+    if( tadd != 0 ) status |= flush( rpcurl, &tadd );
+    if( tset != 0 ) { addIdArg( tr_bencDictFind( tset, ARGUMENTS ), id ); status |= flush( rpcurl, &tset ); }
+    if( sset != 0 ) status |= flush( rpcurl, &sset );
     return status;
 }
 
-/* [host:port] or [host] or [port] */
+/* [host:port] or [host] or [port] or [http://host:port/transmission/] */
 static void
-getHostAndPort( int * argc, char ** argv, char ** host, int * port )
+getHostAndPortAndRpcUrl( int * argc, char ** argv,
+                         char ** host, int * port, char ** rpcurl )
 {
     if( *argv[1] != '-' )
     {
         int          i;
         const char * s = argv[1];
         const char * delim = strchr( s, ':' );
-        if( delim )   /* user passed in both host and port */
+        if( !strncmp(s, "http://", 7 ) )   /* user passed in full rpc url */
+        {
+            *rpcurl = tr_strdup_printf( "%s/rpc/", s );
+        }
+        else if( delim )   /* user passed in both host and port */
         {
             *host = tr_strndup( s, delim - s );
             *port = atoi( delim + 1 );
@@ -2279,6 +2313,7 @@ main( int argc, char ** argv )
 {
     int port = DEFAULT_PORT;
     char * host = NULL;
+    char * rpcurl = NULL;
     int exit_status = EXIT_SUCCESS;
 
     if( argc < 2 ) {
@@ -2290,12 +2325,15 @@ main( int argc, char ** argv )
     tr_formatter_size_init( DISK_K,DISK_K_STR, DISK_M_STR, DISK_G_STR, DISK_T_STR );
     tr_formatter_speed_init( SPEED_K, SPEED_K_STR, SPEED_M_STR, SPEED_G_STR, SPEED_T_STR );
 
-    getHostAndPort( &argc, argv, &host, &port );
+    getHostAndPortAndRpcUrl( &argc, argv, &host, &port, &rpcurl );
     if( host == NULL )
         host = tr_strdup( DEFAULT_HOST );
+    if( rpcurl == NULL )
+        rpcurl = tr_strdup_printf( "http://%s:%d%s", host, port, DEFAULT_URL );
 
-    exit_status = processArgs( host, port, argc, (const char**)argv );
+    exit_status = processArgs( rpcurl, argc, (const char**)argv );
 
     tr_free( host );
+    tr_free( rpcurl );
     return exit_status;
 }

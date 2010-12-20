@@ -55,7 +55,7 @@ enum
 {
     SAVE_INTERVAL_SECS = 360,
 
-    DEFAULT_CACHE_SIZE_MB = 2
+    DEFAULT_CACHE_SIZE_MB = 4
 };
 
 
@@ -298,6 +298,7 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddStr ( d, TR_PREFS_KEY_RPC_WHITELIST,            TR_DEFAULT_RPC_WHITELIST );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RPC_WHITELIST_ENABLED,    TRUE );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_RPC_PORT,                 atoi( TR_DEFAULT_RPC_PORT_STR ) );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_RPC_URL,                  TR_DEFAULT_RPC_URL_STR );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_SCRIPT_TORRENT_DONE_FILENAME, "" );
     tr_bencDictAddBool( d, TR_PREFS_KEY_SCRIPT_TORRENT_DONE_ENABLED, FALSE );
     tr_bencDictAddBool( d, TR_PREFS_KEY_ALT_SPEED_ENABLED,        FALSE );
@@ -374,6 +375,7 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddBool( d, TR_PREFS_KEY_RPC_ENABLED,              tr_sessionIsRPCEnabled( s ) );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_RPC_PASSWORD,             tr_sessionGetRPCPassword( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_RPC_PORT,                 tr_sessionGetRPCPort( s ) );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_RPC_URL,                  tr_sessionGetRPCUrl( s ) );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_RPC_USERNAME,             tr_sessionGetRPCUsername( s ) );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_RPC_WHITELIST,            tr_sessionGetRPCWhitelist( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RPC_WHITELIST_ENABLED,    tr_sessionGetRPCWhitelistEnabled( s ) );
@@ -2411,6 +2413,23 @@ tr_sessionGetRPCPort( const tr_session * session )
 }
 
 void
+tr_sessionSetRPCUrl( tr_session * session,
+                     const char * url )
+{
+    assert( tr_isSession( session ) );
+
+    tr_rpcSetUrl( session->rpcServer, url );
+}
+
+const char*
+tr_sessionGetRPCUrl( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+
+    return tr_rpcGetUrl( session->rpcServer );
+}
+
+void
 tr_sessionSetRPCCallback( tr_session * session,
                           tr_rpc_func  func,
                           void *       user_data )
@@ -2824,4 +2843,14 @@ tr_sessionSetTorrentDoneScript( tr_session * session, const char * scriptFilenam
         tr_free( session->torrentDoneScript );
         session->torrentDoneScript = tr_strdup( scriptFilename );
     }
+}
+
+/***
+****
+***/
+
+void
+tr_sessionSetWebConfigFunc( tr_session * session, void (*func)(tr_session*, void*, const char* ) )
+{
+    session->curl_easy_config_func = func;
 }

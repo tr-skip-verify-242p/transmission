@@ -57,7 +57,8 @@ quitresp( GtkWidget * widget,
                           PREF_KEY_ASKQUIT,
                           !gtk_toggle_button_get_active( tb ) );
 
-    stuff->func( stuff->cbdata, response );
+    if( response == GTK_RESPONSE_ACCEPT )
+        stuff->func( stuff->cbdata );
 
     g_free( stuff );
     gtk_widget_destroy( widget );
