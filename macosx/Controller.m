@@ -396,6 +396,8 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 
 - (void) awakeFromNib
 {
+    [fFilterBar setIsFilter: YES];
+    
     NSToolbar * toolbar = [[NSToolbar alloc] initWithIdentifier: @"TRMainToolbar"];
     [toolbar setDelegate: self];
     [toolbar setAllowsUserCustomization: YES];
@@ -413,18 +415,13 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     if ([fDefaults boolForKey: @"SmallView"])
         [fTableView setRowHeight: ROW_HEIGHT_SMALL];
     
-    #warning remove once localizations are updated for 2.2
-    [fActionButton setBordered: NO];
-    [fActionButton setFrame: NSMakeRect(6.0, 2.0, 36.0, 18.0)];
-    [fSpeedLimitButton setBordered: NO];
-    [fSpeedLimitButton setFrame: NSMakeRect(45.0, 2.0, 36.0, 18.0)];
-    
     //window min height
     NSSize contentMinSize = [fWindow contentMinSize];
     contentMinSize.height = [[fWindow contentView] frame].size.height - [[fTableView enclosingScrollView] frame].size.height
                                 + [fTableView rowHeight] + [fTableView intercellSpacing].height;
     [fWindow setContentMinSize: contentMinSize];
     [fWindow setContentBorderThickness: NSMinY([[fTableView enclosingScrollView] frame]) forEdge: NSMinYEdge];
+    [fWindow setMovableByWindowBackground: YES];
     
     [[fTotalDLField cell] setBackgroundStyle: NSBackgroundStyleRaised];
     [[fTotalULField cell] setBackgroundStyle: NSBackgroundStyleRaised];
@@ -994,7 +991,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     }
     else
     {
-        [torrent closeRemoveTorrent];
+        [torrent closeRemoveTorrent: NO];
         [torrent release];
     }
 }
@@ -1062,7 +1059,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     }
     else
     {
-        [torrent closeRemoveTorrent];
+        [torrent closeRemoveTorrent: NO];
         [torrent release];
     }
 }
@@ -1465,10 +1462,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         //let's expand all groups that have removed items - they either don't exist anymore, are already expanded, or are collapsed (rpc)
         [fTableView removeCollapsedGroup: [torrent groupValue]];
         
-        if (deleteData)
-            [torrent trashData];
-        
-        [torrent closeRemoveTorrent];
+        [torrent closeRemoveTorrent: deleteData];
     }
     
     [torrents release];

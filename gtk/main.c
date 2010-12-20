@@ -35,10 +35,13 @@
 #include <glib/gi18n.h>
 #include <glib/gstdio.h>
 
+#include <curl/curl.h>
+
 #include <libtransmission/transmission.h>
 #include <libtransmission/rpcimpl.h>
 #include <libtransmission/utils.h>
 #include <libtransmission/version.h>
+#include <libtransmission/web.h>
 
 #include "actions.h"
 #include "add-dialog.h"
@@ -85,7 +88,7 @@ struct cbdata
     GSList            * dupqueue;
     GSList            * details;
     GtkTreeSelection  * sel;
-    GtkWidget         * quit_dialog;
+    gpointer            quit_dialog;
 };
 
 /**
@@ -336,8 +339,8 @@ refreshActions( gpointer gdata )
     }
 
     {
-        const int total = tr_core_get_torrent_count( data->core );
-        const int active = tr_core_get_active_torrent_count( data->core );
+        const size_t total = tr_core_get_torrent_count( data->core );
+        const size_t active = tr_core_get_active_torrent_count( data->core );
         action_sensitize( "pause-all-torrents", active != 0 );
         action_sensitize( "start-all-torrents", active != total );
     }
@@ -528,6 +531,129 @@ checkfilenames( int argc, char **argv )
     return g_slist_reverse( ret );
 }
 
+
+#ifdef HAVE_GCONF2
+static void
+applyDesktopProxySettings( CURL * easy, GConfClient * client, const char * host_key, const char * port_key )
+{
+    int port;
+    GConfValue * value;
+    static gboolean env_set;
+    static gboolean env_checked = FALSE;
+
+    /* Both libcurl and GNOME have hooks for proxy support.
+     * If someone has set the http_proxy environment variable,
+     * don't apply the GNOME settings here.  That way libcurl can override GNOME. */
+    if( !env_checked ) {
+        const char * str = g_getenv( "http_proxy" );
+        env_set = str && *str;
+        env_checked = TRUE;
+    }
+    if( env_set )
+        return;
+
+    if(( value = gconf_client_get( client, host_key, NULL )))
+    {
+        const char * url = gconf_value_get_string( value );
+        if( url && *url )
+        {
+            char * scheme = NULL;
+
+            if( !tr_urlParse( url, strlen( url ), &scheme, NULL, NULL, NULL ) )
+            {
+                if( !gtr_strcmp0( scheme, "socks4" ) )
+                    curl_easy_setopt( easy, CURLOPT_PROXYTYPE, (long)CURLPROXY_SOCKS4 );
+                else if( !gtr_strcmp0( scheme, "socks5" ) )
+                    curl_easy_setopt( easy, CURLOPT_PROXYTYPE, (long)CURLPROXY_SOCKS5 );
+                else if( !gtr_strcmp0( scheme, "http" ) )
+                    curl_easy_setopt( easy, CURLOPT_PROXYTYPE, (long)CURLPROXY_HTTP );
+            }
+
+            curl_easy_setopt( easy, CURLOPT_PROXY, url );
+
+            if( port_key != NULL )
+                if(( value = gconf_client_get( client, port_key, NULL )))
+                    if(( port = gconf_value_get_int( value )))
+                        curl_easy_setopt( easy, CURLOPT_PROXYPORT, (long)port );
+
+            tr_free( scheme );
+        }
+    }
+}
+#endif
+
+static void
+curlConfigFunc( tr_session * session UNUSED, void * vcurl UNUSED, const char * destination )
+{
+#ifdef HAVE_GCONF2
+    const char * str;
+    GConfValue * value;
+    CURL * easy = vcurl;
+    gboolean use_http_proxy = TRUE;
+    GConfClient * client = gconf_client_get_default( );
+
+    /* get GNOME's proxy mode */
+    if(( value = gconf_client_get( client, "/system/proxy/mode", NULL )))
+    {
+        char * mode = g_strdup( gconf_value_get_string( value ) );
+
+        if( !gtr_strcmp0( mode, "auto" ) )
+        {
+            applyDesktopProxySettings( easy, client, "/system/proxy/autoconfig_url", NULL );
+            use_http_proxy = FALSE;
+        }
+        else if( !gtr_strcmp0( mode, "manual" ))
+        {
+            char * scheme = NULL;
+            if( !tr_urlParse( destination, strlen( destination ), &scheme, NULL, NULL, NULL ) )
+            {
+                if( !gtr_strcmp0( scheme, "ftp" ) )
+                {
+                    applyDesktopProxySettings( easy, client, "/system/proxy/ftp_host", "/system/proxy/ftp_port" );
+                    use_http_proxy = FALSE;
+                }
+                else if( !gtr_strcmp0( scheme, "https" ) )
+                {
+                    applyDesktopProxySettings( easy, client, "/system/proxy/secure_host", "/system/proxy/secure_port" );
+                    use_http_proxy = FALSE;
+                }
+            }
+            tr_free( scheme );
+        }
+
+        g_free( mode );
+    }
+
+    /* if this the proxy hasn't been handled yet and "use_http_proxy" is disabled, then don't use a proxy */
+    if( use_http_proxy )
+        if(( value = gconf_client_get( client, "/system/http_proxy/use_http_proxy", NULL )))
+            use_http_proxy = gconf_value_get_bool( value ) != 0;
+
+    if( use_http_proxy )
+    {
+        applyDesktopProxySettings( easy, client, "/system/http_proxy/host", "/system/http_proxy/port" );
+
+        if((( value = gconf_client_get( client, "/system/http_proxy/use_authentication", NULL ))) &&  gconf_value_get_bool( value ))
+        {
+            const char * user = NULL;
+            const char * pass = NULL;
+
+            if(( value = gconf_client_get( client, "/system/http_proxy/authentication_user", NULL )))
+                user = str = gconf_value_get_string( value );
+            if(( value = gconf_client_get( client, "/system/http_proxy/authentication_password", NULL )))
+                pass = str = gconf_value_get_string( value );
+
+           if( ( user != NULL ) && ( pass != NULL ) )
+           {
+               char * userpass = g_strdup_printf( "%s:%s", user, pass );
+               curl_easy_setopt( easy, CURLOPT_PROXYUSERPWD, userpass );
+               g_free( userpass );
+           }
+       }
+    }
+#endif
+}
+
 int
 main( int argc, char ** argv )
 {
@@ -660,6 +786,8 @@ main( int argc, char ** argv )
 
         /* initialize the libtransmission session */
         session = tr_sessionInit( "gtk", configDir, TRUE, pref_get_all( ) );
+        tr_sessionSetWebConfigFunc( session, curlConfigFunc );
+
         pref_flag_set( TR_PREFS_KEY_ALT_SPEED_ENABLED, tr_sessionUsesAltSpeed( session ) );
         pref_int_set( TR_PREFS_KEY_PEER_PORT, tr_sessionGetPeerPort( session ) );
         cbdata->core = tr_core_new( session );
@@ -836,13 +964,8 @@ toggleMainWindow( struct cbdata * cbdata )
 static gboolean
 shouldConfirmBeforeExiting( struct cbdata * data )
 {
-    if( !pref_flag_get( PREF_KEY_ASKQUIT ) )
-        return FALSE;
-    else {
-        struct counts_data counts;
-        getTorrentCounts( data, &counts );
-        return counts.activeCount > 0;
-    }
+    return pref_flag_get( PREF_KEY_ASKQUIT )
+        && tr_core_get_active_torrent_count( data->core );
 }
 
 static void
@@ -851,8 +974,10 @@ maybeaskquit( struct cbdata * cbdata )
     if( !shouldConfirmBeforeExiting( cbdata ) )
         wannaquit( cbdata );
     else {
-        if( cbdata->quit_dialog == NULL )
+        if( cbdata->quit_dialog == NULL ) {
             cbdata->quit_dialog = askquit( cbdata->core, cbdata->wind, wannaquit, cbdata );
+            g_object_add_weak_pointer( G_OBJECT( cbdata->quit_dialog ), &cbdata->quit_dialog );
+        }
         gtk_window_present( GTK_WINDOW( cbdata->quit_dialog ) );
     }
 }
