@@ -38,9 +38,10 @@ enum
 
 struct _PiecesCellRendererPrivate
 {
-    tr_torrent * tor;
-    int8_t     * tab;
-    int          tabsize;
+    tr_torrent      * tor;
+    int8_t          * tab;
+    int               tabsize;
+    cairo_surface_t * offscreen;
 };
 
 static void
@@ -71,6 +72,19 @@ pieces_cell_renderer_get_size( GtkCellRenderer  * cell,
         *y_offset = 0;
 }
 
+static cairo_t *
+get_offscreen_context( PiecesCellRendererPrivate * priv, int w, int h )
+{
+    if( !priv->offscreen || cairo_image_surface_get_width( priv->offscreen ) != w
+      || cairo_image_surface_get_height( priv->offscreen ) != h )
+    {
+        if( priv->offscreen )
+            cairo_surface_destroy( priv->offscreen );
+        priv->offscreen = cairo_image_surface_create( CAIRO_FORMAT_ARGB32, w, h );
+    }
+    return cairo_create( priv->offscreen );
+}
+
 static void
 pieces_cell_renderer_render( GtkCellRenderer       * cell,
                              GdkDrawable           * window,
@@ -85,6 +99,7 @@ pieces_cell_renderer_render( GtkCellRenderer       * cell,
     const tr_torrent * tor = priv->tor;
     gint x, y, w, h, xt, yt;
     cairo_t * cr;
+    cairo_surface_t * tmpsurf;
 
     x = cell_area->x + cell->xpad;
     y = cell_area->y + cell->ypad;
@@ -102,14 +117,10 @@ pieces_cell_renderer_render( GtkCellRenderer       * cell,
     w -= 2 * xt;
     h -= 2 * yt;
 
-    cr = gdk_cairo_create( window );
+    cr = get_offscreen_context( priv, w, h );
 
-    gdk_cairo_rectangle( cr, expose_area );
-    cairo_clip( cr );
-
-    cairo_rectangle( cr, x, y, w, h );
     cairo_set_source_rgb( cr, 0.9, 0.9, 0.9 );
-    cairo_fill( cr );
+    cairo_paint( cr );
 
     if( tor && priv->tab && priv->tabsize > 0 )
     {
@@ -128,7 +139,7 @@ pieces_cell_renderer_render( GtkCellRenderer       * cell,
                 for( j = i + 1; j < pieceCount ; ++j )
                     if( pieces[j] != -1 )
                         break;
-                cairo_rectangle( cr, pw * i + x, y, pw * (j - i), h );
+                cairo_rectangle( cr, pw * i, 0, pw * (j - i), h );
                 cairo_fill( cr );
                 i = j + 1;
             }
@@ -136,7 +147,14 @@ pieces_cell_renderer_render( GtkCellRenderer       * cell,
                 ++i;
         }
     }
+    cairo_destroy( cr );
 
+    cr = gdk_cairo_create( window );
+    gdk_cairo_rectangle( cr, expose_area );
+    cairo_clip( cr );
+
+    cairo_set_source_surface( cr, priv->offscreen, x, y );
+    cairo_paint( cr );
     cairo_destroy( cr );
 }
 
@@ -155,7 +173,7 @@ set_torrent( PiecesCellRenderer * self, tr_torrent * tor )
         const tr_info * info = tr_torrentInfo( tor );
 
         priv->tabsize = info->pieceCount;
-        priv->tab = tr_malloc0( priv->tabsize );
+        priv->tab = tr_malloc( priv->tabsize );
     }
     else
     {
@@ -207,6 +225,8 @@ pieces_cell_renderer_finalize( GObject * object )
     GObjectClass              * parent;
 
     tr_free( priv->tab );
+    if( priv->offscreen )
+        cairo_surface_destroy( priv->offscreen );
 
     parent = g_type_class_peek( g_type_parent( PIECES_CELL_RENDERER_TYPE ) ) ;
     parent->finalize( object );
@@ -242,6 +262,9 @@ pieces_cell_renderer_init( GTypeInstance * instance,
     priv = G_TYPE_INSTANCE_GET_PRIVATE(self, PIECES_CELL_RENDERER_TYPE,
                                        PiecesCellRendererPrivate );
     priv->tor = NULL;
+    priv->offscreen = NULL;
+    priv->tab = NULL;
+    priv->tabsize = 0;
 
     self->priv = priv;
 }
