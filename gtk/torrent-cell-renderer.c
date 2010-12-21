@@ -17,6 +17,7 @@
 #include <libtransmission/utils.h> /* tr_truncd() */
 #include "hig.h"
 #include "icons.h"
+#include "pieces-cell-renderer.h"
 #include "torrent-cell-renderer.h"
 #include "tr-torrent.h"
 #include "util.h"
@@ -328,7 +329,7 @@ struct TorrentCellRendererPrivate
     tr_torrent       * tor;
     GtkCellRenderer  * text_renderer;
     GtkCellRenderer  * text_renderer_err;
-    GtkCellRenderer  * progress_renderer;
+    GtkCellRenderer  * pieces_renderer;
     GtkCellRenderer  * icon_renderer;
     int bar_height;
 
@@ -418,7 +419,7 @@ get_size_compact( TorrentCellRenderer * cell,
     *** LAYOUT
     **/
 
-#define BAR_WIDTH 50
+#define BAR_WIDTH 100
     if( width != NULL )
         *width = cell->parent.xpad * 2 + icon_area.width + GUI_PAD + name_area.width + GUI_PAD + BAR_WIDTH + GUI_PAD + stat_area.width;
     if( height != NULL )
@@ -551,7 +552,6 @@ render_compact( TorrentCellRenderer   * cell,
     const tr_torrent * tor = p->tor;
     const tr_stat * st = tr_torrentStatCached( (tr_torrent*)tor );
     const gboolean active = st->activity != TR_STATUS_STOPPED;
-    const double percentDone = MAX( 0.0, st->percentDone );
     const gboolean sensitive = active || st->error;
 
     icon = get_icon( tor, COMPACT_ICON_SIZE, widget );
@@ -587,8 +587,8 @@ render_compact( TorrentCellRenderer   * cell,
 
     g_object_set( p->icon_renderer, "pixbuf", icon, "sensitive", sensitive, NULL );
     gtk_cell_renderer_render( p->icon_renderer, window, widget, &icon_area, &icon_area, &icon_area, flags );
-    g_object_set( p->progress_renderer, "value", (int)(percentDone*100.0), "text", NULL, "sensitive", sensitive, NULL );
-    gtk_cell_renderer_render( p->progress_renderer, window, widget, &prog_area, &prog_area, &prog_area, flags );
+    g_object_set( p->pieces_renderer, "sensitive", sensitive, NULL );
+    gtk_cell_renderer_render( p->pieces_renderer, window, widget, &prog_area, &prog_area, &prog_area, flags );
     g_object_set( text_renderer, "text", status, "scale", SMALL_SCALE, "sensitive", sensitive, "ellipsize", PANGO_ELLIPSIZE_END, NULL );
     gtk_cell_renderer_render( text_renderer, window, widget, &stat_area, &stat_area, &stat_area, flags );
     g_object_set( text_renderer, "text", name, "scale", 1.0, NULL );
@@ -626,7 +626,6 @@ render_full( TorrentCellRenderer   * cell,
     const tr_stat * st = tr_torrentStatCached( (tr_torrent*)tor );
     const tr_info * inf = tr_torrentInfo( tor );
     const gboolean active = st->activity != TR_STATUS_STOPPED;
-    const double percentDone = MAX( 0.0, st->percentDone );
     const gboolean sensitive = active || st->error;
 
     icon = get_icon( tor, FULL_ICON_SIZE, widget );
@@ -677,7 +676,7 @@ render_full( TorrentCellRenderer   * cell,
     prog_area.y = name_area.y + name_area.height;
     prog_area.width = name_area.width;
 
-    /* progressbar */
+    /* pieces bar */
     prct_area.x = prog_area.x;
     prct_area.y = prog_area.y + prog_area.height + GUI_PAD_SMALL;
     prct_area.width = prog_area.width;
@@ -698,8 +697,8 @@ render_full( TorrentCellRenderer   * cell,
     gtk_cell_renderer_render( text_renderer, window, widget, &name_area, &name_area, &name_area, flags );
     g_object_set( text_renderer, "text", progress, "scale", SMALL_SCALE, "weight", PANGO_WEIGHT_NORMAL, NULL );
     gtk_cell_renderer_render( text_renderer, window, widget, &prog_area, &prog_area, &prog_area, flags );
-    g_object_set( p->progress_renderer, "value", (int)(percentDone*100.0), "text", "", "sensitive", sensitive, NULL );
-    gtk_cell_renderer_render( p->progress_renderer, window, widget, &prct_area, &prct_area, &prct_area, flags );
+    g_object_set( p->pieces_renderer, "sensitive", sensitive, NULL );
+    gtk_cell_renderer_render( p->pieces_renderer, window, widget, &prct_area, &prct_area, &prct_area, flags );
     g_object_set( text_renderer, "text", status, NULL );
     gtk_cell_renderer_render( text_renderer, window, widget, &stat_area, &stat_area, &stat_area, flags );
 
@@ -750,7 +749,10 @@ torrent_cell_renderer_set_property( GObject      * object,
 
     switch( property_id )
     {
-        case P_TORRENT:        p->tor                 = g_value_get_pointer( v ); break;
+        case P_TORRENT:
+            p->tor = g_value_get_pointer( v );
+            g_object_set( p->pieces_renderer, "torrent", p->tor, NULL );
+            break;
         case P_UPLOAD_SPEED:   p->upload_speed_KBps   = g_value_get_double( v ); break;
         case P_DOWNLOAD_SPEED: p->download_speed_KBps = g_value_get_double( v ); break;
         case P_BAR_HEIGHT:     p->bar_height          = g_value_get_int( v ); break;
@@ -789,7 +791,7 @@ torrent_cell_renderer_dispose( GObject * o )
     {
         g_object_unref( G_OBJECT( r->priv->text_renderer ) );
         g_object_unref( G_OBJECT( r->priv->text_renderer_err ) );
-        g_object_unref( G_OBJECT( r->priv->progress_renderer ) );
+        g_object_unref( G_OBJECT( r->priv->pieces_renderer ) );
         g_object_unref( G_OBJECT( r->priv->icon_renderer ) );
         r->priv = NULL;
     }
@@ -865,12 +867,12 @@ torrent_cell_renderer_init( GTypeInstance *  instance,
     g_object_set( p->text_renderer, "xpad", 0, "ypad", 0, NULL );
     p->text_renderer_err = gtk_cell_renderer_text_new(  );
     g_object_set( p->text_renderer_err, "xpad", 0, "ypad", 0, NULL );
-    p->progress_renderer = gtk_cell_renderer_progress_new(  );
+    p->pieces_renderer = pieces_cell_renderer_new(  );
     p->icon_renderer = gtk_cell_renderer_pixbuf_new(  );
     g_object_set( p->text_renderer_err, "foreground", "red", NULL );
     gtr_object_ref_sink( p->text_renderer );
     gtr_object_ref_sink( p->text_renderer_err );
-    gtr_object_ref_sink( p->progress_renderer );
+    gtr_object_ref_sink( p->pieces_renderer );
     gtr_object_ref_sink( p->icon_renderer );
 
     p->bar_height = DEFAULT_BAR_HEIGHT;

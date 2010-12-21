@@ -1,0 +1,283 @@
+/******************************************************************************
+ * $Id$
+ *
+ * Copyright (c) 2005-2008 Transmission authors and contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *****************************************************************************/
+
+#include <libtransmission/transmission.h>
+#include <libtransmission/utils.h>
+#include "pieces-cell-renderer.h"
+#include "util.h"
+
+enum
+{
+    PROP_0,
+    PROP_TORRENT
+};
+
+#define MIN_BAR_WIDTH 100
+#define MIN_BAR_HEIGHT 20
+
+struct _PiecesCellRendererPrivate
+{
+    tr_torrent * tor;
+    int8_t     * tab;
+    int          tabsize;
+};
+
+static void
+pieces_cell_renderer_get_size( GtkCellRenderer  * cell,
+                               GtkWidget        * widget UNUSED,
+                               GdkRectangle     * cell_area,
+                               gint             * x_offset,
+                               gint             * y_offset,
+                               gint             * width,
+                               gint             * height )
+{
+    if( width )
+        *width = MIN_BAR_WIDTH + cell->xpad * 2;
+    if( height )
+        *height = MIN_BAR_HEIGHT + cell->ypad * 2;
+
+    if( cell_area )
+    {
+        if( width )
+            *width = cell_area->width;
+        if( height )
+            *height = cell_area->height;
+    }
+
+    if( x_offset )
+        *x_offset = 0;
+    if( y_offset )
+        *y_offset = 0;
+}
+
+static void
+pieces_cell_renderer_render( GtkCellRenderer       * cell,
+                             GdkDrawable           * window,
+                             GtkWidget             * widget,
+                             GdkRectangle          * background_area UNUSED,
+                             GdkRectangle          * cell_area,
+                             GdkRectangle          * expose_area,
+                             GtkCellRendererState    flags UNUSED )
+{
+    PiecesCellRenderer        * self = PIECES_CELL_RENDERER( cell );
+    PiecesCellRendererPrivate * priv = self->priv;
+    const tr_torrent * tor = priv->tor;
+    gint x, y, w, h, xt, yt;
+    cairo_t * cr;
+
+    x = cell_area->x + cell->xpad;
+    y = cell_area->y + cell->ypad;
+    w = cell_area->width - cell->xpad * 2;
+    h = cell_area->height - cell->ypad * 2;
+
+    gtk_paint_box (widget->style, window,
+                   GTK_STATE_NORMAL, GTK_SHADOW_IN,
+                   NULL, widget, NULL,
+                   x, y, w, h);
+    xt = widget->style->xthickness;
+    yt = widget->style->ythickness;
+    x += xt;
+    y += yt;
+    w -= 2 * xt;
+    h -= 2 * yt;
+
+    cr = gdk_cairo_create( window );
+
+    gdk_cairo_rectangle( cr, expose_area );
+    cairo_clip( cr );
+
+    cairo_rectangle( cr, x, y, w, h );
+    cairo_set_source_rgb( cr, 0.9, 0.9, 0.9 );
+    cairo_fill( cr );
+
+    if( tor && priv->tab && priv->tabsize > 0 )
+    {
+        int8_t * pieces      = priv->tab;
+        const int pieceCount = priv->tabsize;
+        const double pw      = (double) w / (double) pieceCount;
+        int i = 0, j;
+
+        tr_torrentAvailability( tor, pieces, pieceCount );
+
+        cairo_set_source_rgb( cr, 0.2, 0.6, 0.1 );
+        while( i < pieceCount )
+        {
+            if( pieces[i] == -1 )
+            {
+                for( j = i + 1; j < pieceCount ; ++j )
+                    if( pieces[j] != -1 )
+                        break;
+                cairo_rectangle( cr, pw * i + x, y, pw * (j - i), h );
+                cairo_fill( cr );
+                i = j + 1;
+            }
+            else
+                ++i;
+        }
+    }
+
+    cairo_destroy( cr );
+}
+
+static void
+set_torrent( PiecesCellRenderer * self, tr_torrent * tor )
+{
+    PiecesCellRendererPrivate * priv = self->priv;
+
+    if( tor == priv->tor )
+        return;
+
+    priv->tor = tor;
+    tr_free( priv->tab );
+    if( tor )
+    {
+        const tr_info * info = tr_torrentInfo( tor );
+
+        priv->tabsize = info->pieceCount;
+        priv->tab = tr_malloc0( priv->tabsize );
+    }
+    else
+    {
+        priv->tabsize = 0;
+        priv->tab = NULL;
+    }
+}
+
+static void
+pieces_cell_renderer_set_property( GObject      * object,
+                                   guint          property_id,
+                                   const GValue * v,
+                                   GParamSpec   * pspec )
+{
+    PiecesCellRenderer        * self = PIECES_CELL_RENDERER( object );
+
+    switch( property_id )
+    {
+        case PROP_TORRENT:
+            set_torrent( self, g_value_get_pointer( v ) );
+            break;
+        default:
+            G_OBJECT_WARN_INVALID_PROPERTY_ID( object, property_id, pspec );
+            break;
+    }
+}
+
+static void
+pieces_cell_renderer_get_property( GObject     * object,
+                                   guint         property_id,
+                                   GValue      * v,
+                                   GParamSpec  * pspec )
+{
+    const PiecesCellRenderer  * self = PIECES_CELL_RENDERER( object );
+    PiecesCellRendererPrivate * priv = self->priv;
+
+    switch( property_id )
+    {
+        case PROP_TORRENT: g_value_set_pointer( v, priv->tor ); break;
+        default: G_OBJECT_WARN_INVALID_PROPERTY_ID( object, property_id, pspec ); break;
+    }
+}
+
+static void
+pieces_cell_renderer_finalize( GObject * object )
+{
+    PiecesCellRenderer        * self = PIECES_CELL_RENDERER( object );
+    PiecesCellRendererPrivate * priv = self->priv;
+    GObjectClass              * parent;
+
+    tr_free( priv->tab );
+
+    parent = g_type_class_peek( g_type_parent( PIECES_CELL_RENDERER_TYPE ) ) ;
+    parent->finalize( object );
+}
+
+static void
+pieces_cell_renderer_class_init( PiecesCellRendererClass * klass )
+{
+    GObjectClass         * gobject_class = G_OBJECT_CLASS( klass );
+    GtkCellRendererClass * cell_class = GTK_CELL_RENDERER_CLASS( klass );
+
+    g_type_class_add_private( klass, sizeof( PiecesCellRendererPrivate ) );
+
+    cell_class->render          = pieces_cell_renderer_render;
+    cell_class->get_size        = pieces_cell_renderer_get_size;
+    gobject_class->set_property = pieces_cell_renderer_set_property;
+    gobject_class->get_property = pieces_cell_renderer_get_property;
+    gobject_class->finalize     = pieces_cell_renderer_finalize;
+
+    g_object_class_install_property( gobject_class, PROP_TORRENT,
+                                     g_param_spec_pointer( "torrent", NULL,
+                                                           "tr_torrent*",
+                                                           G_PARAM_READWRITE ) );
+}
+
+static void
+pieces_cell_renderer_init( GTypeInstance * instance,
+                           gpointer g_class UNUSED )
+{
+    PiecesCellRenderer        * self = PIECES_CELL_RENDERER( instance );
+    PiecesCellRendererPrivate * priv;
+
+    priv = G_TYPE_INSTANCE_GET_PRIVATE(self, PIECES_CELL_RENDERER_TYPE,
+                                       PiecesCellRendererPrivate );
+    priv->tor = NULL;
+
+    self->priv = priv;
+}
+
+GType
+pieces_cell_renderer_get_type( void )
+{
+    static GType type = 0;
+
+    if( !type )
+    {
+        static const GTypeInfo info =
+        {
+            sizeof( PiecesCellRendererClass ),
+            NULL,                                       /* base_init */
+            NULL,                                       /* base_finalize */
+            (GClassInitFunc) pieces_cell_renderer_class_init,
+            NULL,                                       /* class_finalize */
+            NULL,                                       /* class_data */
+            sizeof( PiecesCellRenderer ),
+            0,                                          /* n_preallocs */
+            (GInstanceInitFunc) pieces_cell_renderer_init,
+            NULL
+        };
+
+        type = g_type_register_static( GTK_TYPE_CELL_RENDERER,
+                                       "PiecesCellRenderer",
+                                       &info, (GTypeFlags) 0 );
+    }
+
+    return type;
+}
+
+GtkCellRenderer *
+pieces_cell_renderer_new( void )
+{
+    return (GtkCellRenderer *) g_object_new( PIECES_CELL_RENDERER_TYPE,
+                                             NULL );
+}
