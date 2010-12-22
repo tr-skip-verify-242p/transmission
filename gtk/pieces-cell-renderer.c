@@ -100,7 +100,7 @@ pieces_cell_renderer_render( GtkCellRenderer       * cell,
 {
     PiecesCellRenderer        * self = PIECES_CELL_RENDERER( cell );
     PiecesCellRendererPrivate * priv = self->priv;
-    const tr_torrent * tor = priv->tor;
+    tr_torrent * tor = priv->tor;
     gint x, y, w, h, xt, yt;
     cairo_t * cr, * wincr;
 
@@ -128,27 +128,34 @@ pieces_cell_renderer_render( GtkCellRenderer       * cell,
 
     if( tor && priv->tab && priv->tabsize > 0 )
     {
-        int8_t * pieces      = priv->tab;
-        const int pieceCount = priv->tabsize;
-        const double pw      = (double) w / (double) pieceCount;
-        int i = 0, j;
+        const tr_stat * st      = tr_torrentStatCached( tor );
+        const tr_bool connected = ( st->peersConnected > 0 );
+        int8_t * pieces         = priv->tab;
+        const int pieceCount    = priv->tabsize;
+        const double pw         = (double) w / (double) pieceCount;
+        int i, j;
+        int8_t avail;
 
         tr_torrentAvailability( tor, pieces, pieceCount );
 
-        cairo_set_source_rgb( cr, 0.2, 0.6, 0.1 );
-        while( i < pieceCount )
+        for( i = 0; i < pieceCount; )
         {
-            if( pieces[i] == -1 )
+            if( pieces[i] > 0 || ( !connected && pieces[i] == 0 ) )
             {
-                for( j = i + 1; j < pieceCount ; ++j )
-                    if( pieces[j] != -1 )
-                        break;
-                cairo_rectangle( cr, pw * i, 0, pw * (j - i), h );
-                cairo_fill( cr );
-                i = j + 1;
-            }
-            else
                 ++i;
+                continue;
+            }
+            avail = pieces[i];
+            for( j = i + 1; j < pieceCount; ++j )
+                if( pieces[j] != avail )
+                    break;
+            if( avail == 0 )
+                cairo_set_source_rgb( cr, 7.0, 0.1, 0.1 );
+            else
+                cairo_set_source_rgb( cr, 0.2, 0.6, 0.4 );
+            cairo_rectangle( cr, pw * i, 0, pw * (j - i), h );
+            cairo_fill( cr );
+            i = j;
         }
     }
     cairo_destroy( cr );
