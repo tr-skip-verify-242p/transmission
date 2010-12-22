@@ -49,6 +49,7 @@ noinst_HEADERS = \
     makemeta-ui.h \
     msgwin.h \
     notify.h \
+    pieces-cell-renderer.h \
     relocate.h \
     stats.h \
     torrent-cell-renderer.h \
@@ -81,6 +82,7 @@ transmission_gtk_SOURCES = \
     makemeta-ui.c \
     msgwin.c \
     notify.c \
+    pieces-cell-renderer.c \
     relocate.c \
     stats.c \
     torrent-cell-renderer.c \
