@@ -44,6 +44,9 @@ struct _PiecesCellRendererPrivate
     cairo_surface_t * offscreen;
     int               offscreen_w;
     int               offscreen_h;
+    GdkColor          have_color;
+    GdkColor          missing_color;
+    GdkColor          bg_color;
 };
 
 static void
@@ -123,7 +126,7 @@ pieces_cell_renderer_render( GtkCellRenderer       * cell,
     wincr = gdk_cairo_create( window );
     cr = get_offscreen_context( priv, wincr, w, h );
 
-    cairo_set_source_rgb( cr, 0.9, 0.9, 0.9 );
+    gdk_cairo_set_source_color( cr, &priv->bg_color );
     cairo_paint( cr );
 
     if( tor )
@@ -153,9 +156,9 @@ pieces_cell_renderer_render( GtkCellRenderer       * cell,
                 if( pieces[j] != avail )
                     break;
             if( avail == 0 )
-                cairo_set_source_rgb( cr, 7.0, 0.1, 0.1 );
+                gdk_cairo_set_source_color( cr, &priv->missing_color );
             else
-                cairo_set_source_rgb( cr, 0.2, 0.6, 0.4 );
+                gdk_cairo_set_source_color( cr, &priv->have_color );
             cairo_rectangle( cr, pw * i, 0, pw * (j - i), h );
             cairo_fill( cr );
             i = j;
@@ -276,6 +279,10 @@ pieces_cell_renderer_init( GTypeInstance * instance,
     priv->offscreen = NULL;
     priv->tab = NULL;
     priv->tabsize = 0;
+
+    gdk_color_parse( "#e5e5e5", &priv->bg_color );
+    gdk_color_parse( "#008200", &priv->have_color );
+    gdk_color_parse( "#b21919", &priv->missing_color );
 
     self->priv = priv;
 }
