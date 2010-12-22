@@ -42,6 +42,8 @@ struct _PiecesCellRendererPrivate
     int8_t          * tab;
     int               tabsize;
     cairo_surface_t * offscreen;
+    int               offscreen_w;
+    int               offscreen_h;
 };
 
 static void
@@ -73,14 +75,16 @@ pieces_cell_renderer_get_size( GtkCellRenderer  * cell,
 }
 
 static cairo_t *
-get_offscreen_context( PiecesCellRendererPrivate * priv, int w, int h )
+get_offscreen_context( PiecesCellRendererPrivate * priv, cairo_t * cr, int w, int h )
 {
-    if( !priv->offscreen || cairo_image_surface_get_width( priv->offscreen ) != w
-      || cairo_image_surface_get_height( priv->offscreen ) != h )
+    if( !priv->offscreen || priv->offscreen_w != w || priv->offscreen_h != h )
     {
+        cairo_surface_t * target = cairo_get_target( cr );
         if( priv->offscreen )
             cairo_surface_destroy( priv->offscreen );
-        priv->offscreen = cairo_image_surface_create( CAIRO_FORMAT_ARGB32, w, h );
+        priv->offscreen = cairo_surface_create_similar( target, CAIRO_CONTENT_COLOR_ALPHA, w, h );
+        priv->offscreen_w = w;
+        priv->offscreen_h = h;
     }
     return cairo_create( priv->offscreen );
 }
@@ -98,8 +102,7 @@ pieces_cell_renderer_render( GtkCellRenderer       * cell,
     PiecesCellRendererPrivate * priv = self->priv;
     const tr_torrent * tor = priv->tor;
     gint x, y, w, h, xt, yt;
-    cairo_t * cr;
-    cairo_surface_t * tmpsurf;
+    cairo_t * cr, * wincr;
 
     x = cell_area->x + cell->xpad;
     y = cell_area->y + cell->ypad;
@@ -117,7 +120,8 @@ pieces_cell_renderer_render( GtkCellRenderer       * cell,
     w -= 2 * xt;
     h -= 2 * yt;
 
-    cr = get_offscreen_context( priv, w, h );
+    wincr = gdk_cairo_create( window );
+    cr = get_offscreen_context( priv, wincr, w, h );
 
     cairo_set_source_rgb( cr, 0.9, 0.9, 0.9 );
     cairo_paint( cr );
@@ -149,13 +153,12 @@ pieces_cell_renderer_render( GtkCellRenderer       * cell,
     }
     cairo_destroy( cr );
 
-    cr = gdk_cairo_create( window );
-    gdk_cairo_rectangle( cr, expose_area );
-    cairo_clip( cr );
+    gdk_cairo_rectangle( wincr, expose_area );
+    cairo_clip( wincr );
 
-    cairo_set_source_surface( cr, priv->offscreen, x, y );
-    cairo_paint( cr );
-    cairo_destroy( cr );
+    cairo_set_source_surface( wincr, priv->offscreen, x, y );
+    cairo_paint( wincr );
+    cairo_destroy( wincr );
 }
 
 static void
