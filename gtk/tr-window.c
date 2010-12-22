@@ -178,6 +178,12 @@ prefsChanged( TrCore * core UNUSED,
          * for that, but it *does* revalidate when it thinks the style's been tweaked */
         g_signal_emit_by_name( p->view, "style-set", NULL, NULL );
     }
+    else if( !strcmp( key, PREF_KEY_SHOW_PIECES ) )
+    {
+        const gboolean isEnabled = pref_flag_get( key );
+        g_object_set( p->renderer, "show-pieces", isEnabled, NULL );
+        g_signal_emit_by_name( p->view, "style-set", NULL, NULL );
+    }
     else if( !strcmp( key, PREF_KEY_STATUSBAR ) )
     {
         const gboolean isEnabled = pref_flag_get( key );
@@ -724,6 +730,7 @@ tr_window_new( GtkUIManager * ui_mgr, TrCore * core )
     /* listen for prefs changes that affect the window */
     p->core = core;
     prefsChanged( core, PREF_KEY_COMPACT_VIEW, self );
+    prefsChanged( core, PREF_KEY_SHOW_PIECES, self );
     prefsChanged( core, PREF_KEY_FILTERBAR, self );
     prefsChanged( core, PREF_KEY_STATUSBAR, self );
     prefsChanged( core, PREF_KEY_STATUSBAR_STATS, self );

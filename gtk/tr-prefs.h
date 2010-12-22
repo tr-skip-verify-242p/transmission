@@ -37,6 +37,7 @@ GtkWidget * tr_prefs_dialog_new( GObject *   core,
 #define PREF_KEY_SORT_MODE                         "sort-mode"
 #define PREF_KEY_SORT_REVERSED                     "sort-reversed"
 #define PREF_KEY_COMPACT_VIEW                      "compact-view"
+#define PREF_KEY_SHOW_PIECES                       "show-pieces"
 #define PREF_KEY_FILTERBAR                         "show-filterbar"
 #define PREF_KEY_STATUSBAR                         "show-statusbar"
 #define PREF_KEY_STATUSBAR_STATS                   "statusbar-stats"
