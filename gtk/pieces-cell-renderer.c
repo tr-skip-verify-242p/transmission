@@ -126,15 +126,18 @@ pieces_cell_renderer_render( GtkCellRenderer       * cell,
     cairo_set_source_rgb( cr, 0.9, 0.9, 0.9 );
     cairo_paint( cr );
 
-    if( tor && priv->tab && priv->tabsize > 0 )
+    if( tor )
     {
         const tr_stat * st      = tr_torrentStatCached( tor );
         const tr_bool connected = ( st->peersConnected > 0 );
         int8_t * pieces         = priv->tab;
-        const int pieceCount    = priv->tabsize;
+        const int pieceCount    = tr_torrentInfo( tor )->pieceCount;
         const double pw         = (double) w / (double) pieceCount;
         int i, j;
         int8_t avail;
+
+        g_assert( pieces != NULL );
+        g_assert( priv->tabsize >= pieceCount );
 
         tr_torrentAvailability( tor, pieces, pieceCount );
 
@@ -177,18 +180,16 @@ set_torrent( PiecesCellRenderer * self, tr_torrent * tor )
         return;
 
     priv->tor = tor;
-    tr_free( priv->tab );
     if( tor )
     {
-        const tr_info * info = tr_torrentInfo( tor );
+        int count = tr_torrentInfo( tor )->pieceCount;
 
-        priv->tabsize = info->pieceCount;
-        priv->tab = tr_malloc( priv->tabsize );
-    }
-    else
-    {
-        priv->tabsize = 0;
-        priv->tab = NULL;
+        if( count > priv->tabsize )
+        {
+            tr_free( priv->tab );
+            priv->tab = tr_malloc( count );
+            priv->tabsize = count;
+        }
     }
 }
 
