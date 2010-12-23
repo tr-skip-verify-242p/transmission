@@ -47,6 +47,7 @@ struct _PiecesCellRendererPrivate
     GdkColor          have_color;
     GdkColor          missing_color;
     GdkColor          bg_color;
+    GdkColor          seed_color;
 };
 
 static void
@@ -92,6 +93,35 @@ get_offscreen_context( PiecesCellRendererPrivate * priv, cairo_t * cr, int w, in
     return cairo_create( priv->offscreen );
 }
 
+static int8_t *
+get_pieces_tab( PiecesCellRendererPrivate * priv, int * setmePieceCount )
+{
+    tr_torrent * tor = priv->tor;
+    int count;
+
+    if( !tor )
+    {
+        *setmePieceCount = 0;
+        return NULL;
+    }
+
+    count = tr_torrentInfo( tor )->pieceCount;
+    if( count < 1 )
+    {
+        *setmePieceCount = 0;
+        return NULL;
+    }
+
+    if( !priv->tab || priv->tabsize < count )
+    {
+        tr_free( priv->tab );
+        priv->tab = tr_malloc( count );
+        priv->tabsize = count;
+    }
+    *setmePieceCount = count;
+    return priv->tab;
+}
+
 static void
 pieces_cell_renderer_render( GtkCellRenderer       * cell,
                              GdkDrawable           * window,
@@ -106,6 +136,8 @@ pieces_cell_renderer_render( GtkCellRenderer       * cell,
     tr_torrent * tor = priv->tor;
     gint x, y, w, h, xt, yt;
     cairo_t * cr, * wincr;
+    int8_t * pieces = NULL;
+    int pieceCount = 0;
 
     x = cell_area->x + cell->xpad;
     y = cell_area->y + cell->ypad;
@@ -129,18 +161,17 @@ pieces_cell_renderer_render( GtkCellRenderer       * cell,
     gdk_cairo_set_source_color( cr, &priv->bg_color );
     cairo_paint( cr );
 
-    if( tor )
+    pieces = get_pieces_tab( priv, &pieceCount );
+
+    if( tor && pieces && pieceCount > 0 )
     {
         const tr_stat * st      = tr_torrentStatCached( tor );
         const tr_bool connected = ( st->peersConnected > 0 );
-        int8_t * pieces         = priv->tab;
-        const int pieceCount    = tr_torrentInfo( tor )->pieceCount;
+        const tr_bool seeding   = ( st->percentDone >= 1.0 );
         const double pw         = (double) w / (double) pieceCount;
+        GdkColor * piece_color  = ( seeding ? &priv->seed_color : &priv->have_color );
         int i, j;
         int8_t avail;
-
-        g_assert( pieces != NULL );
-        g_assert( priv->tabsize >= pieceCount );
 
         tr_torrentAvailability( tor, pieces, pieceCount );
 
@@ -158,7 +189,7 @@ pieces_cell_renderer_render( GtkCellRenderer       * cell,
             if( avail == 0 )
                 gdk_cairo_set_source_color( cr, &priv->missing_color );
             else
-                gdk_cairo_set_source_color( cr, &priv->have_color );
+                gdk_cairo_set_source_color( cr, piece_color );
             cairo_rectangle( cr, pw * i, 0, pw * (j - i), h );
             cairo_fill( cr );
             i = j;
@@ -175,43 +206,18 @@ pieces_cell_renderer_render( GtkCellRenderer       * cell,
 }
 
 static void
-set_torrent( PiecesCellRenderer * self, tr_torrent * tor )
-{
-    PiecesCellRendererPrivate * priv = self->priv;
-
-    if( tor == priv->tor )
-        return;
-
-    priv->tor = tor;
-    if( tor )
-    {
-        int count = tr_torrentInfo( tor )->pieceCount;
-
-        if( count > priv->tabsize )
-        {
-            tr_free( priv->tab );
-            priv->tab = tr_malloc( count );
-            priv->tabsize = count;
-        }
-    }
-}
-
-static void
 pieces_cell_renderer_set_property( GObject      * object,
                                    guint          property_id,
                                    const GValue * v,
                                    GParamSpec   * pspec )
 {
     PiecesCellRenderer        * self = PIECES_CELL_RENDERER( object );
+    PiecesCellRendererPrivate * priv = self->priv;
 
     switch( property_id )
     {
-        case PROP_TORRENT:
-            set_torrent( self, g_value_get_pointer( v ) );
-            break;
-        default:
-            G_OBJECT_WARN_INVALID_PROPERTY_ID( object, property_id, pspec );
-            break;
+        case PROP_TORRENT: priv->tor = g_value_get_pointer( v ); break;
+        default: G_OBJECT_WARN_INVALID_PROPERTY_ID( object, property_id, pspec ); break;
     }
 }
 
@@ -239,8 +245,13 @@ pieces_cell_renderer_finalize( GObject * object )
     GObjectClass              * parent;
 
     tr_free( priv->tab );
+    priv->tab = NULL;
+    priv->tabsize = 0;
     if( priv->offscreen )
+    {
         cairo_surface_destroy( priv->offscreen );
+        priv->offscreen = NULL;
+    }
 
     parent = g_type_class_peek( g_type_parent( PIECES_CELL_RENDERER_TYPE ) ) ;
     parent->finalize( object );
@@ -280,9 +291,10 @@ pieces_cell_renderer_init( GTypeInstance * instance,
     priv->tab = NULL;
     priv->tabsize = 0;
 
-    gdk_color_parse( "#e5e5e5", &priv->bg_color );
-    gdk_color_parse( "#008200", &priv->have_color );
-    gdk_color_parse( "#b21919", &priv->missing_color );
+    gdk_color_parse( "#efefef", &priv->bg_color );
+    gdk_color_parse( "#2975d6", &priv->have_color );
+    gdk_color_parse( "#6b0000", &priv->missing_color );
+    gdk_color_parse( "#30b027", &priv->seed_color );
 
     self->priv = priv;
 }
