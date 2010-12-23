@@ -282,7 +282,7 @@ pieces_cell_renderer_init( GTypeInstance * instance,
 
     gdk_color_parse( "#efefef", &priv->bg_color );
     gdk_color_parse( "#2975d6", &priv->have_color );
-    gdk_color_parse( "#6b0000", &priv->missing_color );
+    gdk_color_parse( "#d90000", &priv->missing_color );
     gdk_color_parse( "#30b027", &priv->seed_color );
 
     self->priv = priv;
