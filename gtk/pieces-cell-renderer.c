@@ -47,6 +47,7 @@ struct _PiecesCellRendererPrivate
     GdkColor          have_color;
     GdkColor          missing_color;
     GdkColor          bg_color;
+    GdkColor          seed_color;
 };
 
 static void
@@ -166,7 +167,9 @@ pieces_cell_renderer_render( GtkCellRenderer       * cell,
     {
         const tr_stat * st      = tr_torrentStatCached( tor );
         const tr_bool connected = ( st->peersConnected > 0 );
+        const tr_bool seeding   = ( st->percentDone >= 1.0 );
         const double pw         = (double) w / (double) pieceCount;
+        GdkColor * piece_color  = ( seeding ? &priv->seed_color : &priv->have_color );
         int i, j;
         int8_t avail;
 
@@ -186,7 +189,7 @@ pieces_cell_renderer_render( GtkCellRenderer       * cell,
             if( avail == 0 )
                 gdk_cairo_set_source_color( cr, &priv->missing_color );
             else
-                gdk_cairo_set_source_color( cr, &priv->have_color );
+                gdk_cairo_set_source_color( cr, piece_color );
             cairo_rectangle( cr, pw * i, 0, pw * (j - i), h );
             cairo_fill( cr );
             i = j;
@@ -288,9 +291,10 @@ pieces_cell_renderer_init( GTypeInstance * instance,
     priv->tab = NULL;
     priv->tabsize = 0;
 
-    gdk_color_parse( "#e5e5e5", &priv->bg_color );
-    gdk_color_parse( "#008200", &priv->have_color );
-    gdk_color_parse( "#b21919", &priv->missing_color );
+    gdk_color_parse( "#efefef", &priv->bg_color );
+    gdk_color_parse( "#2975d6", &priv->have_color );
+    gdk_color_parse( "#6b0000", &priv->missing_color );
+    gdk_color_parse( "#30b027", &priv->seed_color );
 
     self->priv = priv;
 }
