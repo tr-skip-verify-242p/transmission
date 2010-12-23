@@ -35,6 +35,8 @@ enum
 };
 
 #define DEFAULT_BAR_HEIGHT 12
+#define PIECE_BAR_FULL_HEIGHT 6
+#define PIECE_BAR_COMPACT_HEIGHT 4
 #define SMALL_SCALE 0.9
 #define COMPACT_ICON_SIZE GTK_ICON_SIZE_MENU
 #define FULL_ICON_SIZE GTK_ICON_SIZE_DND
@@ -330,8 +332,8 @@ struct TorrentCellRendererPrivate
     tr_torrent       * tor;
     GtkCellRenderer  * text_renderer;
     GtkCellRenderer  * text_renderer_err;
-    GtkCellRenderer  * pieces_renderer;
     GtkCellRenderer  * progress_renderer;
+    GtkCellRenderer  * pieces_renderer;
     GtkCellRenderer  * icon_renderer;
     int bar_height;
 
@@ -550,7 +552,9 @@ render_compact( TorrentCellRenderer   * cell,
     GdkRectangle icon_area;
     GdkRectangle name_area;
     GdkRectangle stat_area;
-    GdkRectangle prog_area;
+    GdkRectangle bars_area;
+    GdkRectangle pbar_area;
+    GdkRectangle piec_area;
     GdkRectangle fill_area;
     const char * name;
     char * status;
@@ -562,6 +566,7 @@ render_compact( TorrentCellRenderer   * cell,
     const tr_stat * st = tr_torrentStatCached( (tr_torrent*)tor );
     const gboolean active = st->activity != TR_STATUS_STOPPED;
     const gboolean sensitive = active || st->error;
+    const double percentDone = MAX( 0.0, st->percentDone );
 
     icon = get_icon( tor, COMPACT_ICON_SIZE, widget );
     name = tr_torrentInfo( tor )->name;
@@ -572,7 +577,7 @@ render_compact( TorrentCellRenderer   * cell,
     fill_area.y += cell->parent.ypad;
     fill_area.width -= cell->parent.xpad * 2;
     fill_area.height -= cell->parent.ypad * 2;
-    icon_area = name_area = stat_area = prog_area = fill_area;
+    icon_area = name_area = stat_area = bars_area = fill_area;
 
     g_object_set( p->icon_renderer, "pixbuf", icon, NULL );
     gtk_cell_renderer_get_size( p->icon_renderer, widget, NULL, NULL, NULL, &icon_area.width, NULL );
@@ -583,9 +588,17 @@ render_compact( TorrentCellRenderer   * cell,
     gtk_cell_renderer_get_size( text_renderer, widget, NULL, NULL, NULL, &stat_area.width, NULL );
 
     icon_area.x = fill_area.x;
-    prog_area.x = fill_area.x + fill_area.width - bar_width( cell );
-    prog_area.width = bar_width( cell );
-    stat_area.x = prog_area.x - GUI_PAD - stat_area.width;
+    bars_area.x = fill_area.x + fill_area.width - bar_width( cell );
+    bars_area.width = bar_width( cell );
+    pbar_area = bars_area;
+    piec_area = bars_area;
+    if( p->show_pieces )
+    {
+        pbar_area.height -= PIECE_BAR_COMPACT_HEIGHT;
+        piec_area.y += pbar_area.height;
+        piec_area.height -= pbar_area.height;
+    }
+    stat_area.x = bars_area.x - GUI_PAD - stat_area.width;
     name_area.x = icon_area.x + icon_area.width + GUI_PAD;
     name_area.y = fill_area.y;
     name_area.width = stat_area.x - GUI_PAD - name_area.x;
@@ -596,16 +609,12 @@ render_compact( TorrentCellRenderer   * cell,
 
     g_object_set( p->icon_renderer, "pixbuf", icon, "sensitive", sensitive, NULL );
     gtk_cell_renderer_render( p->icon_renderer, window, widget, &icon_area, &icon_area, &icon_area, flags );
+    g_object_set( p->progress_renderer, "value", (int)(percentDone*100.0), "text", NULL, "sensitive", sensitive, NULL );
+    gtk_cell_renderer_render( p->progress_renderer, window, widget, &pbar_area, &pbar_area, &pbar_area, flags );
     if( p->show_pieces )
     {
         g_object_set( p->pieces_renderer, "sensitive", sensitive, NULL );
-        gtk_cell_renderer_render( p->pieces_renderer, window, widget, &prog_area, &prog_area, &prog_area, flags );
-    }
-    else
-    {
-        const double percentDone = MAX( 0.0, st->percentDone );
-        g_object_set( p->progress_renderer, "value", (int)(percentDone*100.0), "text", NULL, "sensitive", sensitive, NULL );
-        gtk_cell_renderer_render( p->progress_renderer, window, widget, &prog_area, &prog_area, &prog_area, flags );
+        gtk_cell_renderer_render( p->pieces_renderer, window, widget, &piec_area, &piec_area, &piec_area, flags );
     }
     g_object_set( text_renderer, "text", status, "scale", SMALL_SCALE, "sensitive", sensitive, "ellipsize", PANGO_ELLIPSIZE_END, NULL );
     gtk_cell_renderer_render( text_renderer, window, widget, &stat_area, &stat_area, &stat_area, flags );
@@ -632,7 +641,9 @@ render_full( TorrentCellRenderer   * cell,
     GdkRectangle name_area;
     GdkRectangle stat_area;
     GdkRectangle prog_area;
-    GdkRectangle prct_area;
+    GdkRectangle bars_area;
+    GdkRectangle pbar_area;
+    GdkRectangle piec_area;
     const char * name;
     char * status;
     char * progress;
@@ -645,6 +656,7 @@ render_full( TorrentCellRenderer   * cell,
     const tr_info * inf = tr_torrentInfo( tor );
     const gboolean active = st->activity != TR_STATUS_STOPPED;
     const gboolean sensitive = active || st->error;
+    const double percentDone = MAX( 0.0, st->percentDone );
 
     icon = get_icon( tor, FULL_ICON_SIZE, widget );
     name = inf->name;
@@ -689,21 +701,29 @@ render_full( TorrentCellRenderer   * cell,
     name_area.y = fill_area.y;
     name_area.width = fill_area.width - GUI_PAD - icon_area.width - GUI_PAD_SMALL;
 
-    /* prog */
+    /* progress string */
     prog_area.x = name_area.x;
     prog_area.y = name_area.y + name_area.height;
     prog_area.width = name_area.width;
 
-    /* pieces/progress bar */
-    prct_area.x = prog_area.x;
-    prct_area.y = prog_area.y + prog_area.height + GUI_PAD_SMALL;
-    prct_area.width = prog_area.width;
-    prct_area.height = p->bar_height;
+    /* progress and piece bars */
+    bars_area.x = prog_area.x;
+    bars_area.y = prog_area.y + prog_area.height + GUI_PAD_SMALL;
+    bars_area.width = prog_area.width;
+    bars_area.height = p->bar_height;
+    pbar_area = bars_area;
+    piec_area = bars_area;
+    if( p->show_pieces )
+    {
+        pbar_area.height -= PIECE_BAR_FULL_HEIGHT;
+        piec_area.y += pbar_area.height;
+        piec_area.height -= pbar_area.height;
+    }
 
     /* status */
-    stat_area.x = prct_area.x;
-    stat_area.y = prct_area.y + prct_area.height + GUI_PAD_SMALL;
-    stat_area.width = prct_area.width;
+    stat_area.x = bars_area.x;
+    stat_area.y = bars_area.y + bars_area.height + GUI_PAD_SMALL;
+    stat_area.width = bars_area.width;
 
     /**
     *** RENDER
@@ -715,16 +735,12 @@ render_full( TorrentCellRenderer   * cell,
     gtk_cell_renderer_render( text_renderer, window, widget, &name_area, &name_area, &name_area, flags );
     g_object_set( text_renderer, "text", progress, "scale", SMALL_SCALE, "weight", PANGO_WEIGHT_NORMAL, NULL );
     gtk_cell_renderer_render( text_renderer, window, widget, &prog_area, &prog_area, &prog_area, flags );
+    g_object_set( p->progress_renderer, "value", (int)(percentDone*100.0), "text", "", "sensitive", sensitive, NULL );
+    gtk_cell_renderer_render( p->progress_renderer, window, widget, &pbar_area, &pbar_area, &pbar_area, flags );
     if( p->show_pieces )
     {
         g_object_set( p->pieces_renderer, "sensitive", sensitive, NULL );
-        gtk_cell_renderer_render( p->pieces_renderer, window, widget, &prct_area, &prct_area, &prct_area, flags );
-    }
-    else
-    {
-        const double percentDone = MAX( 0.0, st->percentDone );
-        g_object_set( p->progress_renderer, "value", (int)(percentDone*100.0), "text", "", "sensitive", sensitive, NULL );
-        gtk_cell_renderer_render( p->progress_renderer, window, widget, &prct_area, &prct_area, &prct_area, flags );
+        gtk_cell_renderer_render( p->pieces_renderer, window, widget, &piec_area, &piec_area, &piec_area, flags );
     }
     g_object_set( text_renderer, "text", status, NULL );
     gtk_cell_renderer_render( text_renderer, window, widget, &stat_area, &stat_area, &stat_area, flags );

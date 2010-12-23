@@ -94,7 +94,7 @@ static GtkToggleActionEntry  pref_toggle_entries[] =
 {
     { "alt-speed-enabled", NULL, N_( "Enable Alternative Speed _Limits" ), NULL, NULL, G_CALLBACK( toggle_pref_cb ), FALSE },
     { "compact-view",      NULL, N_( "_Compact View" ), "<alt>C", NULL, G_CALLBACK( toggle_pref_cb ), FALSE },
-    { "show-pieces",       NULL, N_( "Pieces _Bar" ), "<alt>B", NULL, G_CALLBACK( toggle_pref_cb ), FALSE },
+    { "show-pieces",       NULL, N_( "Show Piece _Bars" ), "<alt>B", NULL, G_CALLBACK( toggle_pref_cb ), FALSE },
     { "sort-reversed",     NULL, N_( "Re_verse Sort Order" ), NULL, NULL, G_CALLBACK( toggle_pref_cb ), FALSE },
     { "show-filterbar",    NULL, N_( "_Filterbar" ), NULL, NULL, G_CALLBACK( toggle_pref_cb ), FALSE },
     { "show-statusbar",    NULL, N_( "_Statusbar" ), NULL, NULL, G_CALLBACK( toggle_pref_cb ), FALSE },

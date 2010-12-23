@@ -125,7 +125,7 @@ get_pieces_tab( PiecesCellRendererPrivate * priv, int * setmePieceCount )
 static void
 pieces_cell_renderer_render( GtkCellRenderer       * cell,
                              GdkDrawable           * window,
-                             GtkWidget             * widget,
+                             GtkWidget             * widget UNUSED,
                              GdkRectangle          * background_area UNUSED,
                              GdkRectangle          * cell_area,
                              GdkRectangle          * expose_area,
@@ -134,7 +134,7 @@ pieces_cell_renderer_render( GtkCellRenderer       * cell,
     PiecesCellRenderer        * self = PIECES_CELL_RENDERER( cell );
     PiecesCellRendererPrivate * priv = self->priv;
     tr_torrent * tor = priv->tor;
-    gint x, y, w, h, xt, yt;
+    gint x, y, w, h;
     cairo_t * cr, * wincr;
     int8_t * pieces = NULL;
     int pieceCount = 0;
@@ -143,17 +143,6 @@ pieces_cell_renderer_render( GtkCellRenderer       * cell,
     y = cell_area->y + cell->ypad;
     w = cell_area->width - cell->xpad * 2;
     h = cell_area->height - cell->ypad * 2;
-
-    gtk_paint_box (widget->style, window,
-                   GTK_STATE_NORMAL, GTK_SHADOW_IN,
-                   NULL, widget, NULL,
-                   x, y, w, h);
-    xt = widget->style->xthickness;
-    yt = widget->style->ythickness;
-    x += xt;
-    y += yt;
-    w -= 2 * xt;
-    h -= 2 * yt;
 
     wincr = gdk_cairo_create( window );
     cr = get_offscreen_context( priv, wincr, w, h );
