@@ -55,7 +55,7 @@ struct tr_peerProxy
 tr_peerProxy *
 tr_peerProxyNew( const tr_session * session,
                  const tr_address * peerAddr,
-                 tr_port            peerPort )
+                 tr_port            peerPort UNUSED )
 {
     tr_peerProxy *   proxy;
     tr_address       addr;

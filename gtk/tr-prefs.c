@@ -971,6 +971,7 @@ proxyPage( GObject * core )
     GtkWidget *        t;
     GtkWidget *        w;
     struct ProxyPage * page = tr_new0( struct ProxyPage, 1 );
+    char buf[128];
 
     t = hig_workarea_create( );
     hig_workarea_add_section_title ( t, &row, _( "Tracker" ) );
@@ -978,6 +979,11 @@ proxyPage( GObject * core )
     s = _( "Connect to tracker via a pro_xy" );
     w = new_check_button( s, TR_PREFS_KEY_PROXY_ENABLED, core );
     g_signal_connect( w, "toggled", G_CALLBACK( onProxyToggled ), page );
+    hig_workarea_add_wide_control( t, &row, w );
+
+    s = _( "Note: This proxy will also be used for downloading URLs." );
+    g_snprintf( buf, sizeof( buf ), "<i>%s</i>", s );
+    w = gtk_label_new( buf );
     hig_workarea_add_wide_control( t, &row, w );
 
     s = _( "Proxy _server:" );
