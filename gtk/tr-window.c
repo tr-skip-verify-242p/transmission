@@ -181,7 +181,7 @@ prefsChanged( TrCore * core UNUSED,
     }
     else if( !strcmp( key, PREF_KEY_SHOW_PIECES ) )
     {
-        const gboolean isEnabled = pref_flag_get( key );
+        const gboolean isEnabled = gtr_pref_flag_get( key );
         g_object_set( p->renderer, "show-pieces", isEnabled, NULL );
         g_signal_emit_by_name( p->view, "style-set", NULL, NULL );
     }

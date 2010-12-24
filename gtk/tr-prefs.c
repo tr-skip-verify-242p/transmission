@@ -911,10 +911,10 @@ static void
 refreshProxySensitivity( struct ProxyPage * p )
 {
     GSList *       l;
-    const gboolean proxy_enabled = pref_flag_get( TR_PREFS_KEY_PROXY_ENABLED );
-    const gboolean proxy_auth_enabled = pref_flag_get( TR_PREFS_KEY_PROXY_AUTH_ENABLED );
-    const gboolean peer_proxy_enabled = pref_flag_get( TR_PREFS_KEY_PEER_PROXY_ENABLED );
-    const gboolean peer_proxy_auth_enabled = pref_flag_get( TR_PREFS_KEY_PEER_PROXY_AUTH_ENABLED );
+    const gboolean proxy_enabled = gtr_pref_flag_get( TR_PREFS_KEY_PROXY_ENABLED );
+    const gboolean proxy_auth_enabled = gtr_pref_flag_get( TR_PREFS_KEY_PROXY_AUTH_ENABLED );
+    const gboolean peer_proxy_enabled = gtr_pref_flag_get( TR_PREFS_KEY_PEER_PROXY_ENABLED );
+    const gboolean peer_proxy_auth_enabled = gtr_pref_flag_get( TR_PREFS_KEY_PEER_PROXY_AUTH_ENABLED );
 
     for( l = p->proxy_widgets; l != NULL; l = l->next )
         gtk_widget_set_sensitive( GTK_WIDGET( l->data ), proxy_enabled );
@@ -957,7 +957,7 @@ proxy_combo_box_new( GObject * core, const char * key )
                                              "SOCKS4", TR_PROXY_SOCKS4,
                                              "SOCKS5", TR_PROXY_SOCKS5,
                                              NULL );
-    gtr_combo_box_set_active_enum( GTK_COMBO_BOX( w ), pref_int_get( key ) );
+    gtr_combo_box_set_active_enum( GTK_COMBO_BOX( w ), gtr_pref_int_get( key ) );
     g_object_set_data_full( G_OBJECT( w ), PREF_KEY, tr_strdup( key ), g_free );
     g_signal_connect( w, "changed", G_CALLBACK( onIntComboChanged ), core );
     return w;
