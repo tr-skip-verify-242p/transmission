@@ -24,7 +24,7 @@
  #include <unistd.h> /* getcwd */
 #endif
 
-#include <event.h>
+#include <event2/buffer.h>
 
 #define CURL_DISABLE_TYPECHECK /* otherwise -Wunreachable-code goes insane */
 #include <curl/curl.h>
@@ -100,10 +100,10 @@ tr_strltime( char * buf, int seconds, size_t buflen )
     minutes = ( seconds % 3600 ) / 60;
     seconds = ( seconds % 3600 ) % 60;
 
-    tr_snprintf( d, sizeof( d ), "%'d day%s", days, days==1?"":"s" );
-    tr_snprintf( h, sizeof( h ), "%'d hour%s", hours, hours==1?"":"s" );
-    tr_snprintf( m, sizeof( m ), "%'d minute%s", minutes, minutes==1?"":"s" );
-    tr_snprintf( s, sizeof( s ), "%'d second%s", seconds, seconds==1?"":"s" );
+    tr_snprintf( d, sizeof( d ), "%d %s", days, days==1?"day":"days" );
+    tr_snprintf( h, sizeof( h ), "%d %s", hours, hours==1?"hour":"hours" );
+    tr_snprintf( m, sizeof( m ), "%d %s", minutes, minutes==1?"minute":"minutes" );
+    tr_snprintf( s, sizeof( s ), "%d %s", seconds, seconds==1?"seconds":"seconds" );
 
     if( days )
     {
@@ -1349,7 +1349,7 @@ printTrackersImpl( tr_benc * trackerStats )
                 {
                     tr_strltime( buf, now - lastAnnounceTime, sizeof( buf ) );
                     if( lastAnnounceSucceeded )
-                        printf( "  Got a list of %'d peers %s ago\n",
+                        printf( "  Got a list of %d peers %s ago\n",
                                 (int)lastAnnouncePeerCount, buf );
                     else if( lastAnnounceTimedOut )
                         printf( "  Peer list request timed out; will retry\n" );
@@ -1380,7 +1380,7 @@ printTrackersImpl( tr_benc * trackerStats )
                 {
                     tr_strltime( buf, now - lastScrapeTime, sizeof( buf ) );
                     if( lastScrapeSucceeded )
-                        printf( "  Tracker had %'d seeders and %'d leechers %s ago\n",
+                        printf( "  Tracker had %d seeders and %d leechers %s ago\n",
                                 (int)seederCount, (int)leecherCount, buf );
                     else if( lastScrapeTimedOut )
                         printf( "  Tracker scrape timed out; will retry\n" );
@@ -1730,7 +1730,7 @@ flush( const char * rpcurl, tr_benc ** benc )
         curl_easy_getinfo( curl, CURLINFO_RESPONSE_CODE, &response );
         switch( response ) {
             case 200:
-                status |= processResponse( rpcurl, EVBUFFER_DATA(buf), EVBUFFER_LENGTH(buf) );
+                status |= processResponse( rpcurl, (const char*) evbuffer_pullup( buf, -1 ), evbuffer_get_length( buf ) );
                 break;
             case 409:
                 /* session id failed.  our curl header func has already
@@ -1742,7 +1742,7 @@ flush( const char * rpcurl, tr_benc ** benc )
                 benc = NULL;
                 break;
             default:
-                fprintf( stderr, "Unexpected response: %s\n", (char*)EVBUFFER_DATA(buf) );
+                fprintf( stderr, "Unexpected response: %s\n", evbuffer_pullup( buf, -1 ) );
                 status |= EXIT_FAILURE;
                 break;
         }

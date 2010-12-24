@@ -1223,12 +1223,13 @@ handshakeTimeout( int foo UNUSED, short bar UNUSED, void * handshake )
 }
 
 tr_handshake*
-tr_handshakeNew( tr_peerIo *        io,
-                 tr_encryption_mode encryptionMode,
-                 handshakeDoneCB    doneCB,
-                 void *             doneUserData )
+tr_handshakeNew( tr_peerIo           * io,
+                 tr_encryption_mode    encryptionMode,
+                 handshakeDoneCB       doneCB,
+                 void                * doneUserData )
 {
     tr_handshake * handshake;
+    tr_session * session = tr_peerIoGetSession( io );
 
     handshake = tr_new0( tr_handshake, 1 );
     handshake->io = io;
@@ -1236,8 +1237,8 @@ tr_handshakeNew( tr_peerIo *        io,
     handshake->encryptionMode = encryptionMode;
     handshake->doneCB = doneCB;
     handshake->doneUserData = doneUserData;
-    handshake->session = tr_peerIoGetSession( io );
-    handshake->timeout_timer = evtimer_new( NULL, handshakeTimeout, handshake );
+    handshake->session = session;
+    handshake->timeout_timer = evtimer_new( session->event_base, handshakeTimeout, handshake );
     tr_timerAdd( handshake->timeout_timer, HANDSHAKE_TIMEOUT_SEC, 0 );
 
     tr_peerIoRef( io ); /* balanced by the unref in tr_handshakeFree */

@@ -434,6 +434,7 @@ get_size_compact( TorrentCellRenderer * cell,
                   gint                * height )
 {
     int w, h;
+    int xpad, ypad;
     GdkRectangle icon_area;
     GdkRectangle name_area;
     GdkRectangle stat_area;
@@ -449,6 +450,7 @@ get_size_compact( TorrentCellRenderer * cell,
     icon = get_icon( tor, COMPACT_ICON_SIZE, widget );
     name = tr_torrentInfo( tor )->name;
     status = getShortStatusString( tor, st, p->upload_speed_KBps, p->download_speed_KBps );
+    gtr_cell_renderer_get_padding( &cell->parent, &xpad, &ypad );
 
     /* get the idealized cell dimensions */
     g_object_set( p->icon_renderer, "pixbuf", icon, NULL );
@@ -473,7 +475,7 @@ get_size_compact( TorrentCellRenderer * cell,
         *width = ( cell->parent.xpad * 2 + icon_area.width + GUI_PAD + name_area.width
                    + GUI_PAD + bar_width( cell ) + GUI_PAD + stat_area.width );
     if( height != NULL )
-        *height = cell->parent.ypad * 2 + MAX( name_area.height, p->bar_height );
+        *height = ypad * 2 + MAX( name_area.height, p->bar_height );
 
     /* cleanup */
     g_free( status );
@@ -489,6 +491,7 @@ get_size_full( TorrentCellRenderer * cell,
                gint                * height )
 {
     int w, h;
+    int xpad, ypad;
     GdkRectangle icon_area;
     GdkRectangle name_area;
     GdkRectangle stat_area;
@@ -508,6 +511,7 @@ get_size_full( TorrentCellRenderer * cell,
     name = inf->name;
     status = getStatusString( tor, st, p->upload_speed_KBps, p->download_speed_KBps );
     progress = getProgressString( tor, inf, st );
+    gtr_cell_renderer_get_padding( &cell->parent, &xpad, &ypad );
 
     /* get the idealized cell dimensions */
     g_object_set( p->icon_renderer, "pixbuf", icon, NULL );
@@ -533,9 +537,9 @@ get_size_full( TorrentCellRenderer * cell,
     **/
 
     if( width != NULL )
-        *width = cell->parent.xpad * 2 + icon_area.width + GUI_PAD + MAX3( name_area.width, prog_area.width, stat_area.width );
+        *width = xpad * 2 + icon_area.width + GUI_PAD + MAX3( name_area.width, prog_area.width, stat_area.width );
     if( height != NULL )
-        *height = cell->parent.ypad * 2 + name_area.height + prog_area.height + GUI_PAD_SMALL + p->bar_height + GUI_PAD_SMALL + stat_area.height;
+        *height = ypad * 2 + name_area.height + prog_area.height + GUI_PAD_SMALL + p->bar_height + GUI_PAD_SMALL + stat_area.height;
 
     /* cleanup */
     g_free( status );
@@ -557,8 +561,8 @@ torrent_cell_renderer_get_size( GtkCellRenderer  * cell,
 
     if( self && self->priv->tor )
     {
-        struct TorrentCellRendererPrivate * p = self->priv;
         int w, h;
+        struct TorrentCellRendererPrivate * p = self->priv;
 
         if( p->compact )
             get_size_compact( TORRENT_CELL_RENDERER( cell ), widget, &w, &h );
@@ -574,8 +578,11 @@ torrent_cell_renderer_get_size( GtkCellRenderer  * cell,
         if( x_offset )
             *x_offset = cell_area ? cell_area->x : 0;
 
-        if( y_offset )
-            *y_offset = cell_area ? (int)((cell_area->height - (cell->ypad*2 +h)) / 2.0) : 0;
+        if( y_offset ) {
+            int xpad, ypad;
+            gtr_cell_renderer_get_padding( cell, &xpad, &ypad );
+            *y_offset = cell_area ? (int)((cell_area->height - (ypad*2 +h)) / 2.0) : 0;
+        }
     }
 }
 
@@ -588,6 +595,7 @@ render_compact( TorrentCellRenderer   * cell,
                 GdkRectangle          * expose_area UNUSED,
                 GtkCellRendererState    flags )
 {
+    int xpad, ypad;
     GdkRectangle icon_area;
     GdkRectangle name_area;
     GdkRectangle stat_area;
@@ -607,6 +615,7 @@ render_compact( TorrentCellRenderer   * cell,
     icon = get_icon( tor, COMPACT_ICON_SIZE, widget );
     name = tr_torrentInfo( tor )->name;
     status = getShortStatusString( tor, st, p->upload_speed_KBps, p->download_speed_KBps );
+    gtr_cell_renderer_get_padding( &cell->parent, &xpad, &ypad );
 
     fill_area = *background_area;
     fill_area.x += cell->parent.xpad;
@@ -668,6 +677,7 @@ render_full( TorrentCellRenderer   * cell,
              GtkCellRendererState    flags )
 {
     int w, h;
+    int xpad, ypad;
     GdkRectangle fill_area;
     GdkRectangle icon_area;
     GdkRectangle name_area;
@@ -691,6 +701,7 @@ render_full( TorrentCellRenderer   * cell,
     name = inf->name;
     status = getStatusString( tor, st, p->upload_speed_KBps, p->download_speed_KBps );
     progress = getProgressString( tor, inf, st );
+    gtr_cell_renderer_get_padding( &cell->parent, &xpad, &ypad );
 
     /* get the idealized cell dimensions */
     g_object_set( p->icon_renderer, "pixbuf", icon, NULL );
@@ -716,10 +727,10 @@ render_full( TorrentCellRenderer   * cell,
     **/
 
     fill_area = *background_area;
-    fill_area.x += cell->parent.xpad;
-    fill_area.y += cell->parent.ypad;
-    fill_area.width -= cell->parent.xpad * 2;
-    fill_area.height -= cell->parent.ypad * 2;
+    fill_area.x += xpad;
+    fill_area.y += ypad;
+    fill_area.width -= xpad * 2;
+    fill_area.height -= ypad * 2;
 
     /* icon */
     icon_area.x = fill_area.x;

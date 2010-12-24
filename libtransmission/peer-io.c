@@ -414,8 +414,8 @@ tr_peerIoNew( tr_session       * session,
     io->timeCreated = tr_time( );
     io->inbuf = evbuffer_new( );
     io->outbuf = evbuffer_new( );
-    io->event_read = event_new( NULL, io->socket, EV_READ, event_read_cb, io );
-    io->event_write = event_new( NULL, io->socket, EV_WRITE, event_write_cb, io );
+    io->event_read = event_new( session->event_base, io->socket, EV_READ, event_read_cb, io );
+    io->event_write = event_new( session->event_base, io->socket, EV_WRITE, event_write_cb, io );
     tr_bandwidthConstruct( &io->bandwidth, session, parent );
     tr_bandwidthSetPeer( &io->bandwidth, io );
     dbgmsg( io, "bandwidth is %p; its parent is %p", &io->bandwidth, parent );
@@ -678,8 +678,8 @@ tr_peerIoReconnect( tr_peerIo * io )
     event_del( io->event_write );
     io->socket = openOutgoingPeerSocket( session, &io->addr, io->port,
                                          io->isSeed, io->proxy );
-    io->event_read = event_new( NULL, io->socket, EV_READ, event_read_cb, io );
-    io->event_write = event_new( NULL, io->socket, EV_WRITE, event_write_cb, io );
+    io->event_read = event_new( session->event_base, io->socket, EV_READ, event_read_cb, io );
+    io->event_write = event_new( session->event_base, io->socket, EV_WRITE, event_write_cb, io );
 
     if( io->socket >= 0 )
     {
