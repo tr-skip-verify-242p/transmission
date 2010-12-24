@@ -40,8 +40,6 @@ AM_CONDITIONAL(TR_UNSTABLE, test "x$supported_build" = "xno")
 ##
 CURL_MINIMUM=7.15.4
 AC_SUBST(CURL_MINIMUM)
-LIBEVENT_MINIMUM=1.4.9
-AC_SUBST(LIBEVENT_MINIUM)
 OPENSSL_MINIMUM=0.9.4
 AC_SUBST(OPENSSL_MINIMUM)
 
@@ -85,7 +83,7 @@ AC_PROG_CXX
 AC_C_INLINE
 if test "x$GCC" = "xyes" ; then
 
-    CFLAGS="$CFLAGS -std=gnu99 -ggdb3 -Wall -W -Wpointer-arith -Wformat-security -Wcast-align -Wundef -Wcast-align -Wstrict-prototypes -Wmissing-declarations -Wmissing-format-attribute -Wredundant-decls -Wnested-externs -Wunused-parameter -Wwrite-strings -Waggregate-return -Winline -Wfloat-equal"
+    CFLAGS="$CFLAGS -std=gnu99 -ggdb3 -Wall -W -Wpointer-arith -Wformat-security -Wcast-align -Wundef -Wcast-align -Wstrict-prototypes -Wmissing-declarations -Wmissing-format-attribute -Wredundant-decls -Wnested-externs -Wunused-parameter -Wwrite-strings -Winline -Wfloat-equal"
 
     dnl figure out gcc version
     AC_MSG_CHECKING([gcc version])
@@ -203,28 +201,14 @@ AC_CHECK_LIB([rt],
              [libevent_extra_libs=""])
 
 
-dnl libevent
-dnl if the user specified LIBEVENT_LIBS or
-if test -n "$LIBEVENT_LIBS"; then
-    user_specified_libevent=yes
-elif test -n "$LIBEVENT_CFLAGS"; then
-    user_specified_libevent=yes
-fi
-if test "x$user_specified_libevent" = "xyes"; then
-    AC_MSG_NOTICE([Using user-specified LIBEVENT_LIBS and LIBEVENT_CFLAGS])
-else
-    AC_CHECK_LIB([event],[evutil_vsnprintf],
-                 [],
-                 [AC_MSG_ERROR(libevent $LIBEVENT_MINIMUM or higher not found!)],
-                 [$libevent_extra_libs])
-    AC_CHECK_HEADER([event-config.h],[],
-                    [AC_MSG_ERROR(event-config.h not found!)])
-    LIBEVENT_CFLAGS=""
-    LIBEVENT_LIBS="-levent $libevent_extra_libs"
-fi
-AC_ARG_VAR([LIBEVENT_CFLAGS], [C compiler flags for LIBEVENT, overriding pkg-config])dnl
-AC_ARG_VAR([LIBEVENT_LIBS], [linker flags for LIBEVENT, overriding pkg-config])dnl
+dnl ----------------------------------------------------------------------------
+dnl
+dnl  libevent
 
+LIBEVENT_CFLAGS="-I\$(top_srcdir)/third-party/libevent/include"
+LIBEVENT_LIBS="\$(top_builddir)/third-party/libevent/.libs/libevent.a"
+AC_SUBST(LIBEVENT_CFLAGS)
+AC_SUBST(LIBEVENT_LIBS)
 
 
 dnl ----------------------------------------------------------------------------
@@ -497,6 +481,7 @@ AC_CONFIG_FILES([Makefile
                  web/javascript/jquery/Makefile
                  web/stylesheets/Makefile
                  po/Makefile.in])
+AC_CONFIG_SUBDIRS([third-party/libevent])
 
 ac_configure_args="$ac_configure_args --enable-static --disable-shared -q"
 AC_OUTPUT
