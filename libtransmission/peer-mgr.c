@@ -16,9 +16,7 @@
 #include <string.h> /* memcpy, memcmp, strstr */
 #include <stdlib.h> /* qsort */
 
-#include <event2/event.h>
-#include <event2/event_compat.h>
-#include <event2/event_struct.h>
+#include <event.h>
 
 #include "transmission.h"
 #include "announcer.h"

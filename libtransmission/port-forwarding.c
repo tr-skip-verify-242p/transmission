@@ -16,9 +16,7 @@
 
 #include <sys/types.h>
 
-#include <event2/event.h>
-#include <event2/event_struct.h>
-#include <event2/event_compat.h>
+#include <event.h>
 
 #include "transmission.h"
 #include "natpmp.h"

@@ -45,7 +45,7 @@
 #include <unistd.h>
 
 #include <stdarg.h> /* some 1.4.x versions of evutil.h need this */
-#include <event2/util.h>
+#include <evutil.h>
 
 #include "transmission.h"
 #include "fdlimit.h"
