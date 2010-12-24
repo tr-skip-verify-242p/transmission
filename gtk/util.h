@@ -57,7 +57,7 @@ enum
     GTR_UNICODE_DOWN,
     GTR_UNICODE_INF,
     GTR_UNICODE_SEEDER,
-    GTR_UNICODE_LEECHER
+    GTR_UNICODE_LEECHER,
     GTR_UNICODE_BULLET
 };
 const char * gtr_get_unicode_string( int );
