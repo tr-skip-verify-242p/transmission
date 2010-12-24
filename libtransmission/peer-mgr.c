@@ -16,7 +16,7 @@
 #include <string.h> /* memcpy, memcmp, strstr */
 #include <stdlib.h> /* qsort */
 
-#include <event.h>
+#include <event2/event.h>
 
 #include "transmission.h"
 #include "announcer.h"
@@ -121,7 +121,8 @@ enum
  */
 struct peer_atom
 {
-    uint8_t     from;
+    uint8_t     fromFirst;          /* where the peer was first found */
+    uint8_t     fromBest;           /* the "best" value of where the peer has been found */
     uint8_t     flags;              /* these match the added_f flags */
     uint8_t     flags2;             /* flags that aren't defined in added_f */
     uint8_t     uploadOnly;         /* UPLOAD_ONLY_ */
@@ -150,7 +151,8 @@ static tr_bool
 tr_isAtom( const struct peer_atom * atom )
 {
     return ( atom != NULL )
-        && ( atom->from < TR_PEER_FROM__MAX )
+        && ( atom->fromFirst < TR_PEER_FROM__MAX )
+        && ( atom->fromBest < TR_PEER_FROM__MAX )
         && ( tr_isAddress( &atom->addr ) );
 }
 #endif
@@ -501,8 +503,7 @@ deleteTimer( struct event ** t )
 {
     if( *t != NULL )
     {
-        evtimer_del( *t );
-        tr_free( *t );
+        event_free( *t );
         *t = NULL;
     }
 }
@@ -1571,7 +1572,8 @@ ensureAtomExists( Torrent           * t,
         a->addr = *addr;
         a->port = port;
         a->flags = flags;
-        a->from = from;
+        a->fromFirst = from;
+        a->fromBest = from;
         a->shelf_date = tr_time( ) + getDefaultShelfLife( from ) + jitter;
         a->blocklisted = -1;
         atomSetSeedProbability( a, seedProbability );
@@ -1579,9 +1581,13 @@ ensureAtomExists( Torrent           * t,
 
         tordbg( t, "got a new atom: %s", tr_atomAddrStr( a ) );
     }
-    else if( a->seedProbability == -1 )
+    else
     {
-        atomSetSeedProbability( a, seedProbability );
+        if( from < a->fromBest )
+            a->fromBest = from;
+        
+        if( a->seedProbability == -1 )
+            atomSetSeedProbability( a, seedProbability );
     }
 }
 
@@ -1944,8 +1950,8 @@ compareAtomsByUsefulness( const void * va, const void *vb )
 
     if( a->piece_data_time != b->piece_data_time )
         return a->piece_data_time > b->piece_data_time ? -1 : 1;
-    if( a->from != b->from )
-        return a->from < b->from ? -1 : 1;
+    if( a->fromBest != b->fromBest )
+        return a->fromBest < b->fromBest ? -1 : 1;
     if( a->numFails != b->numFails )
         return a->numFails < b->numFails ? -1 : 1;
 
@@ -2035,10 +2041,9 @@ static void rechokePulse   ( int, short, void * );
 static void reconnectPulse ( int, short, void * );
 
 static struct event *
-createTimer( int msec, void (*callback)(int, short, void *), void * cbdata )
+createTimer( tr_session * session, int msec, void (*callback)(int, short, void *), void * cbdata )
 {
-    struct event * timer = tr_new0( struct event, 1 );
-    evtimer_set( timer, callback, cbdata );
+    struct event * timer = evtimer_new( session->event_base, callback, cbdata );
     tr_timerAddMsec( timer, msec );
     return timer;
 }
@@ -2047,16 +2052,16 @@ static void
 ensureMgrTimersExist( struct tr_peerMgr * m )
 {
     if( m->atomTimer == NULL )
-        m->atomTimer = createTimer( ATOM_PERIOD_MSEC, atomPulse, m );
+        m->atomTimer = createTimer( m->session, ATOM_PERIOD_MSEC, atomPulse, m );
 
     if( m->bandwidthTimer == NULL )
-        m->bandwidthTimer = createTimer( BANDWIDTH_PERIOD_MSEC, bandwidthPulse, m );
+        m->bandwidthTimer = createTimer( m->session, BANDWIDTH_PERIOD_MSEC, bandwidthPulse, m );
 
     if( m->rechokeTimer == NULL )
-        m->rechokeTimer = createTimer( RECHOKE_PERIOD_MSEC, rechokePulse, m );
+        m->rechokeTimer = createTimer( m->session, RECHOKE_PERIOD_MSEC, rechokePulse, m );
 
-   if( m->refillUpkeepTimer == NULL )
-        m->refillUpkeepTimer = createTimer( REFILL_UPKEEP_PERIOD_MSEC, refillUpkeep, m );
+    if( m->refillUpkeepTimer == NULL )
+        m->refillUpkeepTimer = createTimer( m->session, REFILL_UPKEEP_PERIOD_MSEC, refillUpkeep, m );
 }
 
 void
@@ -2232,7 +2237,7 @@ tr_peerMgrTorrentStats( tr_torrent       * tor,
 
         ++*setmePeersConnected;
 
-        ++setmePeersFrom[atom->from];
+        ++setmePeersFrom[atom->fromFirst];
 
         if( clientIsDownloadingFrom( tor, peer ) )
             ++*setmePeersSendingToUs;
@@ -2341,7 +2346,7 @@ tr_peerMgrPeerStats( const tr_torrent    * tor,
         tr_strlcpy( stat->client, ( peer->client ? peer->client : "" ),
                    sizeof( stat->client ) );
         stat->port                = ntohs( peer->atom->port );
-        stat->from                = atom->from;
+        stat->from                = atom->fromFirst;
         stat->progress            = peer->progress;
         stat->isEncrypted         = tr_peerIoIsEncrypted( peer->io ) ? 1 : 0;
         stat->rateToPeer_KBps     = toSpeedKBps( tr_peerGetPieceSpeed_Bps( peer, now_msec, TR_CLIENT_TO_PEER ) );
@@ -2373,7 +2378,7 @@ tr_peerMgrPeerStats( const tr_torrent    * tor,
         if( !stat->peerIsChoked && !stat->peerIsInterested ) *pch++ = '?';
         if( stat->isEncrypted ) *pch++ = 'E';
         if( stat->from == TR_PEER_FROM_DHT ) *pch++ = 'H';
-        if( stat->from == TR_PEER_FROM_PEX ) *pch++ = 'X';
+        else if( stat->from == TR_PEER_FROM_PEX ) *pch++ = 'X';
         if( stat->isIncoming ) *pch++ = 'I';
         *pch = '\0';
     }
@@ -3453,8 +3458,8 @@ getPeerCandidateScore( const tr_torrent * tor, const struct peer_atom * atom, ui
     score = addValToKey( score, 8, i );
 
     /* Prefer peers that we got from more trusted sources.
-     * lower `from' values indicate more trusted sources */
-    score = addValToKey( score, 4, atom->from );
+     * lower `fromBest' values indicate more trusted sources */
+    score = addValToKey( score, 4, atom->fromBest );
 
     /* salt */
     score = addValToKey( score, 8, salt );
