@@ -472,7 +472,7 @@ get_size_compact( TorrentCellRenderer * cell,
     **/
 
     if( width != NULL )
-        *width = ( cell->parent.xpad * 2 + icon_area.width + GUI_PAD + name_area.width
+        *width = ( xpad * 2 + icon_area.width + GUI_PAD + name_area.width
                    + GUI_PAD + bar_width( cell ) + GUI_PAD + stat_area.width );
     if( height != NULL )
         *height = ypad * 2 + MAX( name_area.height, p->bar_height );
@@ -618,10 +618,10 @@ render_compact( TorrentCellRenderer   * cell,
     gtr_cell_renderer_get_padding( &cell->parent, &xpad, &ypad );
 
     fill_area = *background_area;
-    fill_area.x += cell->parent.xpad;
-    fill_area.y += cell->parent.ypad;
-    fill_area.width -= cell->parent.xpad * 2;
-    fill_area.height -= cell->parent.ypad * 2;
+    fill_area.x += xpad;
+    fill_area.y += ypad;
+    fill_area.width -= xpad * 2;
+    fill_area.height -= ypad * 2;
     icon_area = name_area = stat_area = pbar_area = fill_area;
 
     g_object_set( p->icon_renderer, "pixbuf", icon, NULL );
