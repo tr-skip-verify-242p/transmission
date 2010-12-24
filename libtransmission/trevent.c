@@ -18,7 +18,9 @@
 
 #include <signal.h>
 
-#include <event.h>
+#include <event2/event.h>
+#include <event2/event_compat.h>
+#include <event2/event_struct.h>
 
 #include "transmission.h"
 #include "net.h"
@@ -125,8 +127,6 @@ piperead( int s, char *buf, int len )
 #endif
 
 #include <unistd.h>
-
-#include <event.h>
 
 #include "transmission.h"
 #include "platform.h"

@@ -140,7 +140,8 @@ gtr_get_unicode_string( int i )
         case GTR_UNICODE_INF:     return "\xE2\x88\x9E";
         case GTR_UNICODE_SEEDER:  return "\xE2\x97\x89";
         case GTR_UNICODE_LEECHER: return "\xE2\x97\x94";
-        default:               return "err";
+        case GTR_UNICODE_BULLET:  return "\xE2\x88\x99";
+        default:                  return "err";
     }
 }
 
@@ -314,9 +315,7 @@ getWindow( GtkWidget * w )
 }
 
 void
-addTorrentErrorDialog( GtkWidget *  child,
-                       int          err,
-                       const char * filename )
+gtr_add_torrent_error_dialog( GtkWidget * child, int err, const char * file )
 {
     char * secondary;
     const char * fmt;
@@ -329,7 +328,7 @@ addTorrentErrorDialog( GtkWidget *  child,
         case TR_PARSE_DUPLICATE: fmt = _( "The torrent file \"%s\" is already in use." ); break;
         default: fmt = _( "The torrent file \"%s\" encountered an unknown error." ); break;
     }
-    secondary = g_strdup_printf( fmt, filename );
+    secondary = g_strdup_printf( fmt, file );
 
     w = gtk_message_dialog_new( win,
                                 GTK_DIALOG_DESTROY_WITH_PARENT,
@@ -756,17 +755,23 @@ gtr_widget_set_visible( GtkWidget * w, gboolean b )
 #endif
 }
 
-void
-gtr_toolbar_set_orientation( GtkToolbar      * toolbar,
-                             GtkOrientation    orientation )
+static GtkWidget*
+gtr_dialog_get_content_area( GtkDialog * dialog )
 {
-#if GTK_CHECK_VERSION( 2,16,0 )
-    gtk_orientable_set_orientation( GTK_ORIENTABLE( toolbar ), orientation );
+#if GTK_CHECK_VERSION( 2,14,0 )
+    return gtk_dialog_get_content_area( dialog );
 #else
-    gtk_toolbar_set_orientation( toolbar, orientation );
+    return dialog->vbox;
 #endif
 }
 
+void
+gtr_dialog_set_content( GtkDialog * dialog, GtkWidget * content )
+{
+    GtkWidget * vbox = gtr_dialog_get_content_area( dialog );
+    gtk_box_pack_start( GTK_BOX( vbox ), content, TRUE, TRUE, 0 );
+    gtk_widget_show_all( content );
+}
 
 /***
 ****

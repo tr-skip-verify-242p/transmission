@@ -58,6 +58,7 @@ enum
     GTR_UNICODE_INF,
     GTR_UNICODE_SEEDER,
     GTR_UNICODE_LEECHER
+    GTR_UNICODE_BULLET
 };
 const char * gtr_get_unicode_string( int );
 
@@ -134,9 +135,6 @@ guint gtr_timeout_add_seconds( guint seconds, GSourceFunc func, gpointer data );
 /* backwards-compatible wrapper around gdk_threads_add_idle() */
 void gtr_idle_add( GSourceFunc  func, gpointer data );
 
-/* backwards-compatible wrapper around gtk_orientable_set_orientation() */
-void gtr_toolbar_set_orientation( GtkToolbar * tb, GtkOrientation orientation );
-
 /* backwards-compatible wrapper around gtk_widget_set_tooltip_text() */
 void gtr_widget_set_tooltip_text( GtkWidget * w, const char * tip );
 
@@ -154,6 +152,8 @@ int gtr_strcmp0( const char * str1, const char * str2 );
 
 /* backwards-compatible wrapper around g_dngettext() */
 const gchar* gtr_ngettext( const gchar*, const gchar*, gulong );
+
+void gtr_dialog_set_content( GtkDialog * dialog, GtkWidget * content );
 
 /***
 ****
@@ -175,9 +175,9 @@ void gtr_unrecognized_url_dialog( GtkWidget * parent, const char * url );
 
 void gtr_http_failure_dialog( GtkWidget * parent, const char * url, long response_code );
 
-void addTorrentErrorDialog( GtkWidget  * window_or_child,
-                            int          err,
-                            const char * filename );
+void gtr_add_torrent_error_dialog( GtkWidget  * window_or_child,
+                                   int          err,
+                                   const char * filename );
 
 /* pop up the context menu if a user right-clicks.
    if the row they right-click on isn't selected, select it. */
