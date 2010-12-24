@@ -30,23 +30,25 @@
 enum
 {
     PROP_0,
-    PROP_TORRENT,
-    PROP_SHOW_PIECES
+    PROP_TORRENT
 };
 
-#define MIN_BAR_WIDTH 100
-#define MIN_BAR_HEIGHT 20
+static const gint MIN_BAR_WIDTH   = 100;
+static const gint MIN_BAR_HEIGHT  = 20;
+static const gint PROGRESS_HEIGHT = 4;
+static const gint BORDER_WIDTH    = 1;
 
 typedef struct _PiecesCellRendererClassPrivate
 {
-    GdkColor          piece_bg_color;
-    GdkColor          piece_have_color;
-    GdkColor          piece_missing_color;
-    GdkColor          piece_seeding_color;
-    GdkColor          progress_bg_color;
-    GdkColor          progress_bar_color;
-    GdkColor          ratio_bg_color;
-    GdkColor          ratio_bar_color;
+    GdkColor piece_bg_color;
+    GdkColor piece_have_color;
+    GdkColor piece_missing_color;
+    GdkColor piece_seeding_color;
+    GdkColor progress_bg_color;
+    GdkColor progress_bar_color;
+    GdkColor ratio_bg_color;
+    GdkColor ratio_bar_color;
+    GdkColor border_color;
 } PiecesCellRendererClassPrivate;
 
 static PiecesCellRendererClassPrivate cpriv_data;
@@ -55,7 +57,6 @@ static PiecesCellRendererClassPrivate * cpriv = &cpriv_data;
 struct _PiecesCellRendererPrivate
 {
     tr_torrent      * tor;
-    gboolean          show_pieces;
     int8_t          * tab;
     int               tabsize;
     cairo_surface_t * offscreen;
@@ -251,55 +252,41 @@ pieces_cell_renderer_render( GtkCellRenderer       * cell,
 {
     PiecesCellRenderer        * self = PIECES_CELL_RENDERER( cell );
     PiecesCellRendererPrivate * priv = self->priv;
-    gint x, y, w, h;
+    gint x, y, w, h, xo, yo, wo, ho, hp;
+    cairo_t * cr, * cro;
 
     x = cell_area->x + cell->xpad;
     y = cell_area->y + cell->ypad;
     w = cell_area->width - cell->xpad * 2;
     h = cell_area->height - cell->ypad * 2;
 
-    if( priv->show_pieces )
-    {
-        static const gint PBH = 4;
-        cairo_t * cr, * cro;
+    cr = gdk_cairo_create( window );
 
-        cr = gdk_cairo_create( window );
+    gdk_cairo_rectangle( cr, expose_area );
+    cairo_clip( cr );
 
-        gdk_cairo_rectangle( cr, expose_area );
-        cairo_clip( cr );
+    cro = get_offscreen_context( priv, cr, w, h );
+    xo = 0;
+    yo = 0;
+    wo = w;
+    ho = h;
 
-        cro = get_offscreen_context( priv, cr, w, h );
+    gdk_cairo_set_source_color( cro, &cpriv->border_color );
+    cairo_paint( cro );
+    xo += BORDER_WIDTH;
+    yo += BORDER_WIDTH;
+    wo -= 2 * BORDER_WIDTH;
+    ho -= 2 * BORDER_WIDTH;
+    hp = PROGRESS_HEIGHT;
 
-        render_progress( priv, cro, 0, 0, w, PBH );
-        render_pieces( priv, cro, 0, PBH, w, h - PBH );
-        cairo_destroy( cro );
+    render_progress( priv, cro, xo, yo, wo, hp );
+    render_pieces( priv, cro, xo, yo + hp, wo, ho - hp );
+    cairo_destroy( cro );
 
-        cairo_set_source_surface( cr, priv->offscreen, x, y );
-        cairo_paint( cr );
+    cairo_set_source_surface( cr, priv->offscreen, x, y );
+    cairo_paint( cr );
 
-        cairo_destroy( cr );
-    }
-    else
-    {
-        gtk_paint_box (widget->style, window,
-                       GTK_STATE_NORMAL, GTK_SHADOW_IN,
-                       NULL, widget, NULL,
-                       x, y, w, h);
-
-        if ( priv->tor )
-        {
-            const tr_stat * st = tr_torrentStatCached( priv->tor );
-            GdkRectangle clip;
-            clip.x = x;
-            clip.y = y;
-            clip.width = st->percentDone * w;
-            clip.height = h;
-            gtk_paint_box (widget->style, window,
-                           GTK_STATE_SELECTED, GTK_SHADOW_OUT,
-                           &clip, widget, "bar", clip.x, clip.y,
-                           clip.width, clip.height );
-        }
-    }
+    cairo_destroy( cr );
 }
 
 static void
@@ -314,7 +301,6 @@ pieces_cell_renderer_set_property( GObject      * object,
     switch( property_id )
     {
         case PROP_TORRENT:     priv->tor         = g_value_get_pointer( v ); break;
-        case PROP_SHOW_PIECES: priv->show_pieces = g_value_get_boolean( v ); break;
         default: G_OBJECT_WARN_INVALID_PROPERTY_ID( object, property_id, pspec ); break;
     }
 }
@@ -331,7 +317,6 @@ pieces_cell_renderer_get_property( GObject     * object,
     switch( property_id )
     {
         case PROP_TORRENT:     g_value_set_pointer( v, priv->tor ); break;
-        case PROP_SHOW_PIECES: g_value_set_boolean( v, priv->show_pieces ); break;
         default: G_OBJECT_WARN_INVALID_PROPERTY_ID( object, property_id, pspec ); break;
     }
 }
@@ -375,12 +360,6 @@ pieces_cell_renderer_class_init( PiecesCellRendererClass * klass )
                                                            "tr_torrent*",
                                                            G_PARAM_READWRITE ) );
 
-    g_object_class_install_property( gobject_class, PROP_SHOW_PIECES,
-                                     g_param_spec_boolean( "show-pieces", NULL,
-                                                           "Show Pieces",
-                                                           FALSE,
-                                                           G_PARAM_READWRITE ) );
-
     gdk_color_parse( "#efefff", &cpriv->piece_bg_color );
     gdk_color_parse( "#2975d6", &cpriv->piece_have_color );
     gdk_color_parse( "#d90000", &cpriv->piece_missing_color );
@@ -389,6 +368,7 @@ pieces_cell_renderer_class_init( PiecesCellRendererClass * klass )
     gdk_color_parse( "#314e6c", &cpriv->progress_bar_color );
     gdk_color_parse( "#a6e3b4", &cpriv->ratio_bg_color );
     gdk_color_parse( "#448632", &cpriv->ratio_bar_color );
+    gdk_color_parse( "#888888", &cpriv->border_color );
 }
 
 static void

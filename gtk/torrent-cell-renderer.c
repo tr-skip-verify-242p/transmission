@@ -331,6 +331,7 @@ struct TorrentCellRendererPrivate
     GtkCellRenderer  * text_renderer;
     GtkCellRenderer  * text_renderer_err;
     GtkCellRenderer  * pbar_renderer;
+    GtkCellRenderer  * prog_renderer;
     GtkCellRenderer  * icon_renderer;
     int bar_height;
 
@@ -595,8 +596,17 @@ render_compact( TorrentCellRenderer   * cell,
 
     g_object_set( p->icon_renderer, "pixbuf", icon, "sensitive", sensitive, NULL );
     gtk_cell_renderer_render( p->icon_renderer, window, widget, &icon_area, &icon_area, &icon_area, flags );
-    g_object_set( p->pbar_renderer, "sensitive", sensitive, NULL );
-    gtk_cell_renderer_render( p->pbar_renderer, window, widget, &pbar_area, &pbar_area, &pbar_area, flags );
+    if( p->show_pieces )
+    {
+        g_object_set( p->pbar_renderer, "sensitive", sensitive, NULL );
+        gtk_cell_renderer_render( p->pbar_renderer, window, widget, &pbar_area, &pbar_area, &pbar_area, flags );
+    }
+    else
+    {
+        const double percentDone = MAX( 0.0, st->percentDone );
+        g_object_set( p->prog_renderer, "value", (int)(percentDone*100.0), "text", NULL, "sensitive", sensitive, NULL );
+        gtk_cell_renderer_render( p->prog_renderer, window, widget, &pbar_area, &pbar_area, &pbar_area, flags );
+    }
     g_object_set( text_renderer, "text", status, "scale", SMALL_SCALE, "sensitive", sensitive, "ellipsize", PANGO_ELLIPSIZE_END, NULL );
     gtk_cell_renderer_render( text_renderer, window, widget, &stat_area, &stat_area, &stat_area, flags );
     g_object_set( text_renderer, "text", name, "scale", 1.0, NULL );
@@ -705,8 +715,17 @@ render_full( TorrentCellRenderer   * cell,
     gtk_cell_renderer_render( text_renderer, window, widget, &name_area, &name_area, &name_area, flags );
     g_object_set( text_renderer, "text", progress, "scale", SMALL_SCALE, "weight", PANGO_WEIGHT_NORMAL, NULL );
     gtk_cell_renderer_render( text_renderer, window, widget, &prog_area, &prog_area, &prog_area, flags );
-    g_object_set( p->pbar_renderer, "sensitive", sensitive, NULL );
-    gtk_cell_renderer_render( p->pbar_renderer, window, widget, &pbar_area, &pbar_area, &pbar_area, flags );
+    if( p->show_pieces )
+    {
+        g_object_set( p->pbar_renderer, "sensitive", sensitive, NULL );
+        gtk_cell_renderer_render( p->pbar_renderer, window, widget, &pbar_area, &pbar_area, &pbar_area, flags );
+    }
+    else
+    {
+        const double percentDone = MAX( 0.0, st->percentDone );
+        g_object_set( p->prog_renderer, "value", (int)(percentDone*100.0), "text", "", "sensitive", sensitive, NULL );
+        gtk_cell_renderer_render( p->prog_renderer, window, widget, &pbar_area, &pbar_area, &pbar_area, flags );
+    }
     g_object_set( text_renderer, "text", status, NULL );
     gtk_cell_renderer_render( text_renderer, window, widget, &stat_area, &stat_area, &stat_area, flags );
 
@@ -765,10 +784,7 @@ torrent_cell_renderer_set_property( GObject      * object,
         case P_DOWNLOAD_SPEED: p->download_speed_KBps = g_value_get_double( v ); break;
         case P_BAR_HEIGHT:     p->bar_height          = g_value_get_int( v ); break;
         case P_COMPACT:        p->compact             = g_value_get_boolean( v ); break;
-        case P_SHOW_PIECES:
-            p->show_pieces = g_value_get_boolean( v );
-            g_object_set( p->pbar_renderer, "show-pieces", p->show_pieces, NULL );
-            break;
+        case P_SHOW_PIECES:    p->show_pieces         = g_value_get_boolean( v ); break;
         default: G_OBJECT_WARN_INVALID_PROPERTY_ID( object, property_id, pspec ); break;
     }
 }
@@ -805,6 +821,7 @@ torrent_cell_renderer_dispose( GObject * o )
         g_object_unref( G_OBJECT( r->priv->text_renderer ) );
         g_object_unref( G_OBJECT( r->priv->text_renderer_err ) );
         g_object_unref( G_OBJECT( r->priv->pbar_renderer ) );
+        g_object_unref( G_OBJECT( r->priv->prog_renderer ) );
         g_object_unref( G_OBJECT( r->priv->icon_renderer ) );
         r->priv = NULL;
     }
@@ -887,11 +904,13 @@ torrent_cell_renderer_init( GTypeInstance *  instance,
     p->text_renderer_err = gtk_cell_renderer_text_new(  );
     g_object_set( p->text_renderer_err, "xpad", 0, "ypad", 0, NULL );
     p->pbar_renderer = pieces_cell_renderer_new( );
+    p->prog_renderer = gtk_cell_renderer_progress_new( );
     p->icon_renderer = gtk_cell_renderer_pixbuf_new(  );
     g_object_set( p->text_renderer_err, "foreground", "red", NULL );
     gtr_object_ref_sink( p->text_renderer );
     gtr_object_ref_sink( p->text_renderer_err );
     gtr_object_ref_sink( p->pbar_renderer );
+    gtr_object_ref_sink( p->prog_renderer );
     gtr_object_ref_sink( p->icon_renderer );
 
     p->bar_height = DEFAULT_BAR_HEIGHT;
