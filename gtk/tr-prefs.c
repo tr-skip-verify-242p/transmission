@@ -45,7 +45,7 @@ response_cb( GtkDialog *     dialog,
     }
 
     if( response == GTK_RESPONSE_CLOSE )
-        gtk_widget_destroy( GTK_WIDGET( dialog ) );
+        gtk_widget_hide( GTK_WIDGET( dialog ) );
 }
 
 static void
@@ -1462,6 +1462,8 @@ gtr_prefs_dialog_new( GtkWindow * parent, GObject * core )
                               gtk_label_new ( _( "Proxy" ) ) );
 
     g_signal_connect( d, "response", G_CALLBACK( response_cb ), core );
+    g_signal_connect( d, "delete-event",
+                      G_CALLBACK( gtk_widget_hide_on_delete ), NULL );
     gtr_dialog_set_content( GTK_DIALOG( d ), n );
     return d;
 }

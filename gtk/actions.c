@@ -125,7 +125,7 @@ static GtkActionEntry entries[] =
     { "quit", GTK_STOCK_QUIT, N_( "_Quit" ), NULL, NULL, G_CALLBACK( action_cb ) },
     { "select-all", GTK_STOCK_SELECT_ALL, N_( "Select _All" ), "<control>A", NULL, G_CALLBACK( action_cb ) },
     { "deselect-all", NULL, N_( "Dese_lect All" ), "<shift><control>A", NULL, G_CALLBACK( action_cb ) },
-    { "edit-preferences", GTK_STOCK_PREFERENCES, NULL, NULL, NULL, G_CALLBACK( action_cb ) },
+    { "edit-preferences", GTK_STOCK_PREFERENCES, NULL, "<alt>P", NULL, G_CALLBACK( action_cb ) },
     { "show-torrent-properties", GTK_STOCK_PROPERTIES, NULL, "<alt>Return", N_( "Torrent properties" ), G_CALLBACK( action_cb ) },
     { "open-torrent-folder",  GTK_STOCK_OPEN, N_( "_Open Folder" ), NULL, NULL, G_CALLBACK( action_cb ) },
     { "show-about-dialog", GTK_STOCK_ABOUT, NULL, NULL, NULL, G_CALLBACK( action_cb ) },
