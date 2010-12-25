@@ -1844,13 +1844,9 @@ doAction( const char * action_name, gpointer user_data )
     else if( !strcmp( action_name, "edit-preferences" ) )
     {
         if( NULL == data->prefs )
-        {
             data->prefs = tr_prefs_dialog_new( G_OBJECT( data->core ),
                                                data->wind );
-            g_signal_connect( data->prefs, "destroy",
-                              G_CALLBACK( gtk_widget_destroyed ), &data->prefs );
-            gtk_widget_show( GTK_WIDGET( data->prefs ) );
-        }
+        gtk_window_present( GTK_WINDOW( data->prefs ) );
     }
     else if( !strcmp( action_name, "toggle-message-log" ) )
     {

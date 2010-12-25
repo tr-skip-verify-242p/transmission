@@ -1389,6 +1389,8 @@ tr_prefs_dialog_new( GObject *   core,
                               gtk_label_new ( _( "Proxy" ) ) );
 
     g_signal_connect( d, "response", G_CALLBACK( response_cb ), core );
+    g_signal_connect( d, "delete-event",
+                      G_CALLBACK( gtk_widget_hide_on_delete ), NULL );
     gtk_box_pack_start( GTK_BOX( GTK_DIALOG( d )->vbox ), n, TRUE, TRUE, 0 );
     gtk_widget_show_all( GTK_DIALOG( d )->vbox );
     return d;
