@@ -45,7 +45,7 @@ response_cb( GtkDialog *     dialog,
     }
 
     if( response == GTK_RESPONSE_CLOSE )
-        gtk_widget_destroy( GTK_WIDGET( dialog ) );
+        gtk_widget_hide( GTK_WIDGET( dialog ) );
 }
 
 static void
