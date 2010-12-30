@@ -578,19 +578,26 @@ renderFilename( GtkTreeViewColumn  * column UNUSED,
                 GtkTreeIter        * iter,
                 gpointer             data UNUSED )
 {
-    char *   filename;
-    char *   str;
-    int64_t  size;
-    char     buf[64];
+    char * filename;
 
-    gtk_tree_model_get( model, iter, FC_LABEL, &filename,
-                                     FC_SIZE, &size,
-                                     -1 );
-    tr_strlsize( buf, size, sizeof( buf ) );
-    str = g_markup_printf_escaped( "<small>%s (%s)</small>", filename, buf );
-    g_object_set( renderer, "markup", str, NULL );
-    g_free( str );
+    gtk_tree_model_get( model, iter, FC_LABEL, &filename, -1 );
+    g_object_set( renderer, "text", filename, NULL );
     g_free( filename );
+}
+
+static void
+renderSize( GtkTreeViewColumn  * column UNUSED,
+            GtkCellRenderer    * renderer,
+            GtkTreeModel       * model,
+            GtkTreeIter        * iter,
+            gpointer             data UNUSED )
+{
+    int64_t size;
+    char buf[64];
+
+    gtk_tree_model_get( model, iter, FC_SIZE, &size, -1 );
+    tr_strlsize( buf, size, sizeof( buf ) );
+    g_object_set( renderer, "text", buf, NULL );
 }
 
 static void
@@ -825,6 +832,15 @@ gtr_file_list_new( TrCore * core, int torrentId )
     gtk_tree_view_column_pack_start( col, rend, TRUE );
     gtk_tree_view_column_set_cell_data_func( col, rend, renderFilename, NULL, NULL );
     gtk_tree_view_column_set_sort_column_id( col, FC_LABEL );
+    gtk_tree_view_append_column( tree_view, col );
+
+    /* add "size" column */
+    title = _( "Size" );
+    rend = gtk_cell_renderer_text_new( );
+    col = gtk_tree_view_column_new_with_attributes( title, rend, NULL );
+    gtk_tree_view_column_set_sizing( col, GTK_TREE_VIEW_COLUMN_GROW_ONLY );
+    gtk_tree_view_column_set_sort_column_id( col, FC_SIZE );
+    gtk_tree_view_column_set_cell_data_func( col, rend, renderSize, NULL, NULL );
     gtk_tree_view_append_column( tree_view, col );
 
     /* add "progress" column */
