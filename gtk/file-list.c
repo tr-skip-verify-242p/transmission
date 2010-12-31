@@ -54,6 +54,7 @@ typedef struct
     GtkTreeStore  * store; /* same object as model, but recast */
     int             torrentId;
     guint           timeout_tag;
+    gboolean        allow_delete;
 }
 FileData;
 
@@ -685,6 +686,30 @@ fileMenuSetPriority( GtkWidget * item, gpointer userdata )
 }
 
 static void
+fileMenuDelete( GtkWidget * item UNUSED, gpointer userdata )
+{
+    FileData * filedata = userdata;
+    GArray * indices;
+    GtkTreeView * view;
+    tr_torrent * tor;
+
+    tor = tr_torrentFindFromId( tr_core_session( filedata->core ),
+                                filedata->torrentId );
+    if( !tor )
+        return;
+
+    view = GTK_TREE_VIEW( filedata->view );
+    indices = g_array_new( FALSE, FALSE, sizeof( tr_file_index_t ) );
+
+    getSelectedFilesAndDescendants( view, indices );
+    tr_torrentDeleteFiles( tor,
+                           (tr_file_index_t *) indices->data,
+                           (tr_file_index_t) indices->len );
+    g_array_free( indices, TRUE );
+    refresh( filedata );
+}
+
+static void
 fileMenuPopup( GtkWidget      * widget,
                GdkEventButton * event,
                gpointer         userdata )
@@ -731,6 +756,17 @@ fileMenuPopup( GtkWidget      * widget,
     g_signal_connect( item, "activate",
                       G_CALLBACK( fileMenuSetDownload ), filedata );
     gtk_menu_shell_append( GTK_MENU_SHELL( menu ), item );
+
+    if( filedata->allow_delete )
+    {
+        item = gtk_separator_menu_item_new( );
+        gtk_menu_shell_append( GTK_MENU_SHELL( menu ), item );
+
+        item = gtk_menu_item_new_with_label( _("Delete") );
+        g_signal_connect( item, "activate",
+                          G_CALLBACK( fileMenuDelete ), filedata );
+        gtk_menu_shell_append( GTK_MENU_SHELL( menu ), item );
+    }
 
     if( event )
     {
@@ -899,4 +935,14 @@ gtr_file_list_new( TrCore * core, int torrentId )
     gtr_file_list_set_torrent( ret, torrentId );
 
     return ret;
+}
+
+void
+gtr_file_list_set_allow_delete ( GtkWidget * w, gboolean enable )
+{
+    FileData * filedata;
+
+    filedata = g_object_get_data( G_OBJECT( w ), "file-data" );
+    if( filedata )
+        filedata->allow_delete = enable;
 }
