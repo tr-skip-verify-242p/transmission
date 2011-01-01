@@ -54,6 +54,7 @@ typedef struct
     GtkTreeStore  * store; /* same object as model, but recast */
     int             torrentId;
     guint           timeout_tag;
+    gboolean        allow_delete;
 }
 FileData;
 
@@ -578,19 +579,26 @@ renderFilename( GtkTreeViewColumn  * column UNUSED,
                 GtkTreeIter        * iter,
                 gpointer             data UNUSED )
 {
-    char *   filename;
-    char *   str;
-    int64_t  size;
-    char     buf[64];
+    char * filename;
 
-    gtk_tree_model_get( model, iter, FC_LABEL, &filename,
-                                     FC_SIZE, &size,
-                                     -1 );
-    tr_strlsize( buf, size, sizeof( buf ) );
-    str = g_markup_printf_escaped( "<small>%s (%s)</small>", filename, buf );
-    g_object_set( renderer, "markup", str, NULL );
-    g_free( str );
+    gtk_tree_model_get( model, iter, FC_LABEL, &filename, -1 );
+    g_object_set( renderer, "text", filename, NULL );
     g_free( filename );
+}
+
+static void
+renderSize( GtkTreeViewColumn  * column UNUSED,
+            GtkCellRenderer    * renderer,
+            GtkTreeModel       * model,
+            GtkTreeIter        * iter,
+            gpointer             data UNUSED )
+{
+    int64_t size;
+    char buf[64];
+
+    gtk_tree_model_get( model, iter, FC_SIZE, &size, -1 );
+    tr_strlsize( buf, size, sizeof( buf ) );
+    g_object_set( renderer, "text", buf, NULL );
 }
 
 static void
@@ -683,94 +691,294 @@ onRowActivated( GtkTreeView * view, GtkTreePath * path,
     return handled;
 }
 
+static void
+fileMenuSetDownload( GtkWidget * item, gpointer userdata )
+{
+    FileData * filedata = userdata;
+    GArray * indices;
+    GtkTreeView * view;
+    tr_torrent * tor;
+    tr_bool download;
+
+    tor = tr_torrentFindFromId( tr_core_session( filedata->core ),
+                                filedata->torrentId );
+    if( !tor )
+        return;
+
+    view = GTK_TREE_VIEW( filedata->view );
+    download = GPOINTER_TO_INT( g_object_get_data( G_OBJECT( item ),
+                                                   "tr-download" ) );
+    indices = g_array_new( FALSE, FALSE, sizeof( tr_file_index_t ) );
+
+    getSelectedFilesAndDescendants( view, indices );
+    tr_torrentSetFileDLs( tor,
+                          (tr_file_index_t *) indices->data,
+                          (tr_file_index_t) indices->len,
+                          download );
+    g_array_free( indices, TRUE );
+    refresh( filedata );
+}
+
+static void
+fileMenuSetPriority( GtkWidget * item, gpointer userdata )
+{
+    FileData * filedata = userdata;
+    GArray * indices;
+    GtkTreeView * view;
+    tr_torrent * tor;
+    int priority;
+
+    tor = tr_torrentFindFromId( tr_core_session( filedata->core ),
+                                filedata->torrentId );
+    if( !tor )
+        return;
+
+    view = GTK_TREE_VIEW( filedata->view );
+    priority = GPOINTER_TO_INT( g_object_get_data( G_OBJECT( item ),
+                                                   "tr-priority" ) );
+    indices = g_array_new( FALSE, FALSE, sizeof( tr_file_index_t ) );
+
+    getSelectedFilesAndDescendants( view, indices );
+    tr_torrentSetFilePriorities( tor,
+                                 (tr_file_index_t *) indices->data,
+                                 (tr_file_index_t) indices->len,
+                                 priority );
+    g_array_free( indices, TRUE );
+    refresh( filedata );
+}
+
+static void
+fileMenuDelete( GtkWidget * item UNUSED, gpointer userdata )
+{
+    FileData * filedata = userdata;
+    GArray * indices;
+    GtkTreeView * view;
+    tr_torrent * tor;
+
+    tor = tr_torrentFindFromId( tr_core_session( filedata->core ),
+                                filedata->torrentId );
+    if( !tor )
+        return;
+
+    view = GTK_TREE_VIEW( filedata->view );
+    indices = g_array_new( FALSE, FALSE, sizeof( tr_file_index_t ) );
+
+    getSelectedFilesAndDescendants( view, indices );
+    tr_torrentDeleteFiles( tor,
+                           (tr_file_index_t *) indices->data,
+                           (tr_file_index_t) indices->len );
+    g_array_free( indices, TRUE );
+    refresh( filedata );
+}
+
+static void
+fileMenuPopup( GtkWidget      * widget,
+               GdkEventButton * event,
+               gpointer         userdata )
+{
+    FileData * filedata = userdata;
+    GtkWidget * menu, * item;
+    int button, event_time;
+
+    menu = gtk_menu_new( );
+    item = gtk_menu_item_new_with_label( _( "Set Priority High" ) );
+    g_object_set_data( G_OBJECT( item ), "tr-priority",
+                       GINT_TO_POINTER( TR_PRI_HIGH ) );
+    g_signal_connect( item, "activate",
+                      G_CALLBACK( fileMenuSetPriority ), filedata );
+    gtk_menu_shell_append( GTK_MENU_SHELL( menu ), item );
+
+    item = gtk_menu_item_new_with_label( _( "Set Priority Normal" ) );
+    g_object_set_data( G_OBJECT( item ), "tr-priority",
+                       GINT_TO_POINTER( TR_PRI_NORMAL ) );
+    g_signal_connect( item, "activate",
+                      G_CALLBACK( fileMenuSetPriority ), filedata );
+    gtk_menu_shell_append( GTK_MENU_SHELL( menu ), item );
+
+    item = gtk_menu_item_new_with_label( _( "Set Priority Low" ) );
+    g_object_set_data( G_OBJECT( item ), "tr-priority",
+                       GINT_TO_POINTER( TR_PRI_LOW ) );
+    g_signal_connect( item, "activate",
+                      G_CALLBACK( fileMenuSetPriority ), filedata );
+    gtk_menu_shell_append( GTK_MENU_SHELL( menu ), item );
+
+    item = gtk_separator_menu_item_new( );
+    gtk_menu_shell_append( GTK_MENU_SHELL( menu ), item );
+
+    item = gtk_menu_item_new_with_label( _( "Download" ) );
+    g_object_set_data( G_OBJECT( item ), "tr-download",
+                       GINT_TO_POINTER( TRUE ) );
+    g_signal_connect( item, "activate",
+                      G_CALLBACK( fileMenuSetDownload ), filedata );
+    gtk_menu_shell_append( GTK_MENU_SHELL( menu ), item );
+
+    item = gtk_menu_item_new_with_label( _( "Do Not Download" ) );
+    g_object_set_data( G_OBJECT( item ), "tr-download",
+                       GINT_TO_POINTER( FALSE ) );
+    g_signal_connect( item, "activate",
+                      G_CALLBACK( fileMenuSetDownload ), filedata );
+    gtk_menu_shell_append( GTK_MENU_SHELL( menu ), item );
+
+    if( filedata->allow_delete )
+    {
+        item = gtk_separator_menu_item_new( );
+        gtk_menu_shell_append( GTK_MENU_SHELL( menu ), item );
+
+        item = gtk_menu_item_new_with_label( _("Delete") );
+        g_signal_connect( item, "activate",
+                          G_CALLBACK( fileMenuDelete ), filedata );
+        gtk_menu_shell_append( GTK_MENU_SHELL( menu ), item );
+    }
+
+    if( event )
+    {
+        button = event->button;
+        event_time = event->time;
+    }
+    else
+    {
+        button = 0;
+        event_time = gtk_get_current_event_time( );
+    }
+
+    gtk_widget_show_all( menu );
+    gtk_menu_attach_to_widget( GTK_MENU( menu ), widget, NULL );
+    gtk_menu_popup( GTK_MENU( menu ), NULL, NULL, NULL, NULL,
+                    button, event_time );
+}
+
+static gboolean
+onViewPathToggled( GtkTreeView       * view,
+                   GtkTreeViewColumn * col,
+                   GtkTreePath       * path,
+                   FileData          * filedata )
+{
+    GtkTreeModel * model;
+    GtkTreeIter    iter;
+    GArray       * indices;
+    tr_torrent   * tor;
+    int            cid;
+
+    if( !col || !path )
+        return FALSE;
+
+    tor = tr_torrentFindFromId( tr_core_session( filedata->core ),
+                                filedata->torrentId );
+    if( tor == NULL )
+        return FALSE;
+
+    cid = GPOINTER_TO_INT( g_object_get_data( G_OBJECT( col ),
+                                              "model-column-id" ) );
+    if( cid != FC_PRIORITY && cid != FC_ENABLED )
+        return FALSE;
+
+    indices = getActiveFilesForPath( view, path );
+    model = filedata->model;
+    gtk_tree_model_get_iter( model, &iter, path );
+
+    if( cid == FC_PRIORITY )
+    {
+        int priority;
+
+        gtk_tree_model_get( model, &iter, FC_PRIORITY, &priority, -1 );
+        switch( priority ) {
+            case TR_PRI_NORMAL: priority = TR_PRI_HIGH; break;
+            case TR_PRI_HIGH:   priority = TR_PRI_LOW; break;
+            default:            priority = TR_PRI_NORMAL; break;
+        }
+
+        tr_torrentSetFilePriorities( tor,
+                                     (tr_file_index_t *) indices->data,
+                                     (tr_file_index_t) indices->len,
+                                     priority );
+    }
+    else
+    {
+        int enabled;
+
+        gtk_tree_model_get( model, &iter, FC_ENABLED, &enabled, -1 );
+        enabled = !enabled;
+
+        tr_torrentSetFileDLs( tor,
+                              (tr_file_index_t *) indices->data,
+                              (tr_file_index_t) indices->len,
+                              enabled );
+    }
+
+    g_array_free( indices, TRUE );
+    refresh( filedata );
+
+    return TRUE;
+}
+
+/**
+ * @note 'col' and 'path' are assumed not to be NULL.
+ */
+static gboolean
+getAndSelectEventPath( GtkTreeView        * treeview,
+                       GdkEventButton     * event,
+                       GtkTreeViewColumn ** col,
+                       GtkTreePath       ** path )
+{
+    GtkTreeSelection * sel;
+
+    if( gtk_tree_view_get_path_at_pos( treeview,
+                                       event->x, event->y,
+                                       path, col, NULL, NULL ) )
+    {
+        sel = gtk_tree_view_get_selection( treeview );
+        if( !gtk_tree_selection_path_is_selected( sel, *path ) )
+        {
+            gtk_tree_selection_unselect_all( sel );
+            gtk_tree_selection_select_path( sel, *path );
+        }
+        return TRUE;
+    }
+
+    return FALSE;
+}
 
 static gboolean
 onViewButtonPressed( GtkWidget * w, GdkEventButton * event, gpointer gdata )
 {
-    FileData * data = gdata;
-    gboolean   handled = FALSE;
-    tr_torrent * tor = tr_torrentFindFromId( tr_core_session( data->core ), data->torrentId );
+    GtkTreeView       * treeview = GTK_TREE_VIEW( w );
+    GtkTreeViewColumn * col = NULL;
+    GtkTreePath       * path = NULL;
+    FileData          * data = gdata;
+    tr_torrent        * tor;
+    gboolean            handled = FALSE;
 
+    tor = tr_torrentFindFromId( tr_core_session( data->core ),
+                                data->torrentId );
     if( tor == NULL )
-        return handled;
+        return FALSE;
 
-    if( ( event->type == GDK_BUTTON_PRESS ) && ( event->button == 1 )
-      && !( event->state & ( GDK_SHIFT_MASK | GDK_CONTROL_MASK ) ) )
+    if( event->type == GDK_BUTTON_PRESS && event->button == 1
+        && !( event->state & ( GDK_SHIFT_MASK | GDK_CONTROL_MASK ) )
+        && getAndSelectEventPath( treeview, event, &col, &path ) )
     {
-        GtkTreeView *       view = GTK_TREE_VIEW( w );
-        GtkTreePath *       path;
-        GtkTreeViewColumn * column;
-        int                 cell_x;
-        int                 cell_y;
-        if( gtk_tree_view_get_path_at_pos( view, event->x, event->y,
-                                           &path, &column, &cell_x, &cell_y ) )
-        {
-            const char * column_title = gtk_tree_view_column_get_title( column );
-            const gboolean downloadColumn = !strcmp( column_title, _( "Download" ) );
-            const gboolean priorityColumn = !strcmp( column_title, _( "Priority" ) );
-            if( downloadColumn || priorityColumn )
-            {
-                GArray * a = getActiveFilesForPath( view, path );
-                GtkTreeSelection * sel = gtk_tree_view_get_selection( view );
-                const gboolean isSelected = gtk_tree_selection_path_is_selected( sel, path );
-                GtkTreeModel * model = data->model;
-                GtkTreeIter iter;
-
-                gtk_tree_model_get_iter( model, &iter, path );
-
-                if( priorityColumn )
-                {
-                    int priority;
-
-                    /* get the `priority' state of the clicked row */
-                    gtk_tree_model_get( model, &iter, FC_PRIORITY, &priority, -1 );
-
-                    /* twiddle it to the next state */
-                    switch( priority ) {
-                        case TR_PRI_NORMAL: priority = TR_PRI_HIGH; break;
-                        case TR_PRI_HIGH:   priority = TR_PRI_LOW; break;
-                        default:            priority = TR_PRI_NORMAL; break;
-                    }
-
-                    /* apply that new state to the active files */
-                    tr_torrentSetFilePriorities( tor,
-                                                 (tr_file_index_t*)a->data,
-                                                 (tr_file_index_t)a->len,
-                                                 priority );
-                }
-                else if( downloadColumn )
-                {
-                    int enabled;
-
-                    /* get the `enabled' state of the clicked row */
-                    gtk_tree_model_get( model, &iter, FC_ENABLED, &enabled, -1 );
-
-                    /* twiddle it to the next state */
-                    enabled = !enabled;
-
-                    /* apply that new state to the active files */
-                    tr_torrentSetFileDLs( tor,
-                                          (tr_file_index_t*)a->data,
-                                          (tr_file_index_t)a->len,
-                                          enabled );
-                }
-
-                refresh( data );
-
-                /* the click was meant to change the priority or enabled state,
-                   not to alter which rows were selected, so don't pass this
-                   event on to the other handlers. */
-                handled = isSelected;
-
-                /* cleanup */
-                g_array_free( a, TRUE );
-            }
-
-            gtk_tree_path_free( path );
-        }
+        handled = onViewPathToggled( treeview, col, path, data );
+    }
+    else if( event->type == GDK_BUTTON_PRESS && event->button == 3
+             && getAndSelectEventPath( treeview, event, &col, &path ) )
+    {
+        GtkTreeSelection * sel;
+        sel = gtk_tree_view_get_selection( treeview );
+        if( gtk_tree_selection_count_selected_rows( sel ) > 0 )
+            fileMenuPopup( w, event, data );
+        handled = TRUE;
     }
 
+    gtk_tree_path_free( path );
+
     return handled;
+}
+
+static gboolean
+onViewPopupMenu( GtkWidget * w, gpointer gdata )
+{
+    fileMenuPopup( w, NULL, gdata );
+    return TRUE;
 }
 
 GtkWidget *
@@ -797,6 +1005,8 @@ gtr_file_list_new( TrCore * core, int torrentId )
     gtk_container_set_border_width( GTK_CONTAINER( view ), GUI_PAD_BIG );
     g_signal_connect( view, "button-press-event",
                       G_CALLBACK( onViewButtonPressed ), data );
+    g_signal_connect( view, "popup-menu",
+                      G_CALLBACK( onViewPopupMenu ), data );
     g_signal_connect( view, "row_activated",
                       G_CALLBACK( onRowActivated ), data );
     g_signal_connect( view, "button-release-event",
@@ -827,6 +1037,15 @@ gtr_file_list_new( TrCore * core, int torrentId )
     gtk_tree_view_column_set_sort_column_id( col, FC_LABEL );
     gtk_tree_view_append_column( tree_view, col );
 
+    /* add "size" column */
+    title = _( "Size" );
+    rend = gtk_cell_renderer_text_new( );
+    col = gtk_tree_view_column_new_with_attributes( title, rend, NULL );
+    gtk_tree_view_column_set_sizing( col, GTK_TREE_VIEW_COLUMN_GROW_ONLY );
+    gtk_tree_view_column_set_sort_column_id( col, FC_SIZE );
+    gtk_tree_view_column_set_cell_data_func( col, rend, renderSize, NULL, NULL );
+    gtk_tree_view_append_column( tree_view, col );
+
     /* add "progress" column */
     title = _( "Progress" );
     pango_layout = gtk_widget_create_pango_layout( view, title );
@@ -848,6 +1067,8 @@ gtr_file_list_new( TrCore * core, int torrentId )
     g_object_unref( G_OBJECT( pango_layout ) );
     rend = gtk_cell_renderer_toggle_new( );
     col = gtk_tree_view_column_new_with_attributes( title, rend, NULL );
+    g_object_set_data( G_OBJECT( col ), "model-column-id",
+                       GINT_TO_POINTER( FC_ENABLED ) );
     gtk_tree_view_column_set_fixed_width( col, width );
     gtk_tree_view_column_set_sizing( col, GTK_TREE_VIEW_COLUMN_FIXED );
     gtk_tree_view_column_set_cell_data_func( col, rend, renderDownload, NULL, NULL );
@@ -863,6 +1084,8 @@ gtr_file_list_new( TrCore * core, int torrentId )
     rend = gtk_cell_renderer_text_new( );
     g_object_set( rend, "xalign", (gfloat)0.5, "yalign", (gfloat)0.5, NULL );
     col = gtk_tree_view_column_new_with_attributes( title, rend, NULL );
+    g_object_set_data( G_OBJECT( col ), "model-column-id",
+                       GINT_TO_POINTER( FC_PRIORITY ) );
     gtk_tree_view_column_set_fixed_width( col, width );
     gtk_tree_view_column_set_sizing( col, GTK_TREE_VIEW_COLUMN_FIXED );
     gtk_tree_view_column_set_sort_column_id( col, FC_PRIORITY );
@@ -886,4 +1109,14 @@ gtr_file_list_new( TrCore * core, int torrentId )
     gtr_file_list_set_torrent( ret, torrentId );
 
     return ret;
+}
+
+void
+gtr_file_list_set_allow_delete ( GtkWidget * w, gboolean enable )
+{
+    FileData * filedata;
+
+    filedata = g_object_get_data( G_OBJECT( w ), "file-data" );
+    if( filedata )
+        filedata->allow_delete = enable;
 }

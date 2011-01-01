@@ -49,6 +49,10 @@
 #include "verify.h"
 #include "version.h"
 
+
+static void
+deleteLocalFile( const char * filename, tr_fileFunc fileFunc );
+
 /***
 ****
 ***/
@@ -2189,20 +2193,140 @@ tr_torrentInitFileDLs( tr_torrent             * tor,
     tr_torrentUnlock( tor );
 }
 
+/**
+ * @note This function assumes it is only called
+ * from tr_torrentDeleteDNDFiles.
+ */
+static void
+deleteDNDFile( tr_torrent * tor,
+               tr_file_index_t fileIndex )
+{
+    tr_file *        file;
+    tr_piece_index_t firstPiece;
+    tr_piece_index_t lastPiece;
+    uint32_t         firstPieceSize;
+    uint32_t         lastPieceSize;
+    int              firstPieceBlocks;
+    int              lastPieceBlocks;
+    int              firstPieceMissing;
+    int              lastPieceMissing;
+    tr_bool          saveFirstPiece;
+    tr_bool          saveLastPiece;
+    uint8_t *        firstPieceBuffer = NULL;
+    uint8_t *        lastPieceBuffer = NULL;
+    char *           path;
+    tr_piece_index_t i;
+
+    file = &tor->info.files[fileIndex];
+    if( !file->dnd )
+        return;
+
+    firstPiece = file->firstPiece;
+    lastPiece = file->lastPiece;
+    firstPieceSize = tr_torPieceCountBytes( tor, firstPiece );
+    lastPieceSize = tr_torPieceCountBytes( tor, lastPiece );
+    firstPieceMissing = tr_cpMissingBlocksInPiece( &tor->completion,
+                                                   firstPiece );
+    lastPieceMissing = tr_cpMissingBlocksInPiece( &tor->completion,
+                                                  lastPiece );
+    firstPieceBlocks = ( tr_torPieceCountBlocks( tor, firstPiece )
+                         - firstPieceMissing );
+    lastPieceBlocks = ( tr_torPieceCountBlocks( tor, lastPiece )
+                        - lastPieceMissing );
+
+    saveFirstPiece = ( !tor->info.pieces[firstPiece].dnd
+                       && firstPieceBlocks > 0 );
+    saveLastPiece = ( firstPiece != lastPiece
+                      && !tor->info.pieces[lastPiece].dnd
+                      && lastPieceBlocks > 0 );
+
+    if( saveFirstPiece )
+    {
+        firstPieceBuffer = tr_malloc( firstPieceSize );
+        tr_ioRead( tor, firstPiece, 0, firstPieceSize, firstPieceBuffer );
+    }
+    if( saveLastPiece )
+    {
+        lastPieceBuffer = tr_malloc( lastPieceSize );
+        tr_ioRead( tor, lastPiece, 0, lastPieceSize, lastPieceBuffer );
+    }
+
+    path = tr_buildPath( tor->currentDir, file->name, NULL );
+    tr_fdFileClose( tor->session, tor, fileIndex );
+    deleteLocalFile( path, remove );
+    tr_free( path );
+
+    if( saveFirstPiece )
+    {
+        tr_ioWrite( tor, firstPiece, 0, firstPieceSize, firstPieceBuffer );
+        tr_free( firstPieceBuffer );
+    }
+    if( saveLastPiece )
+    {
+        tr_ioWrite( tor, lastPiece, 0, lastPieceSize, lastPieceBuffer );
+        tr_free( lastPieceBuffer );
+    }
+
+    for( i = firstPiece; i <= lastPiece; ++i )
+        if( tor->info.pieces[i].dnd )
+            tr_torrentSetHasPiece( tor, i, FALSE );
+}
+
+/**
+ * @note This function assumes it is only called
+ * from tr_torrentSetFileDLsImpl.
+ */
+static void
+tr_torrentDeleteDNDFiles( tr_torrent            * tor,
+                          const tr_file_index_t * files,
+                          tr_file_index_t         fileCount )
+{
+    tr_file_index_t i;
+
+    for( i = 0; i < fileCount; ++i )
+    {
+        if( files[i] < tor->info.fileCount )
+        {
+            tr_cacheFlushFile( tor->session->cache, tor, files[i] );
+            deleteDNDFile( tor, files[i] );
+        }
+    }
+}
+
+static void
+tr_torrentSetFileDLsImpl( tr_torrent             * tor,
+                          const tr_file_index_t  * files,
+                          tr_file_index_t          fileCount,
+                          tr_bool                  doDownload,
+                          tr_bool                  deleteData )
+{
+    assert( tr_isTorrent( tor ) );
+    tr_torrentLock( tor );
+
+    tr_torrentInitFileDLs( tor, files, fileCount, doDownload );
+    if( !doDownload && deleteData )
+        tr_torrentDeleteDNDFiles( tor, files, fileCount );
+    tr_torrentSetDirty( tor );
+    tr_peerMgrRebuildRequests( tor );
+
+    tr_torrentUnlock( tor );
+}
+
 void
 tr_torrentSetFileDLs( tr_torrent             * tor,
                       const tr_file_index_t  * files,
                       tr_file_index_t          fileCount,
                       tr_bool                  doDownload )
 {
-    assert( tr_isTorrent( tor ) );
-    tr_torrentLock( tor );
+    tr_torrentSetFileDLsImpl( tor, files, fileCount, doDownload, FALSE );
+}
 
-    tr_torrentInitFileDLs( tor, files, fileCount, doDownload );
-    tr_torrentSetDirty( tor );
-    tr_peerMgrRebuildRequests( tor );
-
-    tr_torrentUnlock( tor );
+void
+tr_torrentDeleteFiles( tr_torrent            * torrent,
+                       const tr_file_index_t * files,
+                       tr_file_index_t         fileCount )
+{
+    tr_torrentSetFileDLsImpl( torrent, files, fileCount, FALSE, TRUE );
 }
 
 /***

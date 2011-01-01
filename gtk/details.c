@@ -2358,6 +2358,7 @@ gtr_torrent_details_dialog_new( GtkWindow * parent, TrCore * core )
     {
         GtkWidget * v = gtk_vbox_new( FALSE, 0 );
         di->file_list = gtr_file_list_new( core, 0 );
+        gtr_file_list_set_allow_delete( di->file_list, TRUE );
         di->file_label = gtk_label_new( _( "File listing not available for combined torrent properties" ) );
         gtk_box_pack_start( GTK_BOX( v ), di->file_list, TRUE, TRUE, 0 );
         gtk_box_pack_start( GTK_BOX( v ), di->file_label, TRUE, TRUE, 0 );
