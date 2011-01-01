@@ -245,6 +245,7 @@ static tr_option opts[] =
     { 940, "files",                  "List the current torrent(s)' files", "f",  0, NULL },
     { 'g', "get",                    "Mark files for download", "g",  1, "<files>" },
     { 'G', "no-get",                 "Mark files for not downloading", "G",  1, "<files>" },
+    { 903, "delete-files",           "Selectively delete files in torrent", "df", 1, "<files>" },
     { 'i', "info",                   "Show the current torrent(s)' details", "i",  0, NULL },
     { 940, "info-files",             "List the current torrent(s)' files", "if",  0, NULL },
     { 941, "info-peers",             "List the current torrent(s)' peers", "ip",  0, NULL },
@@ -402,6 +403,7 @@ getOptMode( int val )
         case 952: /* no-seedratio */
         case 984: /* honor-session */
         case 985: /* no-honor-session */
+        case 903: /* delete-files */
             return MODE_TORRENT_SET;
 
         case 920: /* session-info */
@@ -2065,6 +2067,8 @@ processArgs( const char * rpcurl, int argc, const char ** argv )
                 case 984: tr_bencDictAddBool( args, "honorsSessionLimits", TRUE );
                           break;
                 case 985: tr_bencDictAddBool( args, "honorsSessionLimits", FALSE );
+                          break;
+                case 903: addFiles( args, "delete-files", optarg );
                           break;
                 default:  assert( "unhandled value" && 0 );
                           break;
