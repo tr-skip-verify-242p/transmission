@@ -766,6 +766,40 @@ setFileDLs( tr_torrent * tor,
     return errmsg;
 }
 
+static const char *
+setDeleteFiles( tr_torrent * tor,
+                tr_benc *    list )
+{
+    int i;
+    int64_t tmp;
+    int fileCount = 0;
+    const int n = tr_bencListSize( list );
+    const char * errmsg = NULL;
+    tr_file_index_t * files;
+
+    if( n < 1 )
+        return "file list argument required";
+
+    files = tr_new0( tr_file_index_t, tor->info.fileCount );
+
+    for( i = 0; !errmsg && i < n; ++i )
+    {
+        if( tr_bencGetInt( tr_bencListChild( list, i ), &tmp ) )
+        {
+            if( 0 <= tmp && tmp < tor->info.fileCount )
+                files[fileCount++] = tmp;
+            else
+                errmsg = "file index out of range";
+        }
+    }
+
+    if( !errmsg )
+        tr_torrentDeleteFiles( tor, files, fileCount );
+
+    tr_free( files );
+    return errmsg;
+}
+
 static tr_bool
 findAnnounceUrl( const tr_tracker_info * t, int n, const char * url, int * pos )
 {
@@ -983,6 +1017,8 @@ torrentSet( tr_session               * session,
             errmsg = setFileDLs( tor, FALSE, files );
         if( !errmsg && tr_bencDictFindList( args_in, "files-wanted", &files ) )
             errmsg = setFileDLs( tor, TRUE, files );
+        if( !errmsg && tr_bencDictFindList( args_in, "delete-files", &files ) )
+            errmsg = setDeleteFiles( tor, files );
         if( tr_bencDictFindInt( args_in, "peer-limit", &tmp ) )
             tr_torrentSetPeerLimit( tor, tmp );
         if( !errmsg &&  tr_bencDictFindList( args_in, "priority-high", &files ) )
