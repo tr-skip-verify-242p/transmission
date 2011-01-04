@@ -53,9 +53,6 @@
 static void
 deleteLocalFile( const char * filename, tr_fileFunc fileFunc );
 
-static tr_bool
-fileExists( const char * filename );
-
 /***
 ****
 ***/
@@ -2270,11 +2267,10 @@ deleteDNDFile( tr_torrent * tor,
      * remain in the cache. */
     tr_cacheFlushFile( tor->session->cache, tor, fileIndex );
 
-    path = tr_buildPath( tor->currentDir, file->name, NULL );
-    if( !fileExists( path ) )
+    path = tr_torrentFindFile( tor, fileIndex );
+    if( !path )
     {
         /* The file is already gone for some reason. */
-        tr_free( path );
         return TRUE;
     }
 
