@@ -53,6 +53,9 @@
 static void
 deleteLocalFile( const char * filename, tr_fileFunc fileFunc );
 
+static tr_bool
+fileExists( const char * filename );
+
 /***
 ****
 ***/
@@ -2176,103 +2179,161 @@ tr_torrentInitFileDLs( tr_torrent             * tor,
 }
 
 /**
- * @note This function assumes it is only called
- * from tr_torrentDeleteDNDFiles.
+ * Delete a file set to DND, if all pieces making up the file are also
+ * set to DND. Otherwise, delete the file and write back the overlapping
+ * non-DND piece parts if doing so would free up disk space at least as
+ * large as the overlap size.
+ *
+ * @note This function assumes it is only called from
+ * tr_torrentDeleteDNDFiles.
+ *
+ * @return TRUE if the file was deleted.
  */
-static void
+static tr_bool
 deleteDNDFile( tr_torrent * tor,
                tr_file_index_t fileIndex )
 {
     tr_file *        file;
-    tr_piece_index_t firstPiece;
-    tr_piece_index_t lastPiece;
-    uint32_t         firstPieceSize;
-    uint32_t         lastPieceSize;
-    int              firstPieceBlocks;
-    int              lastPieceBlocks;
-    int              firstPieceMissing;
-    int              lastPieceMissing;
-    tr_bool          saveFirstPiece;
-    tr_bool          saveLastPiece;
-    uint8_t *        firstPieceBuffer = NULL;
-    uint8_t *        lastPieceBuffer = NULL;
-    char *           path;
+    tr_piece_index_t fpindex;
+    tr_piece_index_t lpindex;
+    uint32_t         fpsize;
+    uint32_t         lpsize;
+    uint32_t         fpoffset;
+    uint32_t         lpoffset;
+    uint32_t         fpoverlap;
+    uint32_t         lpoverlap;
+    int              fpblocks;
+    int              lpblocks;
+    tr_bool          fpsave;
+    tr_bool          lpsave;
+    uint8_t *        fpbuf = NULL;
+    uint8_t *        lpbuf = NULL;
+    char *           path = NULL;
+    int64_t          pcsize;
+    int64_t          delsize;
+    int64_t          rwsize;
     tr_piece_index_t i;
 
+    if( fileIndex >= tor->info.fileCount )
+        return FALSE;
+
     file = &tor->info.files[fileIndex];
+
     if( !file->dnd )
-        return;
+        return FALSE;
 
-    firstPiece = file->firstPiece;
-    lastPiece = file->lastPiece;
-    firstPieceSize = tr_torPieceCountBytes( tor, firstPiece );
-    lastPieceSize = tr_torPieceCountBytes( tor, lastPiece );
-    firstPieceMissing = tr_cpMissingBlocksInPiece( &tor->completion,
-                                                   firstPiece );
-    lastPieceMissing = tr_cpMissingBlocksInPiece( &tor->completion,
-                                                  lastPiece );
-    firstPieceBlocks = ( tr_torPieceCountBlocks( tor, firstPiece )
-                         - firstPieceMissing );
-    lastPieceBlocks = ( tr_torPieceCountBlocks( tor, lastPiece )
-                        - lastPieceMissing );
+    fpindex = file->firstPiece;
+    lpindex = file->lastPiece;
+    fpsize = tr_torPieceCountBytes( tor, fpindex );
+    lpsize = tr_torPieceCountBytes( tor, lpindex );
+    pcsize = tor->info.pieceSize;
+    fpblocks = tr_cpCompleteBlocksInPiece( &tor->completion, fpindex );
+    lpblocks = tr_cpCompleteBlocksInPiece( &tor->completion, lpindex );
 
-    saveFirstPiece = ( !tor->info.pieces[firstPiece].dnd
-                       && firstPieceBlocks > 0 );
-    saveLastPiece = ( firstPiece != lastPiece
-                      && !tor->info.pieces[lastPiece].dnd
-                      && lastPieceBlocks > 0 );
+    /* The offset in the first/last piece where the file begins/ends. */
+    fpoffset = file->offset - pcsize * fpindex;
+    lpoffset = file->offset + file->length - pcsize * lpindex;
 
-    if( saveFirstPiece )
-    {
-        firstPieceBuffer = tr_malloc( firstPieceSize );
-        tr_ioRead( tor, firstPiece, 0, firstPieceSize, firstPieceBuffer );
-    }
-    if( saveLastPiece )
-    {
-        lastPieceBuffer = tr_malloc( lastPieceSize );
-        tr_ioRead( tor, lastPiece, 0, lastPieceSize, lastPieceBuffer );
-    }
+    /* This is the number of bytes of the first/last piece that
+     * are contained in the file. */
+    fpoverlap = fpsize - fpoffset;
+    lpoverlap = lpoffset;
+
+    /* We need to preserve the overlapping piece parts if they are
+     * used by wanted files and have some complete blocks in them. */
+    fpsave = ( !tor->info.pieces[fpindex].dnd && fpblocks > 0 );
+    lpsave = ( !tor->info.pieces[lpindex].dnd && lpblocks > 0
+               && fpindex != lpindex );
+
+    /* Calculate how many bytes we can gain by deleting
+     * pieces that are no longer wanted. */
+    delsize = file->length;
+    if( fpsave )
+        delsize -= fpoverlap;
+    if( lpsave )
+        delsize -= lpoverlap;
+
+    /* Calculate how many bytes we need to read and write
+     * back from overlapping pieces if we delete this file. */
+    rwsize = 0;
+    if( fpsave )
+        rwsize += fpoverlap;
+    if( lpsave )
+        rwsize += lpoverlap;
+
+    /* Don't bother deleting the file if it's mostly composed
+     * of overlapping pieces that we do want. */
+    if( rwsize > delsize )
+        return FALSE;
+
+    /* Ensure that the data we are about to delete does not
+     * remain in the cache. */
+    tr_cacheFlushFile( tor->session->cache, tor, fileIndex );
 
     path = tr_buildPath( tor->currentDir, file->name, NULL );
+    if( !fileExists( path ) )
+    {
+        /* The file is already gone for some reason. */
+        tr_free( path );
+        return TRUE;
+    }
+
+    /* Read the existing overlapping piece parts. */
+    if( fpsave )
+    {
+        fpbuf = tr_malloc( fpoverlap );
+        tr_ioRead( tor, fpindex, fpoffset, fpoverlap, fpbuf );
+    }
+    if( lpsave )
+    {
+        lpbuf = tr_malloc( lpoverlap );
+        tr_ioRead( tor, lpindex, 0, lpoverlap, lpbuf );
+    }
+
+    /* Close and delete the file from the file system. */
     tr_fdFileClose( tor->session, tor, fileIndex );
     deleteLocalFile( path, remove );
     tr_free( path );
 
-    if( saveFirstPiece )
+    /* Write the overlapping piece parts back from the buffers. */
+    if( fpsave )
     {
-        tr_ioWrite( tor, firstPiece, 0, firstPieceSize, firstPieceBuffer );
-        tr_free( firstPieceBuffer );
+        tr_ioWrite( tor, fpindex, fpoffset, fpoverlap, fpbuf );
+        tr_free( fpbuf );
     }
-    if( saveLastPiece )
+    if( lpsave )
     {
-        tr_ioWrite( tor, lastPiece, 0, lastPieceSize, lastPieceBuffer );
-        tr_free( lastPieceBuffer );
+        tr_ioWrite( tor, lpindex, 0, lpoverlap, lpbuf );
+        tr_free( lpbuf );
     }
 
-    for( i = firstPiece; i <= lastPiece; ++i )
+    /* Update the piece status of the deleted pieces. */
+    for( i = fpindex; i <= lpindex; ++i )
         if( tor->info.pieces[i].dnd )
             tr_torrentSetHasPiece( tor, i, FALSE );
+
+    return TRUE;
 }
 
 /**
  * @note This function assumes it is only called
  * from tr_torrentSetFileDLsImpl.
+ *
+ * @return the number of files deleted.
  */
-static void
+static tr_file_index_t
 tr_torrentDeleteDNDFiles( tr_torrent            * tor,
                           const tr_file_index_t * files,
                           tr_file_index_t         fileCount )
 {
-    tr_file_index_t i;
+    tr_file_index_t i, count = 0;
 
     for( i = 0; i < fileCount; ++i )
     {
-        if( files[i] < tor->info.fileCount )
-        {
-            tr_cacheFlushFile( tor->session->cache, tor, files[i] );
-            deleteDNDFile( tor, files[i] );
-        }
+        if( deleteDNDFile( tor, files[i] ) )
+            ++count;
     }
+    return count;
 }
 
 static void
@@ -2280,14 +2341,20 @@ tr_torrentSetFileDLsImpl( tr_torrent             * tor,
                           const tr_file_index_t  * files,
                           tr_file_index_t          fileCount,
                           tr_bool                  doDownload,
-                          tr_bool                  deleteData )
+                          tr_bool                  deleteData,
+                          tr_file_index_t        * setmeDeleteCount )
 {
     assert( tr_isTorrent( tor ) );
     tr_torrentLock( tor );
 
     tr_torrentInitFileDLs( tor, files, fileCount, doDownload );
     if( !doDownload && deleteData )
-        tr_torrentDeleteDNDFiles( tor, files, fileCount );
+    {
+        tr_file_index_t count;
+        count = tr_torrentDeleteDNDFiles( tor, files, fileCount );
+        if( setmeDeleteCount )
+            *setmeDeleteCount = count;
+    }
     tr_torrentSetDirty( tor );
     tr_peerMgrRebuildRequests( tor );
 
@@ -2300,15 +2367,17 @@ tr_torrentSetFileDLs( tr_torrent             * tor,
                       tr_file_index_t          fileCount,
                       tr_bool                  doDownload )
 {
-    tr_torrentSetFileDLsImpl( tor, files, fileCount, doDownload, FALSE );
+    tr_torrentSetFileDLsImpl( tor, files, fileCount, doDownload, FALSE, NULL );
 }
 
-void
+tr_file_index_t
 tr_torrentDeleteFiles( tr_torrent            * torrent,
                        const tr_file_index_t * files,
                        tr_file_index_t         fileCount )
 {
-    tr_torrentSetFileDLsImpl( torrent, files, fileCount, FALSE, TRUE );
+    tr_file_index_t count = 0;
+    tr_torrentSetFileDLsImpl( torrent, files, fileCount, FALSE, TRUE, &count );
+    return count;
 }
 
 /***
