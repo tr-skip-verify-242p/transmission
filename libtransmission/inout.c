@@ -62,6 +62,8 @@ static int
 readOrWriteBytes( tr_session       * session,
                   const tr_torrent * tor,
                   int                ioMode,
+                  tr_piece_index_t   pieceIndex,
+                  uint32_t           pieceOffset,
                   tr_file_index_t    fileIndex,
                   uint64_t           fileOffset,
                   void *             buf,
@@ -99,12 +101,21 @@ readOrWriteBytes( tr_session       * session,
 
         if( !fileExists )
         {
-            base = tr_torrentGetCurrentDir( tor );
-
-            if( tr_sessionIsIncompleteFileNamingEnabled( tor->session ) )
-                subpath = tr_torrentBuildPartial( tor, fileIndex );
+            if( file->dnd && tr_sessionIsPieceTempEnabled( tor->session ) )
+            {
+                fileExists = tr_torrentFindPieceTemp( tor, pieceIndex,
+                                                      &base, &subpath );
+                fileOffset = pieceOffset;
+            }
             else
-                subpath = tr_strdup( file->name );
+            {
+                base = tr_torrentGetCurrentDir( tor );
+
+                if( tr_sessionIsIncompleteFileNamingEnabled( tor->session ) )
+                    subpath = tr_torrentBuildPartial( tor, fileIndex );
+                else
+                    subpath = tr_strdup( file->name );
+            }
         }
 
         if( ( file->dnd ) || ( ioMode < TR_IO_WRITE ) )
@@ -231,7 +242,10 @@ readOrWritePiece( tr_torrent       * tor,
         const tr_file * file = &info->files[fileIndex];
         const uint64_t bytesThisPass = MIN( buflen, file->length - fileOffset );
 
-        err = readOrWriteBytes( tor->session, tor, ioMode, fileIndex, fileOffset, buf, bytesThisPass );
+        err = readOrWriteBytes( tor->session, tor, ioMode,
+                                pieceIndex, pieceOffset,
+                                fileIndex, fileOffset,
+                                buf, bytesThisPass );
         buf += bytesThisPass;
         buflen -= bytesThisPass;
 //fprintf( stderr, "++fileIndex to %d\n", (int)fileIndex );

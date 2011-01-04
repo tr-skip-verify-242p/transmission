@@ -100,6 +100,7 @@ struct tr_session
     tr_bool                      isRatioLimited;
     tr_bool                      isIdleLimited;
     tr_bool                      isIncompleteDirEnabled;
+    tr_bool                      isPieceTempEnabled;
     tr_bool                      pauseAddedTorrent;
     tr_bool                      deleteSourceTorrent;
 

@@ -49,6 +49,11 @@
 #include "verify.h"
 #include "version.h"
 
+
+static void
+tr_torrentInvalidatePieceTempFile( tr_torrent * tor,
+                                   tr_file_index_t fileIndex );
+
 /***
 ****
 ***/
@@ -803,6 +808,10 @@ torrentInit( tr_torrent * tor, const tr_ctor * ctor )
     if( tr_sessionIsIncompleteDirEnabled( session ) )
         tor->incompleteDir = tr_strdup( dir );
 
+    tor->pieceTempDir = tr_buildPath( tr_getResumeDir( tor->session ),
+                                      "piecetmp",
+                                      tor->info.hashString, NULL );
+
     tor->bandwidth = tr_bandwidthNew( session, session->bandwidth );
 
     tor->bandwidth->priority = tr_ctorGetBandwidthPriority( ctor );
@@ -1503,6 +1512,7 @@ freeTorrent( tr_torrent * tor )
 
     tr_free( tor->downloadDir );
     tr_free( tor->incompleteDir );
+    tr_free( tor->pieceTempDir );
     tr_free( tor->peer_id );
 
     if( tor == session->torrentList )
@@ -1755,6 +1765,7 @@ closeTorrent( void * vtor )
     {
         tr_metainfoRemoveSaved( tor->session, &tor->info );
         tr_torrentRemoveResume( tor );
+        tr_torrentRemovePieceTemp( tor );
     }
 
     tor->isRunning = 0;
@@ -2098,6 +2109,7 @@ setFileDND( tr_torrent * tor, tr_file_index_t fileIndex, int doDownload )
 {
     tr_file *        file;
     const int8_t     dnd = !doDownload;
+    int8_t           olddnd;
     tr_piece_index_t firstPiece;
     int8_t           firstPieceDND;
     tr_piece_index_t lastPiece;
@@ -2107,6 +2119,7 @@ setFileDND( tr_torrent * tor, tr_file_index_t fileIndex, int doDownload )
     assert( tr_isTorrent( tor ) );
 
     file = &tor->info.files[fileIndex];
+    olddnd = file->dnd;
     file->dnd = dnd;
     firstPiece = file->firstPiece;
     lastPiece = file->lastPiece;
@@ -2148,6 +2161,9 @@ setFileDND( tr_torrent * tor, tr_file_index_t fileIndex, int doDownload )
         for( pp = firstPiece + 1; pp < lastPiece; ++pp )
             tor->info.pieces[pp].dnd = dnd;
     }
+
+    if( !file->dnd && file->dnd != olddnd )
+        tr_torrentInvalidatePieceTempFile( tor, fileIndex );
 }
 
 void
@@ -3020,6 +3036,115 @@ tr_torrentFindFile( const tr_torrent * tor, tr_file_index_t fileNum )
     }
 
     return ret;
+}
+
+tr_bool
+tr_torrentFindPieceTemp( const tr_torrent * tor, uint32_t pieceIndex,
+                         const char ** base, char ** subpath )
+{
+    const char * b;
+    char * s, * filename;
+    tr_bool exists = FALSE;
+
+    b = tr_torrentGetPieceTempDir( tor );
+    s = tr_strdup_printf( "%010u.dat", pieceIndex );
+
+    filename = tr_buildPath( b, s, NULL );
+    exists = fileExists( filename );
+    tr_free( filename );
+
+    if( base )
+        *base = b;
+    if( subpath )
+        *subpath = s;
+    else
+        tr_free( s);
+
+    return exists;
+}
+
+const char *
+tr_torrentGetPieceTempDir( const tr_torrent * tor )
+{
+    assert( tr_isTorrent( tor ) );
+
+    return tor->pieceTempDir;
+}
+
+void
+tr_torrentRemovePieceTemp( tr_torrent * tor )
+{
+    const char * path;
+
+    assert( tr_isTorrent( tor ) );
+
+    path = tr_torrentGetPieceTempDir( tor );
+    deleteLocalFile( path, remove );
+}
+
+void
+tr_torrentInvalidatePieceTemp( tr_torrent * tor )
+{
+    DIR           * dir;
+    struct dirent * d;
+    uint32_t        pieceIndex;
+    const char    * name;
+    int             count = 0;
+
+    assert( tr_isTorrent( tor ) );
+
+    if( !( dir = opendir( tr_torrentGetPieceTempDir( tor ) ) ) )
+        return;
+
+    tr_torrentLock( tor );
+
+    while( ( d = readdir( dir ) ) )
+    {
+        name = d->d_name;
+        if( !name || sscanf( name, "%u.dat", &pieceIndex ) != 1 )
+            continue;
+        tr_torrentSetHasPiece( tor, pieceIndex, FALSE );
+        ++count;
+    }
+    closedir( dir );
+
+    tr_torrentRemovePieceTemp( tor );
+
+    if( count )
+    {
+        tr_torrentSetDirty( tor );
+        tr_peerMgrRebuildRequests( tor );
+    }
+
+    tr_torrentUnlock( tor );
+}
+
+static void
+tr_torrentInvalidatePieceTempFile( tr_torrent * tor,
+                                   tr_file_index_t fileIndex )
+{
+    tr_file        * file = &tor->info.files[fileIndex];
+    const char     * base;
+    char           * subpath;
+    char           * filename;
+    tr_piece_index_t indices[2];
+    tr_piece_index_t i;
+    size_t           count = 0;
+
+    indices[count++] = file->firstPiece;
+    if( file->firstPiece != file->lastPiece )
+        indices[count++] = file->lastPiece;
+
+    for( i = 0; i < count; ++i )
+    {
+        if( !tr_torrentFindPieceTemp( tor, indices[i], &base, &subpath ) )
+            continue;
+        tr_torrentSetHasPiece( tor, indices[i], FALSE );
+        filename = tr_buildPath( base, subpath, NULL );
+        deleteLocalFile( filename, remove );
+        tr_free( subpath );
+        tr_free( filename );
+    }
 }
 
 /* Decide whether we should be looking for files in downloadDir or incompleteDir. */
