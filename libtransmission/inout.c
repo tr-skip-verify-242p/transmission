@@ -78,6 +78,9 @@ readOrWriteBytes( tr_session       * session,
     tr_bool         isPieceTemp;
     uint64_t        byteOffset;
     uint64_t        desiredSize;
+    char          * subpath = NULL;
+    const char    * base;
+    tr_bool         fileExists = FALSE;
 
 //if( doWrite )
 //    fprintf( stderr, "in file %s at offset %zu, writing %zu bytes; file length is %zu\n", file->name, (size_t)fileOffset, buflen, (size_t)file->length );
@@ -89,12 +92,26 @@ readOrWriteBytes( tr_session       * session,
     if( !file->length )
         return 0;
 
-    isPieceTemp = ( file->dnd && tr_sessionIsPieceTempEnabled( tor->session ) );
+    /* First try to find the actual destination fd or filename. */
+    fd = tr_fdFileGetCached( session, tr_torrentId( tor ),
+                             fileIndex, 0, doWrite );
+    if( fd < 0 )
+        fileExists = tr_torrentFindFile2( tor, fileIndex,
+                                          &base, &subpath );
+
+    /* Only use temporary piece files if the file is DND, the setting
+     * is enabled, and the actual file does not already exist. */
+    isPieceTemp = ( file->dnd && tr_sessionIsPieceTempEnabled( tor->session )
+                    && fd < 0 && !fileExists );
 
     if( isPieceTemp )
     {
         byteOffset = pieceOffset;
         desiredSize = tr_torPieceCountBytes( tor, pieceIndex );
+
+        /* Check cache for piece file fd. */
+        fd = tr_fdFileGetCached( session, tr_torrentId( tor ),
+                                 fileIndex, pieceIndex, doWrite );
     }
     else
     {
@@ -103,16 +120,10 @@ readOrWriteBytes( tr_session       * session,
         pieceIndex = 0;
     }
 
-    fd = tr_fdFileGetCached( session, tr_torrentId( tor ),
-                             fileIndex, pieceIndex, doWrite );
-
     if( fd < 0 )
     {
         /* the fd cache doesn't have this file...
          * we'll need to open it and maybe create it */
-        char * subpath;
-        const char * base;
-        tr_bool fileExists;
         tr_preallocation_mode preallocationMode;
 
         if( isPieceTemp )
@@ -122,8 +133,6 @@ readOrWriteBytes( tr_session       * session,
         }
         else
         {
-            fileExists = tr_torrentFindFile2( tor, fileIndex,
-                                              &base, &subpath );
             if( !fileExists )
             {
                 base = tr_torrentGetCurrentDir( tor );
@@ -162,8 +171,8 @@ readOrWriteBytes( tr_session       * session,
         if( doWrite && !err )
             tr_statsFileCreated( tor->session );
 
-        tr_free( subpath );
     }
+    tr_free( subpath );
 
     if( !err )
     {
