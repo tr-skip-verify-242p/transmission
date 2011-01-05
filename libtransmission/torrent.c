@@ -2262,7 +2262,7 @@ deleteDNDFile( tr_torrent * tor,
     }
 
     path = tr_buildPath( tor->currentDir, file->name, NULL );
-    tr_fdFileClose( tor->session, tor, fileIndex );
+    tr_fdFileClose( tor->session, tor, fileIndex, 0 );
     deleteLocalFile( path, remove );
     tr_free( path );
 
