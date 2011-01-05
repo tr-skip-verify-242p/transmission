@@ -76,7 +76,7 @@ readOrWriteBytes( tr_session       * session,
     int             err = 0;
     const tr_bool   doWrite = ioMode >= TR_IO_WRITE;
     tr_bool         isPieceTemp;
-    uint64_t        byteOffset;
+    uint64_t        offset;
     uint64_t        desiredSize;
     char          * subpath = NULL;
     const char    * base;
@@ -100,22 +100,26 @@ readOrWriteBytes( tr_session       * session,
                                           &base, &subpath );
 
     /* Only use temporary piece files if the file is DND, the setting
-     * is enabled, and the actual file does not already exist. */
+     * is enabled, and the actual file does not already exist.
+     *
+     * NB: The value of this boolean flag changes the behavior
+     * of the "fileIndex" and "pieceIndex" variables used below. */
     isPieceTemp = ( file->dnd && tr_sessionIsPieceTempEnabled( tor->session )
                     && fd < 0 && !fileExists );
 
     if( isPieceTemp )
     {
-        byteOffset = pieceOffset;
+        offset = pieceOffset;
         desiredSize = tr_torPieceCountBytes( tor, pieceIndex );
+        fileIndex = 0;
 
         /* Check cache for piece file fd. */
         fd = tr_fdFileGetCached( session, tr_torrentId( tor ),
-                                 fileIndex, pieceIndex, doWrite );
+                                 0, pieceIndex, doWrite );
     }
     else
     {
-        byteOffset = fileOffset;
+        offset = fileOffset;
         desiredSize = file->length;
         pieceIndex = 0;
     }
@@ -177,20 +181,20 @@ readOrWriteBytes( tr_session       * session,
     if( !err )
     {
         if( ioMode == TR_IO_READ ) {
-            const int rc = tr_pread( fd, buf, buflen, byteOffset );
+            const int rc = tr_pread( fd, buf, buflen, offset );
             if( rc < 0 ) {
                 err = errno;
                 tr_torerr( tor, "read failed for \"%s\": %s",
                            file->name, tr_strerror( err ) );
             }
         } else if( ioMode == TR_IO_PREFETCH ) {
-            const int rc = tr_prefetch( fd, byteOffset, buflen );
+            const int rc = tr_prefetch( fd, offset, buflen );
             if( rc < 0 ) {
                 tr_tordbg( tor, "prefetch failed for \"%s\": %s",
                            file->name, tr_strerror( err ) );
             }
         } else if( ioMode == TR_IO_WRITE ) {
-            const int rc = tr_pwrite( fd, buf, buflen, byteOffset );
+            const int rc = tr_pwrite( fd, buf, buflen, offset );
             if( rc < 0 ) {
                 err = errno;
                 tr_torerr( tor, "write failed for \"%s\": %s",
