@@ -298,6 +298,10 @@ torrentPage( GObject * core )
     w = new_check_button( s, TR_PREFS_KEY_RENAME_PARTIAL_FILES, core );
     hig_workarea_add_wide_control( t, &row, w );
 
+    s = _( "Save _unwanted piece data to temporary location" );
+    w = new_check_button( s, TR_PREFS_KEY_PIECE_TEMP_ENABLED, core );
+    hig_workarea_add_wide_control( t, &row, w );
+
     w = new_path_chooser_button( TR_PREFS_KEY_DOWNLOAD_DIR, core );
     hig_workarea_add_row( t, &row, _( "Save to _Location:" ), w, NULL );
 
