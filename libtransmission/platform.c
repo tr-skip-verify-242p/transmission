@@ -293,9 +293,11 @@ getOldConfigDir( void )
 #if defined(SYS_DARWIN) || defined(WIN32)
  #define RESUME_SUBDIR  "Resume"
  #define TORRENT_SUBDIR "Torrents"
+ #define PIECE_SUBDIR   "Pieces"
 #else
  #define RESUME_SUBDIR  "resume"
  #define TORRENT_SUBDIR "torrents"
+ #define PIECE_SUBDIR   "pieces"
 #endif
 
 static const char *
@@ -397,6 +399,10 @@ tr_setConfigDir( tr_session * session, const char * configDir )
     tr_mkdirp( path, 0777 );
     session->torrentDir = path;
 
+    path = tr_buildPath( configDir, PIECE_SUBDIR, NULL );
+    tr_mkdirp( path, 0777 );
+    session->pieceDir = path;
+
     migrateFiles( session );
 }
 
@@ -416,6 +422,12 @@ const char *
 tr_getResumeDir( const tr_session * session )
 {
     return session->resumeDir;
+}
+
+const char *
+tr_getPieceDir( const tr_session * session )
+{
+    return session->pieceDir;
 }
 
 const char*

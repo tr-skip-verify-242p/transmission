@@ -803,8 +803,7 @@ torrentInit( tr_torrent * tor, const tr_ctor * ctor )
     if( tr_sessionIsIncompleteDirEnabled( session ) )
         tor->incompleteDir = tr_strdup( dir );
 
-    tor->pieceTempDir = tr_buildPath( tr_getResumeDir( tor->session ),
-                                      "piecetmp",
+    tor->pieceTempDir = tr_buildPath( tr_getPieceDir( tor->session ),
                                       tor->info.hashString, NULL );
 
     tor->bandwidth = tr_bandwidthNew( session, session->bandwidth );
