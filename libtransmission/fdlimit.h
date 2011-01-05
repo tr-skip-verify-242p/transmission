@@ -45,6 +45,12 @@ ssize_t tr_pwrite(int fd, const void *buf, size_t count, off_t offset);
 int tr_prefetch(int fd, off_t offset, size_t count);
 
 
+typedef enum
+{
+    TR_FD_INDEX_FILE,
+    TR_FD_INDEX_PIECE
+} tr_fd_index_type;
+
 /**
  * Returns an fd to the specified filename.
  *
@@ -58,20 +64,21 @@ int tr_prefetch(int fd, off_t offset, size_t count);
  * on success, a file descriptor >= 0 is returned.
  * on failure, a -1 is returned and errno is set.
  *
- * @param fileNum should be 0 if the file is for temporary piece storage,
- *                otherwise it should be equal to the index of the file
- *                in the torrent.
+ * @param indexNum a numeric tag to distinguish different files. If
+ *                 @a indexType is @a TR_FD_INDEX_FILE, then it should
+ *                 be the index of the file in the torrent. For
+ *                 @a TR_FD_INDEX_PIECE, it should be the piece index.
  *
- * @param pieceNum should be 0 unless the file is for temporary piece
- *                 storage, in which case it should be the index of the
- *                 piece in the torrent.
+ * @param indexType Either @a TR_FD_INDEX_FILE or @a TR_FD_INDEX_PIECE
+ *                  depending on whether the file is part of the torrent
+ *                  or a temporary piece file.
  *
  * @see tr_fdFileClose
  */
 int  tr_fdFileCheckout( tr_session             * session,
                         int                      torrentId,
-                        tr_file_index_t          fileNum,
-                        tr_piece_index_t         pieceNum,
+                        uint32_t                 indexNum,
+                        tr_fd_index_type         indexType,
                         const char             * fileName,
                         tr_bool                  doWrite,
                         tr_preallocation_mode    preallocationMode,
@@ -79,8 +86,8 @@ int  tr_fdFileCheckout( tr_session             * session,
 
 int tr_fdFileGetCached( tr_session             * session,
                         int                      torrentId,
-                        tr_file_index_t          fileNum,
-                        tr_piece_index_t         pieceNum,
+                        uint32_t                 indexNum,
+                        tr_fd_index_type         indexType,
                         tr_bool                  doWrite );
 
 /**
@@ -89,14 +96,14 @@ int tr_fdFileGetCached( tr_session             * session,
  * If the file isn't checked out, it's closed immediately.
  * If the file is currently checked out, it will be closed upon its return.
  *
- * @note @a fileNum and @a pieceNum should be set as for tr_fdFileCheckout().
+ * @note @a indexNum and @a indexType should be set as for tr_fdFileCheckout().
  *
  * @see tr_fdFileCheckout
  */
 void tr_fdFileClose( tr_session        * session,
                      const tr_torrent  * tor,
-                     tr_file_index_t     fileNum,
-                     tr_piece_index_t    pieceNum );
+                     uint32_t            indexNum,
+                     tr_fd_index_type    indexType );
 
 
 /**

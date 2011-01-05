@@ -3125,7 +3125,7 @@ tr_torrentFileCompleted( tr_torrent * tor, tr_file_index_t fileNum )
     const char * base;
 
     /* close the file so that we can reopen in read-only mode as needed */
-    tr_fdFileClose( tor->session, tor, fileNum, 0 );
+    tr_fdFileClose( tor->session, tor, fileNum, TR_FD_INDEX_FILE );
 
     /* if the torrent's current filename isn't the same as the one in the
      * metadata -- for example, if it had the ".part" suffix appended to
@@ -3328,11 +3328,11 @@ tr_torrentRemovePieceTemp( tr_torrent * tor )
 void
 tr_torrentInvalidatePieceTemp( tr_torrent * tor )
 {
-    DIR           * dir;
-    struct dirent * d;
-    uint32_t        pieceIndex;
-    const char    * name;
-    int             count = 0;
+    DIR              * dir;
+    struct dirent    * d;
+    tr_piece_index_t   pieceIndex;
+    const char       * name;
+    int                count = 0;
 
     assert( tr_isTorrent( tor ) );
 
@@ -3369,7 +3369,7 @@ tr_torrentInvalidatePieceTempFile( tr_torrent      * tor,
     tr_file          * file = &tor->info.files[fileIndex];
     char             * filename;
     tr_piece_index_t   indices[2];
-    tr_piece_index_t   i;
+    size_t             i;
     size_t             count = 0;
 
     indices[count++] = file->firstPiece;
