@@ -2182,19 +2182,17 @@ tr_torrentInitFileDLs( tr_torrent             * tor,
  * large as the overlap size.
  *
  * @note This function assumes it is only called from
- * tr_torrentDeleteDNDFiles.
+ *       tr_torrentDeleteDNDFiles().
  *
  * @return TRUE if the file was deleted.
  */
 static tr_bool
-deleteDNDFile( tr_torrent * tor,
-               tr_file_index_t fileIndex )
+deleteDNDFile( tr_torrent      * tor,
+               tr_file_index_t   fileIndex )
 {
     tr_file *        file;
     tr_piece_index_t fpindex;
     tr_piece_index_t lpindex;
-    uint32_t         fpsize;
-    uint32_t         lpsize;
     uint32_t         fpoffset;
     uint32_t         lpoffset;
     uint32_t         fpoverlap;
@@ -2206,7 +2204,6 @@ deleteDNDFile( tr_torrent * tor,
     uint8_t *        fpbuf = NULL;
     uint8_t *        lpbuf = NULL;
     char *           path = NULL;
-    int64_t          pcsize;
     int64_t          delsize;
     int64_t          rwsize;
     tr_piece_index_t i;
@@ -2221,19 +2218,17 @@ deleteDNDFile( tr_torrent * tor,
 
     fpindex = file->firstPiece;
     lpindex = file->lastPiece;
-    fpsize = tr_torPieceCountBytes( tor, fpindex );
-    lpsize = tr_torPieceCountBytes( tor, lpindex );
-    pcsize = tor->info.pieceSize;
     fpblocks = tr_cpCompleteBlocksInPiece( &tor->completion, fpindex );
     lpblocks = tr_cpCompleteBlocksInPiece( &tor->completion, lpindex );
 
     /* The offset in the first/last piece where the file begins/ends. */
-    fpoffset = file->offset - pcsize * fpindex;
-    lpoffset = file->offset + file->length - pcsize * lpindex;
+    fpoffset = ( file->offset - tr_pieceOffset( tor, fpindex, 0, 0 ) );
+    lpoffset = ( file->offset + file->length
+                 - tr_pieceOffset( tor, lpindex, 0, 0 ) );
 
     /* This is the number of bytes of the first/last piece that
      * are contained in the file. */
-    fpoverlap = fpsize - fpoffset;
+    fpoverlap = tr_torPieceCountBytes( tor, fpindex ) - fpoffset;
     lpoverlap = lpoffset;
 
     /* We need to preserve the overlapping piece parts if they are
@@ -2242,8 +2237,8 @@ deleteDNDFile( tr_torrent * tor,
     lpsave = ( !tor->info.pieces[lpindex].dnd && lpblocks > 0
                && fpindex != lpindex );
 
-    /* Calculate how many bytes we can gain by deleting
-     * pieces that are no longer wanted. */
+    /* Calculate how many bytes we could gain in the best case
+     * by deleting pieces that are no longer wanted. */
     delsize = file->length;
     if( fpsave )
         delsize -= fpoverlap;
@@ -2313,7 +2308,7 @@ deleteDNDFile( tr_torrent * tor,
 
 /**
  * @note This function assumes it is only called
- * from tr_torrentSetFileDLsImpl.
+ *       from tr_torrentSetFileDLsImpl().
  *
  * @return the number of files deleted.
  */
@@ -2322,13 +2317,13 @@ tr_torrentDeleteDNDFiles( tr_torrent            * tor,
                           const tr_file_index_t * files,
                           tr_file_index_t         fileCount )
 {
-    tr_file_index_t i, count = 0;
+    tr_file_index_t count = 0;
+    tr_file_index_t i;
 
     for( i = 0; i < fileCount; ++i )
-    {
         if( deleteDNDFile( tor, files[i] ) )
             ++count;
-    }
+
     return count;
 }
 
