@@ -2919,7 +2919,7 @@ tr_torrentFileCompleted( tr_torrent * tor, tr_file_index_t fileNum )
     const char * base;
 
     /* close the file so that we can reopen in read-only mode as needed */
-    tr_fdFileClose( tor->session, tor, fileNum );
+    tr_fdFileClose( tor->session, tor, fileNum, 0 );
 
     /* if the torrent's current filename isn't the same as the one in the
      * metadata -- for example, if it had the ".part" suffix appended to

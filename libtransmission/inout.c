@@ -74,7 +74,10 @@ readOrWriteBytes( tr_session       * session,
 
     int             fd = -1;
     int             err = 0;
-    const tr_bool doWrite = ioMode >= TR_IO_WRITE;
+    const tr_bool   doWrite = ioMode >= TR_IO_WRITE;
+    tr_bool         isPieceTemp;
+    uint64_t        byteOffset;
+    uint64_t        desiredSize;
 
 //if( doWrite )
 //    fprintf( stderr, "in file %s at offset %zu, writing %zu bytes; file length is %zu\n", file->name, (size_t)fileOffset, buflen, (size_t)file->length );
@@ -86,7 +89,22 @@ readOrWriteBytes( tr_session       * session,
     if( !file->length )
         return 0;
 
-    fd = tr_fdFileGetCached( session, tr_torrentId( tor ), fileIndex, doWrite );
+    isPieceTemp = ( file->dnd && tr_sessionIsPieceTempEnabled( tor->session ) );
+
+    if( isPieceTemp )
+    {
+        byteOffset = pieceOffset;
+        desiredSize = tr_torPieceCountBytes( tor, pieceIndex );
+    }
+    else
+    {
+        byteOffset = fileOffset;
+        desiredSize = file->length;
+        pieceIndex = 0;
+    }
+
+    fd = tr_fdFileGetCached( session, tr_torrentId( tor ),
+                             fileIndex, pieceIndex, doWrite );
 
     if( fd < 0 )
     {
@@ -97,17 +115,16 @@ readOrWriteBytes( tr_session       * session,
         tr_bool fileExists;
         tr_preallocation_mode preallocationMode;
 
-        fileExists = tr_torrentFindFile2( tor, fileIndex, &base, &subpath );
-
-        if( !fileExists )
+        if( isPieceTemp )
         {
-            if( file->dnd && tr_sessionIsPieceTempEnabled( tor->session ) )
-            {
-                fileExists = tr_torrentFindPieceTemp2( tor, pieceIndex,
-                                                       &base, &subpath );
-                fileOffset = pieceOffset;
-            }
-            else
+            fileExists = tr_torrentFindPieceTemp2( tor, pieceIndex,
+                                                   &base, &subpath );
+        }
+        else
+        {
+            fileExists = tr_torrentFindFile2( tor, fileIndex,
+                                              &base, &subpath );
+            if( !fileExists )
             {
                 base = tr_torrentGetCurrentDir( tor );
 
@@ -131,8 +148,9 @@ readOrWriteBytes( tr_session       * session,
         {
             char * filename = tr_buildPath( base, subpath, NULL );
 
-            if( ( fd = tr_fdFileCheckout( session, tor->uniqueId, fileIndex, filename,
-                                          doWrite, preallocationMode, file->length ) ) < 0 )
+            if( ( fd = tr_fdFileCheckout( session, tor->uniqueId, fileIndex,
+                                          pieceIndex, filename, doWrite,
+                                          preallocationMode, desiredSize ) ) < 0 )
             {
                 err = errno;
                 tr_torerr( tor, "tr_fdFileCheckout failed for \"%s\": %s", filename, tr_strerror( err ) );
@@ -150,20 +168,20 @@ readOrWriteBytes( tr_session       * session,
     if( !err )
     {
         if( ioMode == TR_IO_READ ) {
-            const int rc = tr_pread( fd, buf, buflen, fileOffset );
+            const int rc = tr_pread( fd, buf, buflen, byteOffset );
             if( rc < 0 ) {
                 err = errno;
                 tr_torerr( tor, "read failed for \"%s\": %s",
                            file->name, tr_strerror( err ) );
             }
         } else if( ioMode == TR_IO_PREFETCH ) {
-            const int rc = tr_prefetch( fd, fileOffset, buflen );
+            const int rc = tr_prefetch( fd, byteOffset, buflen );
             if( rc < 0 ) {
                 tr_tordbg( tor, "prefetch failed for \"%s\": %s",
                            file->name, tr_strerror( err ) );
             }
         } else if( ioMode == TR_IO_WRITE ) {
-            const int rc = tr_pwrite( fd, buf, buflen, fileOffset );
+            const int rc = tr_pwrite( fd, buf, buflen, byteOffset );
             if( rc < 0 ) {
                 err = errno;
                 tr_torerr( tor, "write failed for \"%s\": %s",

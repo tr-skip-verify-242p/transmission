@@ -58,11 +58,14 @@ int tr_prefetch(int fd, off_t offset, size_t count);
  * on success, a file descriptor >= 0 is returned.
  * on failure, a -1 is returned and errno is set.
  *
+ * @param pieceNum must be 0 unless the file is for temporary piece storage.
+ *
  * @see tr_fdFileClose
  */
 int  tr_fdFileCheckout( tr_session             * session,
                         int                      torrentId,
                         tr_file_index_t          fileNum,
+                        tr_piece_index_t         pieceNum,
                         const char             * fileName,
                         tr_bool                  doWrite,
                         tr_preallocation_mode    preallocationMode,
@@ -71,6 +74,7 @@ int  tr_fdFileCheckout( tr_session             * session,
 int tr_fdFileGetCached( tr_session             * session,
                         int                      torrentId,
                         tr_file_index_t          fileNum,
+                        tr_piece_index_t         pieceNum,
                         tr_bool                  doWrite );
 
 /**
@@ -79,11 +83,14 @@ int tr_fdFileGetCached( tr_session             * session,
  * If the file isn't checked out, it's closed immediately.
  * If the file is currently checked out, it will be closed upon its return.
  *
+ * @param pieceNum must be 0 unless the file is for temporary piece storage.
+ *
  * @see tr_fdFileCheckout
  */
 void tr_fdFileClose( tr_session        * session,
                      const tr_torrent  * tor,
-                     tr_file_index_t     fileNo );
+                     tr_file_index_t     fileNo,
+                     tr_piece_index_t    pieceNum );
 
 
 /**
