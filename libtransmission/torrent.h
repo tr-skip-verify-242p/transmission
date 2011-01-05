@@ -403,16 +403,16 @@ tr_bool tr_torrentFindFile2( const tr_torrent *, tr_file_index_t fileNo,
 
 /**
  * Get the full path of the temporary piece file for piece
- * with index "pieceIndex".
+ * with index @a pieceIndex.
  *
- * @return a newly allocated string containing the full filename,
+ * @return a newly allocated string containing the full filename
  *         or NULL if it does not exist.
  */
 char * tr_torrentFindPieceTemp( const tr_torrent * tor,
                                 tr_piece_index_t   pieceIndex );
 
 /**
- * @brief Like tr_torrentFindFile2, but for temporary piece files.
+ * @brief Like tr_torrentFindFile2() but for temporary piece files.
  */
 tr_bool tr_torrentFindPieceTemp2( const tr_torrent  * tor,
                                   tr_piece_index_t    pieceIndex,
@@ -432,12 +432,12 @@ void tr_torrentRemovePieceTemp( tr_torrent * tor );
 /**
  * All data in temporary pieces files is removed from the torrent.
  *
- * @note No validation or locking is done on "tor".
+ * @note No validation or locking is done on @a tor.
  */
 void tr_torrentInvalidatePieceTemp( tr_torrent * tor );
 
 /**
- * Remove all temporary piece files used by file with index "fileIndex".
+ * Remove all temporary piece files used by file with index @a fileIndex.
  *
  * @note No validation or locking is done on the arguments.
  */
