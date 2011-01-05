@@ -1,7 +1,7 @@
 /*
  * This file Copyright (C) 2008-2010 Mnemosyne LLC
  *
- * This file is licensed by the GPL version 2.  Works owned by the
+ * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
  * so that the bulk of its code can remain under the MIT license.
  * This exemption does not extend to derived works not owned by
@@ -232,7 +232,10 @@ void         tr_sessionUnlock( tr_session * );
 
 tr_bool      tr_sessionIsLocked( const tr_session * );
 
-const struct tr_address*  tr_sessionGetPublicAddress( const tr_session *, int tr_af_type );
+const struct tr_address*  tr_sessionGetPublicAddress( const tr_session  * session,
+                                                      int                 tr_af_type,
+                                                      tr_bool           * is_default_value );
+
 
 struct tr_bindsockets * tr_sessionGetBindSockets( tr_session * );
 
