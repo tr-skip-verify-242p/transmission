@@ -430,12 +430,15 @@ const char * tr_torrentGetPieceTempDir( const tr_torrent * tor );
 void tr_torrentRemovePieceTemp( tr_torrent * tor );
 
 /**
- * @brief All data in temporary pieces files is removed from the torrent.
+ * All data in temporary pieces files is removed from the torrent.
+ *
+ * @note No validation or locking is done on "tor".
  */
 void tr_torrentInvalidatePieceTemp( tr_torrent * tor );
 
 /**
  * Remove all temporary piece files used by file with index "fileIndex".
+ *
  * @note No validation or locking is done on the arguments.
  */
 void tr_torrentInvalidatePieceTempFile( tr_torrent      * tor,

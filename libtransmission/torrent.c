@@ -3087,11 +3087,35 @@ tr_torrentGetPieceTempDir( const tr_torrent * tor )
 void
 tr_torrentRemovePieceTemp( tr_torrent * tor )
 {
-    const char * path;
-
-    assert( tr_isTorrent( tor ) );
+    DIR           * dir;
+    struct dirent * d;
+    const char    * name;
+    const char    * path;
+    tr_ptrArray     del = TR_PTR_ARRAY_INIT;
+    int             n;
+    int             i;
 
     path = tr_torrentGetPieceTempDir( tor );
+    if( !( dir = opendir( path ) ) )
+        return;
+
+    while( ( d = readdir( dir ) ) )
+    {
+        name = d->d_name;
+        if( !name || !strcmp( name, "." ) || !strcmp( name, ".." ) )
+            continue;
+        tr_ptrArrayAppend( &del, tr_buildPath( path, name, NULL ) );
+    }
+    closedir( dir );
+
+    n = tr_ptrArraySize( &del );
+    for( i = 0; i < n; ++i )
+    {
+        name = tr_ptrArrayNth( &del, i );
+        deleteLocalFile( name, remove );
+    }
+    tr_ptrArrayDestruct( &del, tr_free );
+
     deleteLocalFile( path, remove );
 }
 
