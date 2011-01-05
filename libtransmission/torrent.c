@@ -3126,11 +3126,11 @@ tr_torrentRemovePieceTemp( tr_torrent * tor )
 void
 tr_torrentInvalidatePieceTemp( tr_torrent * tor )
 {
-    DIR           * dir;
-    struct dirent * d;
-    uint32_t        pieceIndex;
-    const char    * name;
-    int             count = 0;
+    DIR              * dir;
+    struct dirent    * d;
+    tr_piece_index_t   pieceIndex;
+    const char       * name;
+    int                count = 0;
 
     assert( tr_isTorrent( tor ) );
 
@@ -3167,7 +3167,7 @@ tr_torrentInvalidatePieceTempFile( tr_torrent      * tor,
     tr_file          * file = &tor->info.files[fileIndex];
     char             * filename;
     tr_piece_index_t   indices[2];
-    tr_piece_index_t   i;
+    size_t             i;
     size_t             count = 0;
 
     indices[count++] = file->firstPiece;
