@@ -807,6 +807,9 @@ torrentInit( tr_torrent * tor, const tr_ctor * ctor )
     if( tr_sessionIsIncompleteDirEnabled( session ) )
         tor->incompleteDir = tr_strdup( dir );
 
+    tor->pieceTempDir = tr_buildPath( tr_getPieceDir( tor->session ),
+                                      tor->info.hashString, NULL );
+
     tor->bandwidth = tr_bandwidthNew( session, session->bandwidth );
 
     tor->bandwidth->priority = tr_ctorGetBandwidthPriority( ctor );
@@ -1525,6 +1528,7 @@ freeTorrent( tr_torrent * tor )
 
     tr_free( tor->downloadDir );
     tr_free( tor->incompleteDir );
+    tr_free( tor->pieceTempDir );
     tr_free( tor->peer_id );
 
     if( tor == session->torrentList )
@@ -1777,6 +1781,7 @@ closeTorrent( void * vtor )
     {
         tr_metainfoRemoveSaved( tor->session, &tor->info );
         tr_torrentRemoveResume( tor );
+        tr_torrentRemovePieceTemp( tor );
     }
 
     tor->isRunning = 0;
@@ -2120,6 +2125,7 @@ setFileDND( tr_torrent * tor, tr_file_index_t fileIndex, int doDownload )
 {
     tr_file *        file;
     const int8_t     dnd = !doDownload;
+    int8_t           olddnd;
     tr_piece_index_t firstPiece;
     int8_t           firstPieceDND;
     tr_piece_index_t lastPiece;
@@ -2129,6 +2135,7 @@ setFileDND( tr_torrent * tor, tr_file_index_t fileIndex, int doDownload )
     assert( tr_isTorrent( tor ) );
 
     file = &tor->info.files[fileIndex];
+    olddnd = file->dnd;
     file->dnd = dnd;
     firstPiece = file->firstPiece;
     lastPiece = file->lastPiece;
@@ -2170,6 +2177,9 @@ setFileDND( tr_torrent * tor, tr_file_index_t fileIndex, int doDownload )
         for( pp = firstPiece + 1; pp < lastPiece; ++pp )
             tor->info.pieces[pp].dnd = dnd;
     }
+
+    if( !file->dnd && file->dnd != olddnd )
+        tr_torrentInvalidatePieceTempFile( tor, fileIndex );
 }
 
 void
@@ -3051,7 +3061,7 @@ tr_torrentFileCompleted( tr_torrent * tor, tr_file_index_t fileNum )
     const char * base;
 
     /* close the file so that we can reopen in read-only mode as needed */
-    tr_fdFileClose( tor->session, tor, fileNum );
+    tr_fdFileClose( tor->session, tor, fileNum, 0 );
 
     /* if the torrent's current filename isn't the same as the one in the
      * metadata -- for example, if it had the ".part" suffix appended to
@@ -3162,6 +3172,154 @@ tr_torrentFindFile( const tr_torrent * tor, tr_file_index_t fileNum )
     }
 
     return ret;
+}
+
+tr_bool
+tr_torrentFindPieceTemp2( const tr_torrent  * tor,
+                          tr_piece_index_t    pieceIndex,
+                          const char       ** base,
+                          char             ** subpath )
+{
+    const char * b;
+    char       * s;
+    char       * filename;
+    tr_bool      exists = FALSE;
+
+    b = tr_torrentGetPieceTempDir( tor );
+    s = tr_strdup_printf( "%010u.dat", pieceIndex );
+
+    filename = tr_buildPath( b, s, NULL );
+    exists = fileExists( filename );
+    tr_free( filename );
+
+    if( base )
+        *base = b;
+    if( subpath )
+        *subpath = s;
+    else
+        tr_free( s );
+
+    return exists;
+}
+
+char *
+tr_torrentFindPieceTemp( const tr_torrent * tor,
+                         tr_piece_index_t   pieceIndex )
+{
+    const char * base;
+    char       * subpath;
+    char       * filename = NULL;
+
+    if( tr_torrentFindPieceTemp2( tor, pieceIndex, &base, &subpath ) )
+    {
+        filename = tr_buildPath( base, subpath, NULL );
+        tr_free( subpath );
+    }
+    return filename;
+}
+
+const char *
+tr_torrentGetPieceTempDir( const tr_torrent * tor )
+{
+    assert( tr_isTorrent( tor ) );
+
+    return tor->pieceTempDir;
+}
+
+void
+tr_torrentRemovePieceTemp( tr_torrent * tor )
+{
+    DIR           * dir;
+    struct dirent * d;
+    const char    * name;
+    const char    * path;
+    tr_ptrArray     del = TR_PTR_ARRAY_INIT;
+    int             n;
+    int             i;
+
+    path = tr_torrentGetPieceTempDir( tor );
+    if( !( dir = opendir( path ) ) )
+        return;
+
+    while( ( d = readdir( dir ) ) )
+    {
+        name = d->d_name;
+        if( !name || !strcmp( name, "." ) || !strcmp( name, ".." ) )
+            continue;
+        tr_ptrArrayAppend( &del, tr_buildPath( path, name, NULL ) );
+    }
+    closedir( dir );
+
+    n = tr_ptrArraySize( &del );
+    for( i = 0; i < n; ++i )
+    {
+        name = tr_ptrArrayNth( &del, i );
+        deleteLocalFile( name, remove );
+    }
+    tr_ptrArrayDestruct( &del, tr_free );
+
+    deleteLocalFile( path, remove );
+}
+
+void
+tr_torrentInvalidatePieceTemp( tr_torrent * tor )
+{
+    DIR           * dir;
+    struct dirent * d;
+    uint32_t        pieceIndex;
+    const char    * name;
+    int             count = 0;
+
+    assert( tr_isTorrent( tor ) );
+
+    if( !( dir = opendir( tr_torrentGetPieceTempDir( tor ) ) ) )
+        return;
+
+    tr_torrentLock( tor );
+
+    while( ( d = readdir( dir ) ) )
+    {
+        name = d->d_name;
+        if( !name || sscanf( name, "%u.dat", &pieceIndex ) != 1 )
+            continue;
+        tr_torrentSetHasPiece( tor, pieceIndex, FALSE );
+        ++count;
+    }
+    closedir( dir );
+
+    tr_torrentRemovePieceTemp( tor );
+
+    if( count )
+    {
+        tr_torrentSetDirty( tor );
+        tr_peerMgrRebuildRequests( tor );
+    }
+
+    tr_torrentUnlock( tor );
+}
+
+void
+tr_torrentInvalidatePieceTempFile( tr_torrent      * tor,
+                                   tr_file_index_t   fileIndex )
+{
+    tr_file          * file = &tor->info.files[fileIndex];
+    char             * filename;
+    tr_piece_index_t   indices[2];
+    tr_piece_index_t   i;
+    size_t             count = 0;
+
+    indices[count++] = file->firstPiece;
+    if( file->firstPiece != file->lastPiece )
+        indices[count++] = file->lastPiece;
+
+    for( i = 0; i < count; ++i )
+    {
+        if( !( filename = tr_torrentFindPieceTemp( tor, indices[i] ) ) )
+            continue;
+        tr_torrentSetHasPiece( tor, indices[i], FALSE );
+        deleteLocalFile( filename, remove );
+        tr_free( filename );
+    }
 }
 
 /* Decide whether we should be looking for files in downloadDir or incompleteDir. */

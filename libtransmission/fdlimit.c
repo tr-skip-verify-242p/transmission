@@ -72,6 +72,7 @@ struct tr_openfile
     tr_bool          isWritable;
     int              torrentId;
     tr_file_index_t  fileNum;
+    tr_piece_index_t pieceNum;
     char             filename[TR_PATH_MAX];
     int              fd;
     time_t           date;
@@ -461,6 +462,7 @@ int
 tr_fdFileGetCached( tr_session       * session,
                     int                torrentId,
                     tr_file_index_t    fileNum,
+                    tr_piece_index_t   pieceNum,
                     tr_bool            doWrite )
 {
     struct tr_openfile * match = NULL;
@@ -485,6 +487,8 @@ tr_fdFileGetCached( tr_session       * session,
                 continue;
             if( fileNum != o->fileNum )
                 continue;
+            if( pieceNum != o->pieceNum )
+                continue;
             if( !fileIsOpen( o ) )
                 continue;
 
@@ -507,6 +511,7 @@ int
 tr_fdFileCheckout( tr_session             * session,
                    int                      torrentId,
                    tr_file_index_t          fileNum,
+                   tr_piece_index_t         pieceNum,
                    const char             * filename,
                    tr_bool                  doWrite,
                    tr_preallocation_mode    preallocationMode,
@@ -534,6 +539,8 @@ tr_fdFileCheckout( tr_session             * session,
         if( torrentId != o->torrentId )
             continue;
         if( fileNum != o->fileNum )
+            continue;
+        if( pieceNum != o->pieceNum )
             continue;
         if( !fileIsOpen( o ) )
             continue;
@@ -603,6 +610,7 @@ tr_fdFileCheckout( tr_session             * session,
     dbgmsg( "checking out '%s' in slot %d", filename, winner );
     o->torrentId = torrentId;
     o->fileNum = fileNum;
+    o->pieceNum = pieceNum;
     o->date = tr_time( );
     return o->fd;
 }
@@ -610,7 +618,8 @@ tr_fdFileCheckout( tr_session             * session,
 void
 tr_fdFileClose( tr_session        * session,
                 const tr_torrent  * tor,
-                tr_file_index_t     fileNum )
+                tr_file_index_t     fileNum,
+                tr_piece_index_t    pieceNum )
 {
     struct tr_openfile * o;
     struct tr_fdInfo * gFd;
@@ -629,6 +638,8 @@ tr_fdFileClose( tr_session        * session,
         if( torrentId != o->torrentId )
             continue;
         if( fileNum != o->fileNum )
+            continue;
+        if( pieceNum != o->pieceNum )
             continue;
         if( !fileIsOpen( o ) )
             continue;
