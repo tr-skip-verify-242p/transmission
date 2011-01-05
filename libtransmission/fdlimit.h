@@ -52,7 +52,7 @@ int tr_prefetch(int fd, off_t offset, size_t count);
  * continually opening and closing the same files when downloading
  * piece data.
  *
- * - if @a doWrite is true, subfolders in @a filename are created if necessary.
+ * - if @a doWrite is true, subfolders in @a fileName are created if necessary.
  * - if @a doWrite is true, the target file is created if necessary.
  *
  * on success, a file descriptor >= 0 is returned.
