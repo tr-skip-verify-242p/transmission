@@ -72,15 +72,17 @@ readOrWriteBytes( tr_session       * session,
     const tr_info * info = &tor->info;
     const tr_file * file = &info->files[fileIndex];
 
-    int             fd = -1;
-    int             err = 0;
-    const tr_bool   doWrite = ioMode >= TR_IO_WRITE;
-    tr_bool         isPieceTemp;
-    uint64_t        offset;
-    uint64_t        desiredSize;
-    char          * subpath = NULL;
-    const char    * base;
-    tr_bool         fileExists = FALSE;
+    int                fd = -1;
+    int                err = 0;
+    const tr_bool      doWrite = ioMode >= TR_IO_WRITE;
+    tr_bool            isPieceTemp;
+    uint64_t           offset;
+    uint64_t           desiredSize;
+    char             * subpath = NULL;
+    const char       * base;
+    tr_bool            fileExists = FALSE;
+    uint32_t           indexNum = fileIndex;
+    tr_fd_index_type   indexType = TR_FD_INDEX_FILE;
 
 //if( doWrite )
 //    fprintf( stderr, "in file %s at offset %zu, writing %zu bytes; file length is %zu\n", file->name, (size_t)fileOffset, buflen, (size_t)file->length );
@@ -94,16 +96,13 @@ readOrWriteBytes( tr_session       * session,
 
     /* First try to find the actual destination fd or filename. */
     fd = tr_fdFileGetCached( session, tr_torrentId( tor ),
-                             fileIndex, 0, doWrite );
+                             fileIndex, TR_FD_INDEX_FILE, doWrite );
     if( fd < 0 )
         fileExists = tr_torrentFindFile2( tor, fileIndex,
                                           &base, &subpath );
 
     /* Only use temporary piece files if the file is DND, the setting
-     * is enabled, and the actual file does not already exist.
-     *
-     * NB: The value of this boolean flag changes the behavior
-     * of the "fileIndex" and "pieceIndex" variables used below. */
+     * is enabled, and the actual file does not already exist. */
     isPieceTemp = ( file->dnd && tr_sessionIsPieceTempEnabled( tor->session )
                     && fd < 0 && !fileExists );
 
@@ -111,17 +110,19 @@ readOrWriteBytes( tr_session       * session,
     {
         offset = pieceOffset;
         desiredSize = tr_torPieceCountBytes( tor, pieceIndex );
-        fileIndex = 0;
+        indexNum = pieceIndex;
+        indexType = TR_FD_INDEX_PIECE;
 
         /* Check cache for piece file fd. */
         fd = tr_fdFileGetCached( session, tr_torrentId( tor ),
-                                 0, pieceIndex, doWrite );
+                                 indexNum, indexType, doWrite );
     }
     else
     {
         offset = fileOffset;
         desiredSize = file->length;
-        pieceIndex = 0;
+        indexNum = fileIndex;
+        indexType = TR_FD_INDEX_FILE;
     }
 
     if( fd < 0 )
@@ -161,8 +162,8 @@ readOrWriteBytes( tr_session       * session,
         {
             char * filename = tr_buildPath( base, subpath, NULL );
 
-            if( ( fd = tr_fdFileCheckout( session, tor->uniqueId, fileIndex,
-                                          pieceIndex, filename, doWrite,
+            if( ( fd = tr_fdFileCheckout( session, tor->uniqueId, indexNum,
+                                          indexType, filename, doWrite,
                                           preallocationMode, desiredSize ) ) < 0 )
             {
                 err = errno;
