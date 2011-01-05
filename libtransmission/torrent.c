@@ -49,11 +49,6 @@
 #include "verify.h"
 #include "version.h"
 
-
-static void
-tr_torrentInvalidatePieceTempFile( tr_torrent * tor,
-                                   tr_file_index_t fileIndex );
-
 /***
 ****
 ***/
@@ -3039,12 +3034,15 @@ tr_torrentFindFile( const tr_torrent * tor, tr_file_index_t fileNum )
 }
 
 tr_bool
-tr_torrentFindPieceTemp( const tr_torrent * tor, uint32_t pieceIndex,
-                         const char ** base, char ** subpath )
+tr_torrentFindPieceTemp2( const tr_torrent  * tor,
+                          tr_piece_index_t    pieceIndex,
+                          const char       ** base,
+                          char             ** subpath )
 {
     const char * b;
-    char * s, * filename;
-    tr_bool exists = FALSE;
+    char       * s;
+    char       * filename;
+    tr_bool      exists = FALSE;
 
     b = tr_torrentGetPieceTempDir( tor );
     s = tr_strdup_printf( "%010u.dat", pieceIndex );
@@ -3058,9 +3056,25 @@ tr_torrentFindPieceTemp( const tr_torrent * tor, uint32_t pieceIndex,
     if( subpath )
         *subpath = s;
     else
-        tr_free( s);
+        tr_free( s );
 
     return exists;
+}
+
+char *
+tr_torrentFindPieceTemp( const tr_torrent * tor,
+                         tr_piece_index_t   pieceIndex )
+{
+    const char * base;
+    char       * subpath;
+    char       * filename = NULL;
+
+    if( tr_torrentFindPieceTemp2( tor, pieceIndex, &base, &subpath ) )
+    {
+        filename = tr_buildPath( base, subpath, NULL );
+        tr_free( subpath );
+    }
+    return filename;
 }
 
 const char *
@@ -3119,17 +3133,15 @@ tr_torrentInvalidatePieceTemp( tr_torrent * tor )
     tr_torrentUnlock( tor );
 }
 
-static void
-tr_torrentInvalidatePieceTempFile( tr_torrent * tor,
-                                   tr_file_index_t fileIndex )
+void
+tr_torrentInvalidatePieceTempFile( tr_torrent      * tor,
+                                   tr_file_index_t   fileIndex )
 {
-    tr_file        * file = &tor->info.files[fileIndex];
-    const char     * base;
-    char           * subpath;
-    char           * filename;
-    tr_piece_index_t indices[2];
-    tr_piece_index_t i;
-    size_t           count = 0;
+    tr_file          * file = &tor->info.files[fileIndex];
+    char             * filename;
+    tr_piece_index_t   indices[2];
+    tr_piece_index_t   i;
+    size_t             count = 0;
 
     indices[count++] = file->firstPiece;
     if( file->firstPiece != file->lastPiece )
@@ -3137,12 +3149,10 @@ tr_torrentInvalidatePieceTempFile( tr_torrent * tor,
 
     for( i = 0; i < count; ++i )
     {
-        if( !tr_torrentFindPieceTemp( tor, indices[i], &base, &subpath ) )
+        if( !( filename = tr_torrentFindPieceTemp( tor, indices[i] ) ) )
             continue;
         tr_torrentSetHasPiece( tor, indices[i], FALSE );
-        filename = tr_buildPath( base, subpath, NULL );
         deleteLocalFile( filename, remove );
-        tr_free( subpath );
         tr_free( filename );
     }
 }

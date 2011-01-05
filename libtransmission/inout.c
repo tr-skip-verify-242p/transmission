@@ -103,8 +103,8 @@ readOrWriteBytes( tr_session       * session,
         {
             if( file->dnd && tr_sessionIsPieceTempEnabled( tor->session ) )
             {
-                fileExists = tr_torrentFindPieceTemp( tor, pieceIndex,
-                                                      &base, &subpath );
+                fileExists = tr_torrentFindPieceTemp2( tor, pieceIndex,
+                                                       &base, &subpath );
                 fileOffset = pieceOffset;
             }
             else
