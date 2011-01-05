@@ -1313,13 +1313,16 @@ void tr_torrentSetFileDLs( tr_torrent             * torrent,
  * Delete a batch of files in the torrent.
  *
  * The files will be set to "do not download" (as by
- * tr_torrentSetFileDLs) and all pieces that do not
+ * tr_torrentSetFileDLs()) and all pieces that do not
  * overlap with other files will be deleted from the
  * filesystem.
+ *
+ * @return the number of files actually deleted.
  */
-void tr_torrentDeleteFiles( tr_torrent            * torrent,
-                            const tr_file_index_t * files,
-                            tr_file_index_t         fileCount );
+tr_file_index_t tr_torrentDeleteFiles( tr_torrent            * torrent,
+                                       const tr_file_index_t * files,
+                                       tr_file_index_t         fileCount );
+
 
 const tr_info * tr_torrentInfo( const tr_torrent * torrent );
 
