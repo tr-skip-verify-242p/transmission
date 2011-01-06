@@ -10,8 +10,10 @@
  * $Id$
  */
 
-#if defined( HAVE_ZLIB ) && _FILE_OFFSET_BITS == 64
- #define _LARGEFILE64_SOURCE
+#if defined( HAVE_ZLIB ) && defined( _FILE_OFFSET_BITS )
+ #if _FILE_OFFSET_BITS == 64
+  #define _LARGEFILE64_SOURCE
+ #endif
 #endif
 
 #include <assert.h>
