@@ -1624,7 +1624,13 @@ tr_valloc( size_t bufLen )
 
 #ifdef HAVE_POSIX_MEMALIGN
     if( !buf )
-        posix_memalign( &buf, pageSize, allocLen );
+    {
+        if( posix_memalign( &buf, pageSize, allocLen ) != 0 )
+        {
+            /* Just retry with valloc/malloc. */
+            buf = NULL;
+        }
+    }
 #endif
 #ifdef HAVE_VALLOC
     if( !buf )
