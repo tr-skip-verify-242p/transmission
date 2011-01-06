@@ -261,7 +261,11 @@ tr_eventInit( tr_session * session )
 
     eh = tr_new0( tr_event_handle, 1 );
     eh->lock = tr_lockNew( );
-    pipe( eh->fds );
+    if( pipe( eh->fds ) == -1 )
+    {
+        const int err = errno;
+        tr_err( _( "Pipe creation failed: %s" ), tr_strerror( err ) );
+    }
     eh->session = session;
     eh->thread = tr_threadNew( libeventThreadFunc, eh );
 
@@ -316,10 +320,18 @@ tr_runInEventThread( tr_session * session,
         struct tr_run_data data;
 
         tr_lockLock( lock );
-        pipewrite( fd, &ch, 1 );
+        if( pipewrite( fd, &ch, 1 ) == -1 )
+        {
+            const int err = errno;
+            tr_err( _( "Pipe write error: %s" ), tr_strerror( err ) );
+        }
         data.func = func;
         data.user_data = user_data;
-        pipewrite( fd, &data, sizeof( data ) );
+        if( pipewrite( fd, &data, sizeof( data ) ) == -1 )
+        {
+            const int err = errno;
+            tr_err( _( "Pipe write error: %s" ), tr_strerror( err ) );
+        }
         tr_lockUnlock( lock );
     }
 }
