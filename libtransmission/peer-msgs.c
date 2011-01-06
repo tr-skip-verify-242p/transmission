@@ -268,6 +268,7 @@ myDebug( const char * file, int line,
         char              timestr[64];
         struct evbuffer * buf = evbuffer_new( );
         char *            base = tr_basename( file );
+        size_t            rv;
 
         evbuffer_add_printf( buf, "[%s] %s - %s [%s]: ",
                              tr_getLogTimeStr( timestr, sizeof( timestr ) ),
@@ -278,7 +279,8 @@ myDebug( const char * file, int line,
         evbuffer_add_vprintf( buf, fmt, args );
         va_end( args );
         evbuffer_add_printf( buf, " (%s:%d)\n", base, line );
-        fwrite( evbuffer_pullup( buf, -1 ), 1, evbuffer_get_length( buf ), fp );
+        rv = fwrite( evbuffer_pullup( buf, -1 ), 1, evbuffer_get_length( buf ), fp );
+        /* NB: Ignore write error. */
 
         tr_free( base );
         evbuffer_free( buf );
