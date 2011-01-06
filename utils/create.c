@@ -10,6 +10,7 @@
  * $Id$
  */
 
+#include <errno.h>
 #include <stdio.h>
 #include <unistd.h> /* getcwd() */
 
@@ -82,7 +83,11 @@ tr_getcwd( void )
 #ifdef WIN32
     _getcwd( buf, sizeof( buf ) );
 #else
-    getcwd( buf, sizeof( buf ) );
+    if( !getcwd( buf, sizeof( buf ) ) )
+    {
+        fprintf( stderr, "getcwd: %s", strerror( errno ) );
+        buf[0] = '\0';
+    }
 #endif
     return tr_strdup( buf );
 }
