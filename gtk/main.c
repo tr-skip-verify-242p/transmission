@@ -1533,10 +1533,6 @@ on_prefs_changed( TrCore * core UNUSED, const char * key, gpointer data )
     {
         tr_sessionSetIncompleteDirEnabled( tr, gtr_pref_flag_get( key ) );
     }
-    else if( !strcmp( key, TR_PREFS_KEY_PIECE_TEMP_ENABLED ) )
-    {
-        tr_sessionSetPieceTempEnabled( tr, gtr_pref_flag_get( key ) );
-    }
     else if( !strcmp( key, TR_PREFS_KEY_SCRIPT_TORRENT_DONE_ENABLED ) )
     {
         tr_sessionSetTorrentDoneScriptEnabled( tr, gtr_pref_flag_get( key ) );

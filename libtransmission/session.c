@@ -276,7 +276,6 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddBool( d, TR_PREFS_KEY_IDLE_LIMIT_ENABLED,       FALSE );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_INCOMPLETE_DIR,           tr_getDefaultDownloadDir( ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED,   FALSE );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_PIECE_TEMP_ENABLED,       FALSE );
     tr_bencDictAddBool( d, TR_PREFS_KEY_LAZY_BITFIELD,            TRUE );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_MSGLEVEL,                 TR_MSG_INF );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_OPEN_FILE_LIMIT,          atoi( TR_DEFAULT_OPEN_FILE_LIMIT_STR ) );
@@ -355,7 +354,6 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddBool( d, TR_PREFS_KEY_IDLE_LIMIT_ENABLED,       tr_sessionIsIdleLimited( s ) );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_INCOMPLETE_DIR,           tr_sessionGetIncompleteDir( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED,   tr_sessionIsIncompleteDirEnabled( s ) );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_PIECE_TEMP_ENABLED,       tr_sessionIsPieceTempEnabled( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_LAZY_BITFIELD,            s->useLazyBitfield );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_MSGLEVEL,                 tr_getMessageLevel( ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_OPEN_FILE_LIMIT,          tr_fdGetFileLimit( s ) );
@@ -774,8 +772,6 @@ sessionSetImpl( void * vdata )
         tr_sessionSetIncompleteDir( session, str );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED, &boolVal ) )
         tr_sessionSetIncompleteDirEnabled( session, boolVal );
-    if( tr_bencDictFindBool( settings, TR_PREFS_KEY_PIECE_TEMP_ENABLED, &boolVal ) )
-        tr_sessionSetPieceTempEnabled( session, boolVal );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_RENAME_PARTIAL_FILES, &boolVal ) )
         tr_sessionSetIncompleteFileNamingEnabled( session, boolVal );
 
@@ -1010,32 +1006,6 @@ tr_sessionIsIncompleteDirEnabled( const tr_session * session )
     assert( tr_isSession( session ) );
 
     return session->isIncompleteDirEnabled;
-}
-
-void
-tr_sessionSetPieceTempEnabled( tr_session * session, tr_bool b )
-{
-    tr_torrent * tor = NULL;
-
-    assert( tr_isSession( session ) );
-
-    if( session->isPieceTempEnabled == b )
-        return;
-
-    session->isPieceTempEnabled = b;
-    if( b )
-        return;
-
-    while( ( tor = tr_torrentNext( session, tor ) ) )
-        tr_torrentInvalidatePieceTemp( tor );
-}
-
-tr_bool
-tr_sessionIsPieceTempEnabled( const tr_session * session )
-{
-    assert( tr_isSession( session ) );
-
-    return session->isPieceTempEnabled;
 }
 
 /***

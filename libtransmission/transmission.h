@@ -176,7 +176,6 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_IDLE_LIMIT_ENABLED            "idle-seeding-limit-enabled"
 #define TR_PREFS_KEY_INCOMPLETE_DIR                "incomplete-dir"
 #define TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED        "incomplete-dir-enabled"
-#define TR_PREFS_KEY_PIECE_TEMP_ENABLED            "piece-temp-enabled"
 #define TR_PREFS_KEY_LAZY_BITFIELD                 "lazy-bitfield-enabled"
 #define TR_PREFS_KEY_MSGLEVEL                      "message-level"
 #define TR_PREFS_KEY_OPEN_FILE_LIMIT               "open-file-limit"
@@ -404,8 +403,6 @@ void tr_sessionSetIncompleteDirEnabled( tr_session * session, tr_bool );
 /** @brief get whether or not the incomplete download folder is enabled */
 tr_bool tr_sessionIsIncompleteDirEnabled( const tr_session * session );
 
-void    tr_sessionSetPieceTempEnabled ( tr_session *, tr_bool );
-tr_bool tr_sessionIsPieceTempEnabled  ( const tr_session * );
 
 /**
  * @brief When enabled, newly-created files will have ".part" appended

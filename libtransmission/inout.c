@@ -103,8 +103,7 @@ readOrWriteBytes( tr_session       * session,
 
     /* Only use temporary piece files if the file is DND, the setting
      * is enabled, and the actual file does not already exist. */
-    isPieceTemp = ( file->dnd && tr_sessionIsPieceTempEnabled( tor->session )
-                    && fd < 0 && !fileExists );
+    isPieceTemp = file->dnd && ( fd < 0 ) && !fileExists;
 
     if( isPieceTemp )
     {
