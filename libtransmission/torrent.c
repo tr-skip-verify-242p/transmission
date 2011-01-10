@@ -1773,6 +1773,7 @@ tr_torrentRemovePieceTemp( tr_torrent * tor )
         }
 
         closedir( dir );
+        tr_list_append( &files, tr_strdup( path ) );
     }
 
     for( l=files; l!=NULL; l=l->next )
