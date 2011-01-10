@@ -2210,8 +2210,9 @@ tr_torrentFindPieceTemp( const tr_torrent * tor,
 static void
 remove_piece_temp( tr_torrent * tor, tr_piece_index_t piece )
 {
-    char * filename = tr_torrentFindPieceTemp( tor, piece );
-    if( filename != NULL )
+    char * filename;
+    tr_fdFileClose( tor->session, tor, piece, TR_FD_INDEX_PIECE );
+    if( ( filename = tr_torrentFindPieceTemp( tor, piece ) ) )
     {
         deleteLocalFile( filename, remove );
         tr_free( filename );
@@ -2244,10 +2245,16 @@ setFileDND( tr_torrent * tor, tr_file_index_t file_index, int8_t dnd )
     if( file->dnd == dnd )
         return;
 
-    /* Whether we need to copy over existing data from
-     * temporary piece files to the actual destination file. */
+    /* Flags indicating whether we need to copy over existing data
+     * from temporary piece files to the actual destination file. */
     fpsavept = ( file->dnd && !dnd && fpblocks > 0 );
     lpsavept = ( fpindex != lpindex && file->dnd && !dnd && lpblocks > 0 );
+
+    /* Check cache and filesystem for temporary piece files. */
+    if( fpsavept || lpsavept )
+        tr_cacheFlushFile( tor->session->cache, tor, file_index );
+    fpsavept = fpsavept && tr_torrentFindPieceTemp2( tor, lpindex, NULL, NULL );
+    lpsavept = lpsavept && tr_torrentFindPieceTemp2( tor, fpindex, NULL, NULL );
 
     if( fpsavept )
     {
