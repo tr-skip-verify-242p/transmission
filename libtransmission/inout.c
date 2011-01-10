@@ -57,7 +57,16 @@ enum { TR_IO_READ, TR_IO_PREFETCH,
        TR_IO_WRITE
 };
 
-/* returns 0 on success, or an errno on failure */
+/**
+ * @return 0 on success, or an errno on failure.
+ *
+ * @note If @a tor->info.files[fileIndex]->dnd is TRUE and the actual
+ *       destination file does not exist, the IO operations will be
+ *       carried out on a temporary piece file instead. If you change
+ *       this behavior, you also need to change code in setFileDND().
+ *
+ * @see setFileDND()
+ */
 static int
 readOrWriteBytes( tr_session       * session,
                   tr_torrent       * tor,
@@ -101,8 +110,8 @@ readOrWriteBytes( tr_session       * session,
         fileExists = tr_torrentFindFile2( tor, fileIndex,
                                           &base, &subpath );
 
-    /* Only use temporary piece files if the file is DND, the setting
-     * is enabled, and the actual file does not already exist. */
+    /* Only use a temporary piece file if the file is not
+     * wanted and does not already exist on the disk. */
     isPieceTemp = file->dnd && ( fd < 0 ) && !fileExists;
 
     if( isPieceTemp )
