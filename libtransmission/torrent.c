@@ -2153,13 +2153,6 @@ fileExists( const char * filename )
     return ok;
 }
 
-/**
- * Get the full path of the temporary piece file for piece
- * with index @a pieceIndex.
- *
- * @return a newly allocated string containing the full filename
- *         or NULL if it does not exist.
- */
 tr_bool
 tr_torrentFindPieceTemp2( const tr_torrent  * tor,
                           tr_piece_index_t    pieceIndex,
@@ -2187,6 +2180,13 @@ tr_torrentFindPieceTemp2( const tr_torrent  * tor,
     return exists;
 }
 
+/**
+ * Get the full path of the temporary piece file for piece
+ * with index @a pieceIndex.
+ *
+ * @return a newly allocated string containing the full filename
+ *         or NULL if it does not exist.
+ */
 static char *
 tr_torrentFindPieceTemp( const tr_torrent * tor,
                          tr_piece_index_t   pieceIndex )
