@@ -2254,12 +2254,12 @@ setFileDND( tr_torrent * tor, tr_file_index_t file_index, int8_t dnd )
     if( fpsavept )
     {
         tr_cacheFlushPiece( tor->session->cache, tor, fpindex );
-        fpsavept = tr_torrentFindPieceTemp2( tor, lpindex, NULL, NULL );
+        fpsavept = tr_torrentFindPieceTemp2( tor, fpindex, NULL, NULL );
     }
     if( lpsavept )
     {
         tr_cacheFlushPiece( tor->session->cache, tor, lpindex );
-        lpsavept = tr_torrentFindPieceTemp2( tor, fpindex, NULL, NULL );
+        lpsavept = tr_torrentFindPieceTemp2( tor, lpindex, NULL, NULL );
     }
 
     if( fpsavept )
