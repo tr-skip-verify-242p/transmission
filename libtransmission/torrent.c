@@ -2250,11 +2250,17 @@ setFileDND( tr_torrent * tor, tr_file_index_t file_index, int8_t dnd )
     fpsavept = ( file->dnd && !dnd && fpblocks > 0 );
     lpsavept = ( fpindex != lpindex && file->dnd && !dnd && lpblocks > 0 );
 
-    /* Check cache and filesystem for temporary piece files. */
-    if( fpsavept || lpsavept )
-        tr_cacheFlushFile( tor->session->cache, tor, file_index );
-    fpsavept = fpsavept && tr_torrentFindPieceTemp2( tor, lpindex, NULL, NULL );
-    lpsavept = lpsavept && tr_torrentFindPieceTemp2( tor, fpindex, NULL, NULL );
+    /* Check cache and filesystem to make sure temporary piece files exist. */
+    if( fpsavept )
+    {
+        tr_cacheFlushPiece( tor->session->cache, tor, fpindex );
+        fpsavept = tr_torrentFindPieceTemp2( tor, lpindex, NULL, NULL );
+    }
+    if( lpsavept )
+    {
+        tr_cacheFlushPiece( tor->session->cache, tor, lpindex );
+        lpsavept = tr_torrentFindPieceTemp2( tor, fpindex, NULL, NULL );
+    }
 
     if( fpsavept )
     {
