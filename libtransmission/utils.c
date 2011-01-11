@@ -243,8 +243,8 @@ tr_deepLog( const char  * file,
         evbuffer_add_printf( buf, " (%s:%d)\n", base, line );
         /* FIXME(libevent2) ifdef this out for nonwindows platforms */
         OutputDebugString( evbuffer_pullup( buf, -1 ) );
-        if(fp) /* FIXME(libevent2) tr_getLog() should return an fd, then use evbuffer_write() here ) */
-            (void) fwrite( evbuffer_pullup( buf, -1 ), 1, evbuffer_get_length( buf ), fp );
+        if( fp )
+            evbuffer_write( buf, fileno( fp ) );
 
         tr_free( base );
         evbuffer_free( buf );
@@ -1624,7 +1624,8 @@ tr_valloc( size_t bufLen )
 
 #ifdef HAVE_POSIX_MEMALIGN
     if( !buf )
-        posix_memalign( &buf, pageSize, allocLen );
+        if( posix_memalign( &buf, pageSize, allocLen ) )
+            buf = NULL; /* just retry with valloc/malloc */
 #endif
 #ifdef HAVE_VALLOC
     if( !buf )

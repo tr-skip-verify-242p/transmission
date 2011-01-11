@@ -43,7 +43,7 @@
 #include "session.h"
 #include "stats.h"
 #include "torrent.h"
-#include "tr-dht.h"
+#include "tr-udp.h"
 #include "tr-lpd.h"
 #include "trevent.h"
 #include "utils.h"
@@ -241,7 +241,7 @@ tr_sessionGetPublicAddress( const tr_session * session, int tr_af_type, tr_bool 
             break;
     }
 
-    if( is_default_value != NULL )
+    if( is_default_value && bindinfo )
         *is_default_value = !tr_strcmp0( default_value, tr_ntop_non_ts( &bindinfo->addr ) );
 
     return bindinfo ? &bindinfo->addr : NULL;
@@ -537,6 +537,8 @@ tr_sessionInit( const char  * tag,
 
     /* initialize the bare skeleton of the session object */
     session = tr_new0( tr_session, 1 );
+    session->udp_socket = -1;
+    session->udp6_socket = -1;
     session->bandwidth = tr_bandwidthNew( session, NULL );
     session->lock = tr_lockNew( );
     session->cache = tr_cacheNew( 1024*1024*2 );
@@ -678,8 +680,7 @@ tr_sessionInitImpl( void * vdata )
 
     tr_sessionSet( session, &settings );
 
-    if( session->isDHTEnabled )
-        tr_dhtInit( session, &session->public_ipv4->addr );
+    tr_udpInit( session, &session->public_ipv4->addr );
 
     if( session->isLPDEnabled )
         tr_lpdInit( session, &session->public_ipv4->addr );
@@ -910,6 +911,14 @@ tr_sessionGetDownloadDir( const tr_session * session )
     assert( tr_isSession( session ) );
 
     return session->downloadDir;
+}
+
+int64_t
+tr_sessionGetDownloadDirFreeSpace( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+
+    return tr_getFreeSpace( session->downloadDir );
 }
 
 /***
@@ -1708,8 +1717,7 @@ sessionCloseImpl( void * vsession )
     if( session->isLPDEnabled )
         tr_lpdUninit( session );
 
-    if( session->isDHTEnabled )
-        tr_dhtUninit( session );
+    tr_udpUninit( session );
 
     event_free( session->saveTimer );
     session->saveTimer = NULL;
@@ -1928,13 +1936,9 @@ toggleDHTImpl(  void * data )
     tr_session * session = data;
     assert( tr_isSession( session ) );
 
-    if( session->isDHTEnabled )
-        tr_dhtUninit( session );
-
+    tr_udpUninit( session );
     session->isDHTEnabled = !session->isDHTEnabled;
-
-    if( session->isDHTEnabled )
-        tr_dhtInit( session, &session->public_ipv4->addr );
+    tr_udpInit( session, &session->public_ipv4->addr );
 }
 
 void

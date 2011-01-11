@@ -2540,7 +2540,6 @@ tr_torrentSetPieceChecked( tr_torrent * tor, tr_piece_index_t pieceIndex )
     assert( tr_isTorrent( tor ) );
     assert( pieceIndex < tor->info.pieceCount );
 
-    tr_tordbg( tor, "[LAZY] setting piece %zu timeChecked to now", (size_t)pieceIndex );
     tor->info.pieces[pieceIndex].timeChecked = tr_time( );
 }
 
