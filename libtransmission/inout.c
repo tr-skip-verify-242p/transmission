@@ -120,10 +120,10 @@ readOrWriteBytes( tr_session       * session,
     {
         /* the fd cache doesn't have this file...
          * we'll need to open it and maybe create it */
-        tr_preallocation_mode preallocationMode;
-        tr_bool fileExists;
-        char * subpath = NULL;
+        char * subpath;
         const char * base;
+        tr_bool fileExists;
+        tr_preallocation_mode preallocationMode;
 
         if( file->usept )
         {
