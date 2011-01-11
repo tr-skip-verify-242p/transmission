@@ -860,12 +860,12 @@ getAndSelectEventPath( GtkTreeView        * treeview,
 static gboolean
 onViewButtonPressed( GtkWidget * w, GdkEventButton * event, gpointer gdata )
 {
-    GtkTreeView       * treeview = GTK_TREE_VIEW( w );
+    tr_torrent        * tor;
     GtkTreeViewColumn * col = NULL;
     GtkTreePath       * path = NULL;
     FileData          * data = gdata;
-    tr_torrent        * tor;
     gboolean            handled = FALSE;
+    GtkTreeView       * treeview = GTK_TREE_VIEW( w );
 
     tor = tr_torrentFindFromId( tr_core_session( data->core ),
                                 data->torrentId );
@@ -881,11 +881,12 @@ onViewButtonPressed( GtkWidget * w, GdkEventButton * event, gpointer gdata )
     else if( event->type == GDK_BUTTON_PRESS && event->button == 3
              && getAndSelectEventPath( treeview, event, &col, &path ) )
     {
-        GtkTreeSelection * sel;
-        sel = gtk_tree_view_get_selection( treeview );
+        GtkTreeSelection * sel = gtk_tree_view_get_selection( treeview );
         if( gtk_tree_selection_count_selected_rows( sel ) > 0 )
+        {
             fileMenuPopup( w, event, data );
-        handled = TRUE;
+            handled = TRUE;
+        }
     }
 
     gtk_tree_path_free( path );
@@ -966,6 +967,12 @@ gtr_file_list_new( TrCore * core, int torrentId )
     /* add "size" column */
     title = _( "Size" );
     rend = gtk_cell_renderer_text_new( );
+    g_object_set( rend, "alignment", PANGO_ALIGN_RIGHT,
+                        "font-desc", pango_font_description,
+                        "xpad", GUI_PAD,
+                        "xalign", 1.0f,
+                        "yalign", 0.5f,
+                        NULL );
     col = gtk_tree_view_column_new_with_attributes( title, rend, NULL );
     gtk_tree_view_column_set_sizing( col, GTK_TREE_VIEW_COLUMN_GROW_ONLY );
     gtk_tree_view_column_set_sort_column_id( col, FC_SIZE );
