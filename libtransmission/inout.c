@@ -57,7 +57,16 @@ enum { TR_IO_READ, TR_IO_PREFETCH,
        TR_IO_WRITE
 };
 
-/* returns 0 on success, or an errno on failure */
+/**
+ * @return 0 on success, or an errno on failure.
+ *
+ * @note If @a tor->info.files[fileIndex]->usept is TRUE the IO
+ *       operations will be carried out on a temporary piece file
+ *       instead of the actual file. If you change this behavior,
+ *       you also need to change code in setFileDND().
+ *
+ * @see setFileDND()
+ */
 static int
 readOrWriteBytes( tr_session       * session,
                   tr_torrent       * tor,
@@ -71,18 +80,13 @@ readOrWriteBytes( tr_session       * session,
 {
     const tr_info * info = &tor->info;
     const tr_file * file = &info->files[fileIndex];
-
-    int                fd = -1;
-    int                err = 0;
-    const tr_bool      doWrite = ioMode >= TR_IO_WRITE;
-    tr_bool            isPieceTemp;
-    uint64_t           offset;
-    uint64_t           desiredSize;
-    char             * subpath = NULL;
-    const char       * base;
-    tr_bool            fileExists = FALSE;
-    uint32_t           indexNum = fileIndex;
-    tr_fd_index_type   indexType = TR_FD_INDEX_FILE;
+    const tr_bool doWrite = ioMode >= TR_IO_WRITE;
+    uint64_t offset;
+    uint64_t desiredSize;
+    uint32_t indexNum;
+    tr_fd_index_type indexType;
+    int fd = -1;
+    int err = 0;
 
 //if( doWrite )
 //    fprintf( stderr, "in file %s at offset %zu, writing %zu bytes; file length is %zu\n", file->name, (size_t)fileOffset, buflen, (size_t)file->length );
@@ -94,27 +98,12 @@ readOrWriteBytes( tr_session       * session,
     if( !file->length )
         return 0;
 
-    /* First try to find the actual destination fd or filename. */
-    fd = tr_fdFileGetCached( session, tr_torrentId( tor ),
-                             fileIndex, TR_FD_INDEX_FILE, doWrite );
-    if( fd < 0 )
-        fileExists = tr_torrentFindFile2( tor, fileIndex,
-                                          &base, &subpath );
-
-    /* Only use temporary piece files if the file is DND, the setting
-     * is enabled, and the actual file does not already exist. */
-    isPieceTemp = file->dnd && ( fd < 0 ) && !fileExists;
-
-    if( isPieceTemp )
+    if( file->usept )
     {
         offset = pieceOffset;
         desiredSize = tr_torPieceCountBytes( tor, pieceIndex );
         indexNum = pieceIndex;
         indexType = TR_FD_INDEX_PIECE;
-
-        /* Check cache for piece file fd. */
-        fd = tr_fdFileGetCached( session, tr_torrentId( tor ),
-                                 indexNum, indexType, doWrite );
     }
     else
     {
@@ -124,19 +113,28 @@ readOrWriteBytes( tr_session       * session,
         indexType = TR_FD_INDEX_FILE;
     }
 
+    fd = tr_fdFileGetCached( session, tr_torrentId( tor ),
+                             indexNum, indexType, doWrite );
+
     if( fd < 0 )
     {
         /* the fd cache doesn't have this file...
          * we'll need to open it and maybe create it */
+        char * subpath;
+        const char * base;
+        tr_bool fileExists;
         tr_preallocation_mode preallocationMode;
 
-        if( isPieceTemp )
+        if( file->usept )
         {
             fileExists = tr_torrentFindPieceTemp2( tor, pieceIndex,
                                                    &base, &subpath );
         }
         else
         {
+            fileExists = tr_torrentFindFile2( tor, fileIndex,
+                                              &base, &subpath );
+
             if( !fileExists )
             {
                 base = tr_torrentGetCurrentDir( tor );
@@ -175,8 +173,8 @@ readOrWriteBytes( tr_session       * session,
         if( doWrite && !err )
             tr_statsFileCreated( tor->session );
 
+        tr_free( subpath );
     }
-    tr_free( subpath );
 
     if( !err )
     {
@@ -290,6 +288,7 @@ readOrWritePiece( tr_torrent       * tor,
 //fprintf( stderr, "++fileIndex to %d\n", (int)fileIndex );
         ++fileIndex;
         fileOffset = 0;
+        pieceOffset += bytesThisPass;
 
         if( ( err != 0 ) && (ioMode == TR_IO_WRITE ) && ( tor->error != TR_STAT_LOCAL_ERROR ) )
         {

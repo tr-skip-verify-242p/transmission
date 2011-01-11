@@ -402,7 +402,8 @@ tr_bool tr_torrentFindFile2( const tr_torrent *, tr_file_index_t fileNo,
                              const char ** base, char ** subpath );
 
 /**
- * @brief Like tr_torrentFindFile2() but for temporary piece files.
+ * Like tr_torrentFindFile2() but for temporary piece files.
+ * Both @a base and @a subpath may be NULL.
  */
 tr_bool tr_torrentFindPieceTemp2( const tr_torrent  * tor,
                                   tr_piece_index_t    pieceIndex,

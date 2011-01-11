@@ -1772,9 +1772,9 @@ deleteLocalFile( const char * filename, tr_fileFunc fileFunc )
         fileFunc( filename );
 }
 
-/** 
- * @brief Delete all temporary piece files for the torrent. 
- */ 
+/**
+ * @brief Delete all temporary piece files for the torrent.
+ */
 static void
 tr_torrentRemovePieceTemp( tr_torrent * tor )
 {
@@ -1795,6 +1795,7 @@ tr_torrentRemovePieceTemp( tr_torrent * tor )
         }
 
         closedir( dir );
+        tr_list_append( &files, tr_strdup( path ) );
     }
 
     for( l=files; l!=NULL; l=l->next )
@@ -2174,13 +2175,6 @@ fileExists( const char * filename )
     return ok;
 }
 
-/** 
- * Get the full path of the temporary piece file for piece 
- * with index @a pieceIndex. 
- * 
- * @return a newly allocated string containing the full filename 
- *         or NULL if it does not exist. 
- */ 
 tr_bool
 tr_torrentFindPieceTemp2( const tr_torrent  * tor,
                           tr_piece_index_t    pieceIndex,
@@ -2208,6 +2202,13 @@ tr_torrentFindPieceTemp2( const tr_torrent  * tor,
     return exists;
 }
 
+/**
+ * Get the full path of the temporary piece file for piece
+ * with index @a pieceIndex.
+ *
+ * @return a newly allocated string containing the full filename
+ *         or NULL if it does not exist.
+ */
 static char *
 tr_torrentFindPieceTemp( const tr_torrent * tor,
                          tr_piece_index_t   pieceIndex )
@@ -2229,121 +2230,191 @@ tr_torrentFindPieceTemp( const tr_torrent * tor,
 **/
 
 static void
-setFileDND( tr_torrent * tor, tr_file_index_t fileIndex, int doDownload )
-{
-    tr_file_index_t  i;
-    int8_t firstPieceDND;
-    int8_t lastPieceDND;
-    const int8_t dnd = !doDownload;
-    tr_file * file = &tor->info.files[fileIndex];
-    const tr_piece_index_t firstPiece = file->firstPiece;
-    const tr_piece_index_t lastPiece = file->lastPiece;
-
-    file->dnd = dnd;
-
-    /* can't set the first piece to DND unless
-       every file using that piece is DND */
-    firstPieceDND = dnd;
-    if( fileIndex > 0 )
-    {
-        for( i = fileIndex - 1; firstPieceDND; --i )
-        {
-            if( tor->info.files[i].lastPiece != firstPiece )
-                break;
-            firstPieceDND = tor->info.files[i].dnd;
-            if( !i )
-                break;
-        }
-    }
-
-    /* can't set the last piece to DND unless
-       every file using that piece is DND */
-    lastPieceDND = dnd;
-    for( i = fileIndex + 1; lastPieceDND && i < tor->info.fileCount; ++i )
-    {
-        if( tor->info.files[i].firstPiece != lastPiece )
-            break;
-        lastPieceDND = tor->info.files[i].dnd;
-    }
-
-    if( firstPiece == lastPiece )
-    {
-        tor->info.pieces[firstPiece].dnd = firstPieceDND && lastPieceDND;
-    }
-    else
-    {
-        tr_piece_index_t pp;
-        tor->info.pieces[firstPiece].dnd = firstPieceDND;
-        tor->info.pieces[lastPiece].dnd = lastPieceDND;
-        for( pp = firstPiece + 1; pp < lastPiece; ++pp )
-            tor->info.pieces[pp].dnd = dnd;
-    }
-}
-
-static void
 remove_piece_temp( tr_torrent * tor, tr_piece_index_t piece )
 {
-    char * filename = tr_torrentFindPieceTemp( tor, piece );
-    if( filename != NULL )
+    char * filename;
+    tr_fdFileClose( tor->session, tor, piece, TR_FD_INDEX_PIECE );
+    if( ( filename = tr_torrentFindPieceTemp( tor, piece ) ) )
     {
-        tr_torrentSetHasPiece( tor, piece, FALSE );
         deleteLocalFile( filename, remove );
         tr_free( filename );
     }
 }
 
-static int
-compare_piece_indices( const void * va, const void * vb )
+/**
+ * @return TRUE if the file should use temporary piece files.
+ */
+static tr_bool
+use_piece_temp( tr_torrent * tor, tr_file_index_t i )
 {
-    const tr_piece_index_t a = *(const tr_piece_index_t *)va;
-    const tr_piece_index_t b = *(const tr_piece_index_t *)vb;
-    if( a < b ) return -1;
-    if( a > b ) return 1;
-    return 0;
+    int fd;
+
+    if( !tor->info.files[i].dnd )
+        return FALSE;
+
+    fd = tr_fdFileGetCached( tor->session, tr_torrentId( tor ),
+                             i, TR_FD_INDEX_FILE, FALSE );
+    return fd < 0 && !tr_torrentFindFile2( tor, i, NULL, NULL );
+}
+/**
+ * @note This function assumes @a tor is valid and already locked, and
+ *       @a fileIndex is a valid file index for the torrent.
+ * @note When @a file->dnd is TRUE and @a dnd is FALSE, this function has
+ *       the side effect of copying over data from temporary piece files
+ *       to the destination file.
+ * @see readOrWriteBytes()
+ */
+static void
+set_file_dnd( tr_torrent * tor, tr_file_index_t file_index, int8_t dnd )
+{
+    tr_file * file = &tor->info.files[file_index];
+    tr_file_index_t i;
+    const tr_piece_index_t fpindex = file->firstPiece;
+    const tr_piece_index_t lpindex = file->lastPiece;
+    tr_bool fpmovept, lpmovept, fpdnd, lpdnd, fpnopt, lpnopt;
+    size_t fpoverlap, lpoverlap;
+    uint32_t fpoffset, lpoffset;
+    uint8_t * fpbuf, * lpbuf;
+
+    if( file->dnd == dnd )
+        return;
+
+    /* Flags indicating whether we need to copy over existing data
+     * from temporary piece files to the actual destination file. */
+    fpmovept = file->usept && !dnd;
+    lpmovept = fpmovept && fpindex != lpindex;
+
+    /* Check cache and filesystem to make sure temporary piece files exist. */
+    if( fpmovept )
+    {
+        tr_cacheFlushPiece( tor->session->cache, tor, fpindex );
+        fpmovept = tr_torrentFindPieceTemp2( tor, fpindex, NULL, NULL );
+    }
+    if( lpmovept )
+    {
+        tr_cacheFlushPiece( tor->session->cache, tor, lpindex );
+        lpmovept = tr_torrentFindPieceTemp2( tor, lpindex, NULL, NULL );
+    }
+
+    if( fpmovept )
+    {
+        fpoffset = file->offset - tr_pieceOffset( tor, fpindex, 0, 0 );
+        fpoverlap = tr_torPieceCountBytes( tor, fpindex ) - fpoffset;
+        if( fpoverlap > file->length )
+            fpoverlap = file->length;
+        fpbuf = tr_malloc0( fpoverlap );
+
+        if( tr_ioRead( tor, fpindex, fpoffset, fpoverlap, fpbuf ) != 0 )
+        {
+            tr_free( fpbuf );
+            fpmovept = FALSE;
+        }
+    }
+
+    if( lpmovept )
+    {
+        lpoffset = 0;
+        lpoverlap = file->offset + file->length - tr_pieceOffset( tor, lpindex, 0, 0 );
+        lpbuf = tr_malloc0( lpoverlap );
+
+        if( tr_ioRead( tor, lpindex, lpoffset, lpoverlap, lpbuf ) != 0 )
+        {
+            tr_free( lpbuf );
+            lpmovept = FALSE;
+        }
+    }
+
+    file->dnd = dnd;
+    if( fpmovept || lpmovept )
+        file->usept = FALSE;
+    else
+        file->usept = use_piece_temp( tor, file_index );
+
+    if( fpmovept )
+    {
+        tr_ioWrite( tor, fpindex, fpoffset, fpoverlap, fpbuf );
+        tr_free( fpbuf );
+    }
+    if( lpmovept )
+    {
+        tr_ioWrite( tor, lpindex, lpoffset, lpoverlap, lpbuf );
+        tr_free( lpbuf );
+    }
+
+    /* Check conditions for setting piece DND and
+     * removing temporary piece files:
+     * - We can set the piece to DND if all files using
+     *   that piece are DND.
+     * - We can remove the temporary piece file if all
+     *   files using it have @a usept set to FALSE. */
+
+    fpdnd = file->dnd;
+    fpnopt = !file->usept;
+    if( file_index > 0 )
+    {
+        for( i = file_index - 1; fpdnd || fpnopt; --i )
+        {
+            if( tor->info.files[i].lastPiece != fpindex )
+                break;
+            if( fpdnd )
+                fpdnd = tor->info.files[i].dnd;
+            if( fpnopt )
+                fpnopt = !tor->info.files[i].usept;
+            if( !i )
+                break;
+        }
+    }
+
+    lpdnd = file->dnd;
+    lpnopt = !file->usept;
+    for( i = file_index + 1; ( lpdnd || lpnopt ) && i < tor->info.fileCount; ++i )
+    {
+        if( tor->info.files[i].firstPiece != lpindex )
+            break;
+        if( lpdnd )
+            lpdnd = tor->info.files[i].dnd;
+        if( lpnopt )
+            lpnopt = !tor->info.files[i].usept;
+    }
+
+    if( fpindex == lpindex )
+    {
+        tor->info.pieces[fpindex].dnd = fpdnd && lpdnd;
+        if( fpnopt && lpnopt )
+            remove_piece_temp( tor, fpindex );
+    }
+    else
+    {
+        tr_piece_index_t p;
+        tor->info.pieces[fpindex].dnd = fpdnd;
+        tor->info.pieces[lpindex].dnd = lpdnd;
+        for( p = fpindex + 1; p < lpindex; ++p )
+            tor->info.pieces[p].dnd = dnd;
+        if( fpnopt )
+            remove_piece_temp( tor, fpindex );
+        if( lpnopt )
+            remove_piece_temp( tor, lpindex );
+    }
 }
 
 void
 tr_torrentInitFileDLs( tr_torrent             * tor,
                        const tr_file_index_t  * files,
-                       tr_file_index_t          file_count,
-                       tr_bool                  do_download )
+                       tr_file_index_t          fileCount,
+                       tr_bool                  doDownload )
 {
     tr_file_index_t i;
-    tr_piece_index_t piece_count = 0;
-    tr_piece_index_t * pieces = tr_new( tr_piece_index_t, file_count * 2 );
+
     assert( tr_isTorrent( tor ) );
 
     tr_torrentLock( tor );
 
-    for( i=0; i<file_count; ++i )
-    {
-        const tr_file_index_t f = files[i];
+    for( i=0; i<fileCount; ++i )
+        if( files[i] < tor->info.fileCount )
+            set_file_dnd( tor, files[i], !doDownload );
 
-        if( f < tor->info.fileCount )
-        {
-            const tr_file * file = &tor->info.files[f];
-            if( !file->dnd != do_download )
-            {
-                /* did the flag change? */
-                pieces[piece_count++] = file->firstPiece;
-                pieces[piece_count++] = file->lastPiece;
-                setFileDND( tor, f, do_download );
-            }
-        }
-    }
+    tr_cpInvalidateDND( &tor->completion );
 
-    if( piece_count > 0 )
-    {
-        tr_cpInvalidateDND( &tor->completion );
-
-        qsort( pieces, piece_count, sizeof( tr_piece_index_t ), compare_piece_indices );
-
-        for( i=0; i<piece_count; ++i )
-            if( i==0 || pieces[i]!=pieces[i-1] )
-                remove_piece_temp( tor, pieces[i] );
-    }
-
-    tr_free( pieces );
     tr_torrentUnlock( tor );
 }
 
