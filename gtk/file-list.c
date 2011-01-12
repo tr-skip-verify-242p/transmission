@@ -936,7 +936,6 @@ onViewPopupMenu( GtkWidget * w, gpointer gdata )
 GtkWidget *
 gtr_file_list_new( TrCore * core, int torrentId )
 {
-    int size;
     int width;
     GtkWidget * ret;
     GtkWidget * view;
@@ -947,8 +946,6 @@ gtr_file_list_new( TrCore * core, int torrentId )
     GtkTreeView * tree_view;
     const char * title;
     PangoLayout * pango_layout;
-    PangoContext * pango_context;
-    PangoFontDescription * pango_font_description;
     FileData * data = g_new0( FileData, 1 );
 
     data->core = core;
@@ -967,13 +964,6 @@ gtr_file_list_new( TrCore * core, int torrentId )
     g_signal_connect( view, "button-release-event",
                       G_CALLBACK( on_tree_view_button_released ), NULL );
 
-
-    pango_context = gtk_widget_create_pango_context( view );
-    pango_font_description = pango_font_description_copy( pango_context_get_font_description( pango_context ) );
-    size = pango_font_description_get_size( pango_font_description );
-    pango_font_description_set_size( pango_font_description, size * 0.8 );
-    g_object_unref( G_OBJECT( pango_context ) );
-
     /* set up view */
     sel = gtk_tree_view_get_selection( tree_view );
     gtk_tree_selection_set_mode( sel, GTK_SELECTION_MULTIPLE );
@@ -991,7 +981,7 @@ gtr_file_list_new( TrCore * core, int torrentId )
     gtk_tree_view_column_add_attribute( col, rend, "pixbuf", FC_ICON );
     /* add text renderer */
     rend = gtk_cell_renderer_text_new( );
-    g_object_set( rend, "ellipsize", PANGO_ELLIPSIZE_END, "font-desc", pango_font_description, NULL );
+    g_object_set( rend, "ellipsize", PANGO_ELLIPSIZE_END, NULL );
     gtk_tree_view_column_pack_start( col, rend, TRUE );
     gtk_tree_view_column_set_attributes( col, rend, "text", FC_LABEL, NULL );
     gtk_tree_view_column_set_sort_column_id( col, FC_LABEL );
@@ -1001,7 +991,6 @@ gtr_file_list_new( TrCore * core, int torrentId )
     title = _( "Size" );
     rend = gtk_cell_renderer_text_new( );
     g_object_set( rend, "alignment", PANGO_ALIGN_RIGHT,
-                        "font-desc", pango_font_description,
                         "xpad", GUI_PAD,
                         "xalign", 1.0f,
                         "yalign", 0.5f,
