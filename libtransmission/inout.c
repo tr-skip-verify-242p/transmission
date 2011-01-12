@@ -285,10 +285,10 @@ readOrWritePiece( tr_torrent       * tor,
                                 buf, bytesThisPass );
         buf += bytesThisPass;
         buflen -= bytesThisPass;
+        pieceOffset += bytesThisPass;
 //fprintf( stderr, "++fileIndex to %d\n", (int)fileIndex );
         ++fileIndex;
         fileOffset = 0;
-        pieceOffset += bytesThisPass;
 
         if( ( err != 0 ) && (ioMode == TR_IO_WRITE ) && ( tor->error != TR_STAT_LOCAL_ERROR ) )
         {
