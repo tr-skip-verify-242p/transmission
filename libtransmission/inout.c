@@ -276,8 +276,15 @@ readOrWritePiece( tr_torrent       * tor,
 
     while( buflen && !err )
     {
+        uint32_t leftInPiece;
+        uint32_t bytesThisPass;
+        uint64_t leftInFile;
         const tr_file * file = &info->files[fileIndex];
-        const uint64_t bytesThisPass = MIN( buflen, file->length - fileOffset );
+
+        leftInPiece = tr_torPieceCountBytes( tor, pieceIndex ) - pieceOffset;
+        leftInFile = file->length - fileOffset;
+        bytesThisPass = MIN( leftInFile, leftInPiece );
+        bytesThisPass = MIN( bytesThisPass, buflen );
 
         err = readOrWriteBytes( tor->session, tor, ioMode,
                                 pieceIndex, pieceOffset,
@@ -285,10 +292,21 @@ readOrWritePiece( tr_torrent       * tor,
                                 buf, bytesThisPass );
         buf += bytesThisPass;
         buflen -= bytesThisPass;
+        leftInPiece -= bytesThisPass;
+        leftInFile -= bytesThisPass;
         pieceOffset += bytesThisPass;
-//fprintf( stderr, "++fileIndex to %d\n", (int)fileIndex );
-        ++fileIndex;
-        fileOffset = 0;
+        fileOffset += bytesThisPass;
+
+        if( leftInPiece == 0 )
+        {
+            ++pieceIndex;
+            pieceOffset = 0;
+        }
+        if( leftInFile == 0 )
+        {
+            ++fileIndex;
+            fileOffset = 0;
+        }
 
         if( ( err != 0 ) && (ioMode == TR_IO_WRITE ) && ( tor->error != TR_STAT_LOCAL_ERROR ) )
         {
