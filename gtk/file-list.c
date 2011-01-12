@@ -933,6 +933,17 @@ onViewPopupMenu( GtkWidget * w, gpointer gdata )
     return TRUE;
 }
 
+static gboolean
+onViewKeyPressed( GtkWidget * w, GdkEventKey * event, gpointer user_data )
+{
+    /* Do not propagate modifier key presses because the expander
+     * focus shortcut conflicts with treeview multiselection. */
+    if (event->is_modifier)
+        return TRUE;
+
+    return FALSE;
+}
+
 GtkWidget *
 gtr_file_list_new( TrCore * core, int torrentId )
 {
@@ -957,6 +968,8 @@ gtr_file_list_new( TrCore * core, int torrentId )
     gtk_container_set_border_width( GTK_CONTAINER( view ), GUI_PAD_BIG );
     g_signal_connect( view, "button-press-event",
                       G_CALLBACK( onViewButtonPressed ), data );
+    g_signal_connect( view, "key-press-event",
+                      G_CALLBACK( onViewKeyPressed ), NULL );
     g_signal_connect( view, "popup-menu",
                       G_CALLBACK( onViewPopupMenu ), data );
     g_signal_connect( view, "row_activated",
