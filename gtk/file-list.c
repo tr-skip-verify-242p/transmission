@@ -722,8 +722,30 @@ fileMenuSetPriority( GtkWidget * item, gpointer gdata )
 }
 
 static void
-fileMenuPopup( GtkWidget * w, GdkEventButton * event, gpointer filedata )
+fileMenuDelete( GtkWidget * item UNUSED, gpointer userdata )
 {
+    FileData * filedata = userdata;
+    GArray * indices;
+    GtkTreeView * view;
+    tr_torrent * tor;
+    tor = tr_torrentFindFromId( tr_core_session( filedata->core ),
+                                filedata->torrentId );
+    if( !tor )
+        return;
+
+    view = GTK_TREE_VIEW( filedata->view );
+    indices = getSelectedFilesAndDescendants( view );
+    tr_torrentDeleteFiles( tor,
+                           (tr_file_index_t *) indices->data,
+                           (tr_file_index_t) indices->len );
+    g_array_free( indices, TRUE );
+    refresh( filedata );
+}
+
+static void
+fileMenuPopup( GtkWidget * w, GdkEventButton * event, gpointer userdata )
+{
+    FileData * filedata = userdata;
     GtkWidget * item;
     GtkWidget * menu;
 
@@ -765,6 +787,17 @@ fileMenuPopup( GtkWidget * w, GdkEventButton * event, gpointer filedata )
     g_signal_connect( item, "activate",
                       G_CALLBACK( fileMenuSetDownload ), filedata );
     gtk_menu_shell_append( GTK_MENU_SHELL( menu ), item );
+
+    if( filedata->allow_delete )
+    {
+        item = gtk_separator_menu_item_new( );
+        gtk_menu_shell_append( GTK_MENU_SHELL( menu ), item );
+
+        item = gtk_menu_item_new_with_label( _("Delete") );
+        g_signal_connect( item, "activate",
+                          G_CALLBACK( fileMenuDelete ), filedata );
+        gtk_menu_shell_append( GTK_MENU_SHELL( menu ), item );
+    }
 
     gtk_widget_show_all( menu );
     gtk_menu_attach_to_widget( GTK_MENU( menu ), w, NULL );
