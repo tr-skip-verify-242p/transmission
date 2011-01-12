@@ -2208,7 +2208,7 @@ tr_torrentFindPieceTemp( const tr_torrent * tor,
 **/
 
 static void
-remove_piece_temp( tr_torrent * tor, tr_piece_index_t piece )
+removePieceTemp( tr_torrent * tor, tr_piece_index_t piece )
 {
     char * filename;
     tr_fdFileClose( tor->session, tor, piece, TR_FD_INDEX_PIECE );
@@ -2223,7 +2223,7 @@ remove_piece_temp( tr_torrent * tor, tr_piece_index_t piece )
  * @return TRUE if the file should use temporary piece files.
  */
 static tr_bool
-use_piece_temp( tr_torrent * tor, tr_file_index_t i )
+usePieceTemp( tr_torrent * tor, tr_file_index_t i )
 {
     int fd;
 
@@ -2243,7 +2243,7 @@ use_piece_temp( tr_torrent * tor, tr_file_index_t i )
  * @see readOrWriteBytes()
  */
 static void
-set_file_dnd( tr_torrent * tor, tr_file_index_t file_index, int8_t dnd )
+setFileDND( tr_torrent * tor, tr_file_index_t file_index, int8_t dnd )
 {
     tr_file * file = &tor->info.files[file_index];
     tr_file_index_t i;
@@ -2306,7 +2306,7 @@ set_file_dnd( tr_torrent * tor, tr_file_index_t file_index, int8_t dnd )
     if( fpmovept || lpmovept )
         file->usept = FALSE;
     else
-        file->usept = use_piece_temp( tor, file_index );
+        file->usept = usePieceTemp( tor, file_index );
 
     if( fpmovept )
     {
@@ -2359,7 +2359,7 @@ set_file_dnd( tr_torrent * tor, tr_file_index_t file_index, int8_t dnd )
     {
         tor->info.pieces[fpindex].dnd = fpdnd && lpdnd;
         if( fpnopt && lpnopt )
-            remove_piece_temp( tor, fpindex );
+            removePieceTemp( tor, fpindex );
     }
     else
     {
@@ -2369,9 +2369,9 @@ set_file_dnd( tr_torrent * tor, tr_file_index_t file_index, int8_t dnd )
         for( p = fpindex + 1; p < lpindex; ++p )
             tor->info.pieces[p].dnd = dnd;
         if( fpnopt )
-            remove_piece_temp( tor, fpindex );
+            removePieceTemp( tor, fpindex );
         if( lpnopt )
-            remove_piece_temp( tor, lpindex );
+            removePieceTemp( tor, lpindex );
     }
 }
 
@@ -2389,7 +2389,7 @@ tr_torrentInitFileDLs( tr_torrent             * tor,
 
     for( i=0; i<fileCount; ++i )
         if( files[i] < tor->info.fileCount )
-            set_file_dnd( tor, files[i], !doDownload );
+            setFileDND( tor, files[i], !doDownload );
 
     tr_cpInvalidateDND( &tor->completion );
 
