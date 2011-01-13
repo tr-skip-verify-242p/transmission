@@ -108,7 +108,7 @@ static GtkActionEntry entries[] =
     { "edit-menu", NULL, N_( "_Edit" ), NULL, NULL, NULL },
     { "help-menu", NULL, N_( "_Help" ), NULL, NULL, NULL },
     { "copy-magnet-link-to-clipboard",  GTK_STOCK_COPY, N_("Copy _Magnet Link to Clipboard" ), "<control>M", NULL,  G_CALLBACK( action_cb ) },
-    { "add-torrent-from-url",  GTK_STOCK_ADD, N_("Add _URL..." ), NULL, N_( "Add URL..." ),  G_CALLBACK( action_cb ) },
+    { "add-torrent-from-url",  GTK_STOCK_ADD, N_("Add _URL..." ), "<control>U", N_( "Add URL..." ),  G_CALLBACK( action_cb ) },
     { "add-torrent-toolbar",  GTK_STOCK_ADD, NULL, NULL, N_( "Add a torrent" ),  G_CALLBACK( action_cb ) },
     { "add-torrent-menu", GTK_STOCK_ADD, N_( "_Add File..." ), "<control>D", N_( "Add a torrent" ), G_CALLBACK( action_cb ) },
     { "start-torrent", GTK_STOCK_MEDIA_PLAY, N_( "_Start" ), "<control>S", N_( "Start torrent" ), G_CALLBACK( action_cb ) },
