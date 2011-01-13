@@ -363,6 +363,10 @@ desktopPage( GObject * core )
     w = new_check_button( s, PREF_KEY_SHOW_DESKTOP_NOTIFICATION, core );
     hig_workarea_add_wide_control( t, &row, w );
 
+    s = _( "Move files to _Trash instead of deleting them" );
+    w = new_check_button( s, PREF_KEY_USE_TRASH_WHEN_DELETING, core );
+    hig_workarea_add_wide_control( t, &row, w );
+
 #ifdef HAVE_LIBCANBERRA
     s = _( "Play _sound when downloads are complete" );
     w = new_check_button( s, PREF_KEY_PLAY_DOWNLOAD_COMPLETE_SOUND, core );

@@ -76,7 +76,9 @@ tr_torrent_dispose( GObject * o )
         if( self->priv->handle )
         {
             if( self->priv->do_remove )
-                tr_torrentRemove( self->priv->handle, self->priv->delete_local_data, gtr_file_trash_or_remove );
+                tr_torrentRemove( self->priv->handle, self->priv->delete_local_data,
+                                  gtr_pref_flag_get( PREF_KEY_USE_TRASH_WHEN_DELETING )
+                                  ? gtr_file_trash_or_remove : remove );
             else
                 tr_torrentFree( self->priv->handle );
         }
