@@ -404,11 +404,26 @@ tr_bool tr_torrentFindFile2( const tr_torrent *, tr_file_index_t fileNo,
 /**
  * Like tr_torrentFindFile2() but for temporary piece files.
  * Both @a base and @a subpath may be NULL.
+ *
+ * @see tr_torrentFindFile2()
+ * @see tr_torrentFilePieceTemp()
  */
 tr_bool tr_torrentFindPieceTemp2( const tr_torrent  * tor,
                                   tr_piece_index_t    pieceIndex,
                                   const char       ** base,
                                   char             ** subpath );
+
+/**
+ * Get the full path of the temporary piece file for piece
+ * with index @a pieceIndex.
+ *
+ * @return a newly allocated string containing the full filename
+ *         or NULL if it does not exist.
+ *
+ * @see tr_torrentFindPieceTemp2()
+ */
+char * tr_torrentFindPieceTemp( const tr_torrent * tor,
+                                tr_piece_index_t   pieceIndex );
 
 /* Returns a newly-allocated version of the tr_file.name string
  * that's been modified to denote that it's not a complete file yet.
