@@ -1329,6 +1329,13 @@ networkPage( GObject * core )
     w = new_spin_button( TR_PREFS_KEY_PEER_LIMIT_GLOBAL, core, 1, 3000, 5 );
     hig_workarea_add_row( t, &row, _( "Maximum peers _overall:" ), w, NULL );
 
+    w = new_spin_button( TR_PREFS_KEY_MAX_CONNECTIONS_PER_SEC, core, 0, 1000, 1 );
+    s = _( "The maximum rate at which new peer connections are made. "
+           "A value of zero means no limit." );
+    gtr_widget_set_tooltip_text( w, s );
+    s = _( "Maximum _connections per second:" );
+    hig_workarea_add_row( t, &row, s, w, NULL );
+
     hig_workarea_add_section_divider( t, &row );
     hig_workarea_add_section_title( t, &row, _( "Options" ) );
 
