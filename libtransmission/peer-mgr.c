@@ -66,11 +66,10 @@ enum
     /* when few peers are available, keep idle ones this long */
     MAX_UPLOAD_IDLE_SECS = ( 60 * 5 ),
 
-    /* max number of peers to ask for per second overall.
-     * this throttle is to avoid overloading the router */
+    /* Default maximum number of peers to connect to per second.
+     * This throttle is to avoid overloading routers.
+     * See tr_peerMgrSetMaxConnectionsPerSecond() */
     MAX_CONNECTIONS_PER_SECOND = 12,
-
-    MAX_CONNECTIONS_PER_PULSE = (int)(MAX_CONNECTIONS_PER_SECOND * (RECONNECT_PERIOD_MSEC/1000.0)),
 
     /* number of bad pieces a peer is allowed to send before we ban them */
     MAX_BAD_PIECES_PER_PEER = 5,
@@ -215,6 +214,8 @@ struct tr_peerMgr
     struct event  * rechokeTimer;
     struct event  * refillUpkeepTimer;
     struct event  * atomTimer;
+    int             cppadd;
+    int             cppacc;
 };
 
 #define tordbg( t, ... ) \
@@ -495,6 +496,7 @@ tr_peerMgrNew( tr_session * session )
     tr_peerMgr * m = tr_new0( tr_peerMgr, 1 );
     m->session = session;
     m->incomingHandshakes = TR_PTR_ARRAY_INIT;
+    tr_peerMgrSetMaxConnectionsPerSecond( m, MAX_CONNECTIONS_PER_SECOND );
     return m;
 }
 
@@ -3147,7 +3149,7 @@ enforceSessionPeerLimit( tr_session * session, uint64_t now )
     }
 }
 
-static void makeNewPeerConnections( tr_peerMgr * mgr, const int max );
+static void makeNewPeerConnections( tr_peerMgr * mgr );
 
 static void
 reconnectPulse( int foo UNUSED, short bar UNUSED, void * vmgr )
@@ -3176,7 +3178,7 @@ reconnectPulse( int foo UNUSED, short bar UNUSED, void * vmgr )
         closeBadPeers( tor->torrentPeers, now_msec, now_sec );
 
     /* try to make new peer connections */
-    makeNewPeerConnections( mgr, MAX_CONNECTIONS_PER_PULSE );
+    makeNewPeerConnections( mgr );
 }
 
 /****
@@ -3610,16 +3612,38 @@ initiateCandidateConnection( tr_peerMgr * mgr, struct peer_candidate * c )
     initiateConnection( mgr, c->tor->torrentPeers, c->atom );
 }
 
+void
+tr_peerMgrSetMaxConnectionsPerSecond( tr_peerMgr * mgr, float value )
+{
+    if( value > 0 )
+        mgr->cppadd = value * RECONNECT_PERIOD_MSEC;
+    else
+        mgr->cppadd = 0;
+    mgr->cppacc = 0;
+}
+
 static void
-makeNewPeerConnections( struct tr_peerMgr * mgr, const int max )
+makeNewPeerConnections( struct tr_peerMgr * mgr )
 {
     int i, n;
     struct peer_candidate * candidates;
 
+    if( mgr->cppadd > 0 )
+    {
+        mgr->cppacc += mgr->cppadd;
+        if( mgr->cppacc <= 0 )
+            return;
+    }
+
     candidates = getPeerCandidates( mgr->session, &n );
 
-    for( i=0; i<n && i<max; ++i )
+    for( i = 0; i < n && ( mgr->cppadd <= 0 || mgr->cppacc > 0 ); ++i )
+    {
         initiateCandidateConnection( mgr, &candidates[i] );
+        mgr->cppacc -= 1000;
+    }
+    if( mgr->cppacc >= 1000 )
+        mgr->cppacc %= 1000;
 
     tr_free( candidates );
 }

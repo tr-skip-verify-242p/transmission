@@ -1387,6 +1387,10 @@ on_prefs_changed( TrCore * core UNUSED, const char * key, gpointer data )
     {
         tr_sessionSetIdleLimited( tr, gtr_pref_flag_get( key ) );
     }
+    else if( !strcmp( key, TR_PREFS_KEY_MAX_CONNECTIONS_PER_SEC ) )
+    {
+        tr_sessionSetMaxConnectionsPerSec( tr, gtr_pref_int_get( key ) );
+    }
     else if( !strcmp( key, TR_PREFS_KEY_PORT_FORWARDING ) )
     {
         tr_sessionSetPortForwardingEnabled( tr, gtr_pref_flag_get( key ) );

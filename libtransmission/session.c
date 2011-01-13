@@ -279,6 +279,7 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddBool( d, TR_PREFS_KEY_LAZY_BITFIELD,            TRUE );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_MSGLEVEL,                 TR_MSG_INF );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_OPEN_FILE_LIMIT,          atoi( TR_DEFAULT_OPEN_FILE_LIMIT_STR ) );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_MAX_CONNECTIONS_PER_SEC,  atoi( TR_DEFAULT_MAX_CONNECTIONS_PER_SEC_STR ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_LIMIT_GLOBAL,        atoi( TR_DEFAULT_PEER_LIMIT_GLOBAL_STR ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_LIMIT_TORRENT,       atoi( TR_DEFAULT_PEER_LIMIT_TORRENT_STR ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PORT,                atoi( TR_DEFAULT_PEER_PORT_STR ) );
@@ -357,6 +358,7 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddBool( d, TR_PREFS_KEY_LAZY_BITFIELD,            s->useLazyBitfield );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_MSGLEVEL,                 tr_getMessageLevel( ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_OPEN_FILE_LIMIT,          tr_fdGetFileLimit( s ) );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_MAX_CONNECTIONS_PER_SEC,  tr_sessionGetMaxConnectionsPerSec( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_LIMIT_GLOBAL,        tr_sessionGetPeerLimit( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_LIMIT_TORRENT,       s->peerLimitPerTorrent );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PORT,                tr_sessionGetPeerPort( s ) );
@@ -847,6 +849,8 @@ sessionSetImpl( void * vdata )
         tr_fdSetPeerLimit( session, i );
     if( tr_bencDictFindInt( settings, TR_PREFS_KEY_OPEN_FILE_LIMIT, &i ) )
         tr_fdSetFileLimit( session, i );
+    if( tr_bencDictFindInt( settings, TR_PREFS_KEY_MAX_CONNECTIONS_PER_SEC, &i ) )
+        tr_sessionSetMaxConnectionsPerSec( session, i );
 
     /**
     **/
@@ -2059,6 +2063,25 @@ tr_sessionGetCacheLimit_MB( const tr_session * session )
     assert( tr_isSession( session ) );
 
     return toMemMB( tr_cacheGetLimit( session->cache ) );
+}
+
+/***
+****
+***/
+
+void
+tr_sessionSetMaxConnectionsPerSec( tr_session * session, int a )
+{
+    assert( tr_isSession( session ) );
+    session->maxConnectionsPerSecond = a;
+    tr_peerMgrSetMaxConnectionsPerSecond( session->peerMgr, a );
+}
+
+int
+tr_sessionGetMaxConnectionsPerSec( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+    return session->maxConnectionsPerSecond;
 }
 
 /***

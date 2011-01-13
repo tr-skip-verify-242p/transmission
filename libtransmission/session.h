@@ -116,6 +116,7 @@ struct tr_session
     struct tr_turtle_info        turtle;
 
     struct tr_fdInfo           * fdInfo;
+    int                          maxConnectionsPerSecond;
 
     int                          magicNumber;
 

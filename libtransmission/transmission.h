@@ -148,6 +148,7 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_DEFAULT_BIND_ADDRESS_IPV4        "0.0.0.0"
 #define TR_DEFAULT_BIND_ADDRESS_IPV6             "::"
 #define TR_DEFAULT_OPEN_FILE_LIMIT_STR           "32"
+#define TR_DEFAULT_MAX_CONNECTIONS_PER_SEC_STR   "12"
 #define TR_DEFAULT_RPC_WHITELIST          "127.0.0.1"
 #define TR_DEFAULT_RPC_PORT_STR                "9091"
 #define TR_DEFAULT_RPC_URL_STR       "/transmission/"
@@ -179,6 +180,7 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_LAZY_BITFIELD                 "lazy-bitfield-enabled"
 #define TR_PREFS_KEY_MSGLEVEL                      "message-level"
 #define TR_PREFS_KEY_OPEN_FILE_LIMIT               "open-file-limit"
+#define TR_PREFS_KEY_MAX_CONNECTIONS_PER_SEC       "max-connections-per-sec"
 #define TR_PREFS_KEY_PEER_LIMIT_GLOBAL             "peer-limit-global"
 #define TR_PREFS_KEY_PEER_LIMIT_TORRENT            "peer-limit-per-torrent"
 #define TR_PREFS_KEY_PEER_PORT                     "peer-port"
@@ -671,6 +673,9 @@ void     tr_sessionSetLPDEnabled( tr_session * session, tr_bool enabled );
 
 void     tr_sessionSetCacheLimit_MB( tr_session * session, int mb );
 int      tr_sessionGetCacheLimit_MB( const tr_session * session );
+
+void     tr_sessionSetMaxConnectionsPerSec( tr_session *, int );
+int      tr_sessionGetMaxConnectionsPerSec( const tr_session * );
 
 void     tr_sessionSetLazyBitfieldEnabled( tr_session * session, tr_bool enabled );
 tr_bool  tr_sessionIsLazyBitfieldEnabled( const tr_session * session );
