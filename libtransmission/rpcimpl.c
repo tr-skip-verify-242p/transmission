@@ -10,6 +10,12 @@
  * $Id$
  */
 
+#if defined( HAVE_ZLIB ) && defined( _FILE_OFFSET_BITS )
+ #if _FILE_OFFSET_BITS == 64
+  #define _LARGEFILE64_SOURCE
+ #endif
+#endif
+
 #include <assert.h>
 #include <ctype.h> /* isdigit */
 #include <errno.h>
