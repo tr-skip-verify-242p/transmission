@@ -367,6 +367,10 @@ desktopPage( GObject * core )
     w = new_check_button( s, PREF_KEY_SHOW_DESKTOP_NOTIFICATION, core );
     hig_workarea_add_wide_control( t, &row, w );
 
+    s = _( "Move files to _Trash instead of deleting them" );
+    w = new_check_button( s, PREF_KEY_USE_TRASH_WHEN_DELETING, core );
+    hig_workarea_add_wide_control( t, &row, w );
+
     s = _( "Ask before _quitting if torrents are running" );
     w = new_check_button( s, PREF_KEY_ASKQUIT, core );
     hig_workarea_add_wide_control( t, &row, w );

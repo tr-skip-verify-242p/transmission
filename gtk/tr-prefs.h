@@ -29,6 +29,7 @@ GtkWidget * gtr_prefs_dialog_new( GtkWindow * parent, GObject * core );
 #define PREF_KEY_SHOW_TRAY_ICON                    "show-notification-area-icon"
 #define PREF_KEY_SHOW_DESKTOP_NOTIFICATION         "show-desktop-notification"
 #define PREF_KEY_PLAY_DOWNLOAD_COMPLETE_SOUND      "play-download-complete-sound"
+#define PREF_KEY_USE_TRASH_WHEN_DELETING           "use-trash-when-deleting"
 #define PREF_KEY_SHOW_MORE_TRACKER_INFO            "show-tracker-scrapes"
 #define PREF_KEY_SHOW_MORE_PEER_INFO               "show-extra-peer-details"
 #define PREF_KEY_SHOW_BACKUP_TRACKERS              "show-backup-trackers"
