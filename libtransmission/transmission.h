@@ -1658,6 +1658,26 @@ void tr_torrentAmountFinished( const tr_torrent  * torrent,
 
 void tr_torrentVerify( tr_torrent * torrent );
 
+/**
+ * This function will mark all data in files in the torrent as "verified",
+ * if the files themselves already exist and are wanted (i.e. file->dnd
+ * is FALSE).
+ *
+ * If the torrent is currently being verified, the verification is
+ * cancelled. If the torrent is running, it is stopped and restarted
+ * afterwards as part of this function.
+ *
+ * @note Since the piece data itself is not checked against the checksums
+ *       in the torrent, using this function with partially complete files
+ *       will result in bad data being sent to peers. This is not what
+ *       you want. Take extra care when using this function, or just use
+ *       tr_torrentVerify().
+ *
+ * @see tr_torrentVerify()
+ * @see tr_torrentSetFileDLs()
+ */
+void tr_torrentSetFilesVerified( tr_torrent * tor );
+
 /***********************************************************************
  * tr_info
  **********************************************************************/
