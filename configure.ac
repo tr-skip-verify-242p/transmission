@@ -4,7 +4,7 @@ dnl         "Z" for unsupported trunk builds,
 dnl         "0" for stable, supported releases
 dnl these should be the only two lines you need to change
 m4_define([user_agent_prefix],[2.13+])
-m4_define([peer_id_prefix],[-WH213Z-])
+m4_define([peer_id_prefix],[-TR213Z-])
 
 AC_INIT([transmission],
         [user_agent_prefix],
@@ -26,10 +26,6 @@ if test m4_substr(peer_id_prefix,6,1) = "0"; then
   CPPFLAGS="$CPPFLAGS -DNDEBUG"
 else
   supported_build=no
-  if test "x$GCC" = "xyes" ; then
-    CFLAGS="$CFLAGS -g -O0"
-    CXXFLAGS="$CXXFLAGS -g -O0"
-  fi
 fi
 AM_CONDITIONAL(TR_UNSTABLE, test "x$supported_build" = "xno")
 
@@ -81,27 +77,6 @@ LIBAPPINDICATOR_MINIMUM=0.0.11
 AC_PROG_CC
 AC_PROG_CXX
 AC_C_INLINE
-if test "x$GCC" = "xyes" ; then
-
-    CFLAGS="$CFLAGS -std=gnu99 -ggdb3 -Wall -W -Wpointer-arith -Wformat-security -Wcast-align -Wundef -Wcast-align -Wstrict-prototypes -Wmissing-declarations -Wmissing-format-attribute -Wredundant-decls -Wnested-externs -Wunused-parameter -Wwrite-strings -Winline -Wfloat-equal"
-
-    dnl figure out gcc version
-    AC_MSG_CHECKING([gcc version])
-    GCC_VERSION=`$CC -dumpversion`
-    GCC_MAJOR=`echo $GCC_VERSION | cut -d . -f1`
-    GCC_MINOR=`echo $GCC_VERSION | cut -d . -f2`
-    GCC_VERSION_NUM=`(expr $GCC_MAJOR "*" 100 + $GCC_MINOR) 2>/dev/null`
-
-    AC_MSG_RESULT($GCC_VERSION)
-    if test $GCC_VERSION_NUM -ge 304; then
-        dnl these were added in 3.4
-        CFLAGS="$CFLAGS -Wextra -Wdeclaration-after-statement -Winit-self"
-    fi
-    if test $GCC_VERSION_NUM -ge 403; then
-        dnl these were added in 4.3
-        CFLAGS="$CFLAGS -Wvariadic-macros"
-    fi
-fi
 
 AC_HEADER_STDC
 AC_HEADER_TIME
@@ -454,6 +429,11 @@ if test "x$have_msw" = "xyes"; then
     AC_DEFINE([HAVE_MSW], 1)
 fi
 AM_CONDITIONAL(WIN32, test "x$have_msw" = "xyes")
+
+dnl  Setup CFLAGS after all compilation tests
+if test "x$GCC" = "xyes" ; then
+    CFLAGS="$CFLAGS -std=gnu99 -ggdb3 -Wall -Werror"
+fi
 
 dnl ----------------------------------------------------------------------------
 dnl
