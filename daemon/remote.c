@@ -298,6 +298,7 @@ static tr_option opts[] =
     { 'u', "uplimit",                "Set the max upload speed in "SPEED_K_STR" for the current torrent(s) or globally", "u", 1, "<speed>" },
     { 'U', "no-uplimit",             "Disable max upload speed for the current torrent(s) or globally", "U", 0, NULL },
     { 'v', "verify",                 "Verify the current torrent(s)", "v",  0, NULL },
+    { 964, "set-verified",           "Assume files in current torrent(s) are verified", "sv", 0, NULL },
     { 'V', "version",                "Show version number and exit", "V", 0, NULL },
     { 'w', "download-dir",           "When adding a new torrent, set its download folder. Otherwise, set the default download folder", "w",  1, "<path>" },
     { 'x', "pex",                    "Enable peer exchange (PEX)", "x",  0, NULL },
@@ -456,6 +457,7 @@ getOptMode( int val )
             return MODE_SESSION_STATS;
 
         case 'v': /* verify */
+        case 964: /* set-verified */
             return MODE_TORRENT_VERIFY;
 
         case 600: /* reannounce */
@@ -2244,6 +2246,21 @@ processArgs( const char * rpcurl, int argc, const char ** argv )
                 top = tr_new0( tr_benc, 1 );
                 tr_bencInitDict( top, 2 );
                 tr_bencDictAddStr( top, "method", "torrent-verify" );
+                addIdArg( tr_bencDictAddDict( top, ARGUMENTS, 1 ), id );
+                status |= flush( rpcurl, &top );
+                break;
+            }
+            case 964:
+            {
+                tr_benc * top;
+                if( tset != 0 )
+                {
+                    addIdArg( tr_bencDictFind( tset, ARGUMENTS ), id );
+                    status |= flush( rpcurl, &tset );
+                }
+                top = tr_new0( tr_benc, 1 );
+                tr_bencInitDict( top, 2 );
+                tr_bencDictAddStr( top, "method", "torrent-set-verified" );
                 addIdArg( tr_bencDictAddDict( top, ARGUMENTS, 1 ), id );
                 status |= flush( rpcurl, &top );
                 break;

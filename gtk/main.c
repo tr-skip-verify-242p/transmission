@@ -259,6 +259,7 @@ struct counts_data
     int total_count;
     int active_count;
     int inactive_count;
+    int verify_count;
 };
 
 static void
@@ -274,6 +275,8 @@ get_selected_torrent_counts_foreach( GtkTreeModel * model, GtkTreePath * path UN
 
     if( activity == TR_STATUS_STOPPED )
         ++counts->inactive_count;
+    else if( activity == TR_STATUS_CHECK_WAIT || activity == TR_STATUS_CHECK )
+        ++counts->verify_count;
     else
         ++counts->active_count;
 }
@@ -284,6 +287,7 @@ get_selected_torrent_counts( struct cbdata * data, struct counts_data * counts )
     counts->active_count = 0;
     counts->inactive_count = 0;
     counts->total_count = 0;
+    counts->verify_count = 0;
 
     gtk_tree_selection_selected_foreach( data->sel, get_selected_torrent_counts_foreach, counts );
 }
@@ -318,6 +322,10 @@ refresh_actions( gpointer gdata )
     gtr_action_set_sensitive( "remove-torrent", sel_counts.total_count != 0 );
     gtr_action_set_sensitive( "delete-torrent", sel_counts.total_count != 0 );
     gtr_action_set_sensitive( "verify-torrent", sel_counts.total_count != 0 );
+    gtr_action_set_sensitive( "set-torrent-verified",
+                              ( sel_counts.inactive_count > 0
+                                || sel_counts.verify_count > 0 )
+                              && sel_counts.active_count == 0 );
     gtr_action_set_sensitive( "relocate-torrent", sel_counts.total_count != 0 );
     gtr_action_set_sensitive( "show-torrent-properties", sel_counts.total_count != 0 );
     gtr_action_set_sensitive( "open-torrent-folder", sel_counts.total_count == 1 );
@@ -1822,6 +1830,31 @@ gtr_actions_handler( const char * action_name, gpointer user_data )
     else if( !strcmp( action_name, "verify-torrent" ) )
     {
         changed |= rpcOnSelectedTorrents( data, "torrent-verify" );
+    }
+    else if( !strcmp( action_name, "set-torrent-verified" ) )
+    {
+        const char * primary = _( "Assume file data is correct?" );
+        const char * secondary =
+            _( "If any files enabled for download contain only partially "
+               "complete data, it will be sent to peers and could result "
+               "in your client being disconnected. Only use this operation "
+               "if you know for certain that the files enabled for download "
+               "in the selected torrents are verified and correct." );
+        const int flags = GTK_DIALOG_DESTROY_WITH_PARENT | GTK_DIALOG_MODAL;
+        GtkWidget * w = gtk_message_dialog_new( data->wind,
+                                                flags,
+                                                GTK_MESSAGE_WARNING,
+                                                GTK_BUTTONS_NONE,
+                                                "%s", primary );
+        gtk_dialog_add_buttons( GTK_DIALOG( w ),
+                                GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
+                                _( "Proceed" ), GTK_RESPONSE_ACCEPT,
+                                NULL );
+        gtk_message_dialog_format_secondary_text( GTK_MESSAGE_DIALOG( w ),
+                                                  "%s", secondary );
+        if( gtk_dialog_run( GTK_DIALOG( w ) ) == GTK_RESPONSE_ACCEPT )
+            changed |= rpcOnSelectedTorrents( data, "torrent-set-verified" );
+        gtk_widget_destroy( w );
     }
     else if( !strcmp( action_name, "update-tracker" ) )
     {

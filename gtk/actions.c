@@ -115,6 +115,7 @@ static GtkActionEntry entries[] =
     { "show-stats", NULL, N_( "_Statistics" ), NULL, NULL, G_CALLBACK( action_cb ) },
     { "donate", NULL, N_( "_Donate" ), NULL, NULL, G_CALLBACK( action_cb ) },
     { "verify-torrent", NULL, N_( "_Verify Local Data" ), "<control>V", NULL, G_CALLBACK( action_cb ) },
+    { "set-torrent-verified", NULL, N_( "Assume E_xisting Files Are Verified" ), NULL, NULL, G_CALLBACK( action_cb ) },
     { "pause-torrent", GTK_STOCK_MEDIA_PAUSE, N_( "_Pause" ), "<control>P", N_( "Pause torrent" ), G_CALLBACK( action_cb ) },
     { "pause-all-torrents", GTK_STOCK_MEDIA_PAUSE, N_( "_Pause All" ), NULL, N_( "Pause all torrents" ), G_CALLBACK( action_cb ) },
     { "start-all-torrents", GTK_STOCK_MEDIA_PLAY, N_( "_Start All" ), NULL, N_( "Start all torrents" ), G_CALLBACK( action_cb ) },

@@ -94,6 +94,7 @@ static const char * fallback_ui_file =
     "    <menuitem action='copy-magnet-link-to-clipboard'/>\n"
     "    <separator/>\n"
     "    <menuitem action='verify-torrent'/>\n"
+    "    <menuitem action='set-torrent-verified'/>\n"
     "    <menuitem action='relocate-torrent'/>\n"
     "    <separator/>\n"
     "    <menuitem action='remove-torrent'/>\n"

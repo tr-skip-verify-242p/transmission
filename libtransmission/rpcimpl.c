@@ -317,6 +317,28 @@ torrentVerify( tr_session               * session,
     return NULL;
 }
 
+static const char*
+torrentSetVerified( tr_session               * session,
+                    tr_benc                  * args_in,
+                    tr_benc                  * args_out UNUSED,
+                    struct tr_rpc_idle_data  * idle_data UNUSED )
+{
+    int i, torrentCount;
+    tr_torrent ** torrents = getTorrents( session, args_in, &torrentCount );
+
+    assert( idle_data == NULL );
+
+    for( i = 0; i < torrentCount; ++i )
+    {
+        tr_torrent * tor = torrents[i];
+        tr_torrentSetFilesVerified( tor );
+        notify( session, TR_RPC_TORRENT_CHANGED, tor );
+    }
+
+    tr_free( torrents );
+    return NULL;
+}
+
 /***
 ****
 ***/
@@ -1689,6 +1711,7 @@ methods[] =
     { "torrent-start",         TRUE,  torrentStart        },
     { "torrent-stop",          TRUE,  torrentStop         },
     { "torrent-verify",        TRUE,  torrentVerify       },
+    { "torrent-set-verified",  TRUE,  torrentSetVerified  },
     { "torrent-reannounce",    TRUE,  torrentReannounce   }
 };
 
