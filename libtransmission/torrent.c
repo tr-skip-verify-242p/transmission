@@ -2233,6 +2233,54 @@ usePieceTemp( tr_torrent * tor, tr_file_index_t i )
 }
 
 /**
+ * Calculate the offset and amount of overlap that the file
+ * given by index @a fi has with its first and last pieces. The
+ * offsets are relative to the start of pieces, and the the
+ * overlap sizes are less than or equal to the piece size.
+ *
+ * @note All of the @a setme_* arguments are assumed non-NULL.
+ *
+ * @note For small files, be sure to check whether the file
+ *       is completely contained in a single piece, i.e.
+ *       whether @code file->firstPiece == file->lastPiece @endcode.
+ */
+static void
+getFileOverlap( tr_torrent * tor,
+                tr_file_index_t fi,
+                size_t * setme_fpoffset,
+                size_t * setme_fpoverlap,
+                size_t * setme_lpoffset,
+                size_t * setme_lpoverlap )
+{
+    const tr_file * file = &tor->info.files[fi];
+    tr_piece_index_t fpindex = file->firstPiece;
+    tr_piece_index_t lpindex = file->lastPiece;
+    size_t fpoffset, fpoverlap, lpoffset, lpoverlap;
+
+    fpoffset = file->offset - tr_pieceOffset( tor, fpindex, 0, 0 );
+    fpoverlap = tr_torPieceCountBytes( tor, fpindex ) - fpoffset;
+    if( fpoverlap > file->length )
+        fpoverlap = file->length;
+
+    if( fpindex != lpindex )
+    {
+        lpoffset = 0;
+        lpoverlap = ( file->offset + file->length
+                      - tr_pieceOffset( tor, lpindex, 0, 0 ) );
+    }
+    else
+    {
+        lpoffset = fpoffset;
+        lpoverlap = fpoverlap;
+    }
+
+    *setme_fpoffset = fpoffset;
+    *setme_fpoverlap = fpoverlap;
+    *setme_lpoffset = lpoffset;
+    *setme_lpoverlap = lpoverlap;
+}
+
+/**
  * @note This function assumes @a tor is valid and already locked, and
  *       @a fileIndex is a valid file index for the torrent.
  * @note When @a file->dnd is TRUE and @a dnd is FALSE, this function has
@@ -2248,8 +2296,7 @@ setFileDND( tr_torrent * tor, tr_file_index_t file_index, int8_t dnd )
     const tr_piece_index_t fpindex = file->firstPiece;
     const tr_piece_index_t lpindex = file->lastPiece;
     tr_bool fpmovept, lpmovept, fpdnd, lpdnd, fpnopt, lpnopt;
-    size_t fpoverlap, lpoverlap;
-    uint32_t fpoffset, lpoffset;
+    size_t fpoverlap, lpoverlap, fpoffset, lpoffset;
     uint8_t * fpbuf, * lpbuf;
 
     if( file->dnd == dnd )
@@ -2272,14 +2319,13 @@ setFileDND( tr_torrent * tor, tr_file_index_t file_index, int8_t dnd )
         lpmovept = tr_torrentFindPieceTemp2( tor, lpindex, NULL, NULL );
     }
 
+    getFileOverlap( tor, file_index,
+                    &fpoffset, &fpoverlap,
+                    &lpoffset, &lpoverlap );
+
     if( fpmovept )
     {
-        fpoffset = file->offset - tr_pieceOffset( tor, fpindex, 0, 0 );
-        fpoverlap = tr_torPieceCountBytes( tor, fpindex ) - fpoffset;
-        if( fpoverlap > file->length )
-            fpoverlap = file->length;
         fpbuf = tr_malloc0( fpoverlap );
-
         if( tr_ioRead( tor, fpindex, fpoffset, fpoverlap, fpbuf ) != 0 )
         {
             tr_free( fpbuf );
@@ -2289,10 +2335,7 @@ setFileDND( tr_torrent * tor, tr_file_index_t file_index, int8_t dnd )
 
     if( lpmovept )
     {
-        lpoffset = 0;
-        lpoverlap = file->offset + file->length - tr_pieceOffset( tor, lpindex, 0, 0 );
         lpbuf = tr_malloc0( lpoverlap );
-
         if( tr_ioRead( tor, lpindex, lpoffset, lpoverlap, lpbuf ) != 0 )
         {
             tr_free( lpbuf );
@@ -2412,7 +2455,7 @@ deleteDNDFile( tr_torrent * tor, tr_file_index_t file_index )
     tr_file * file;
     tr_file_index_t fi;
     tr_piece_index_t fpindex, lpindex, pi;
-    uint32_t fpoffset, lpoffset, fpoverlap, lpoverlap;
+    size_t fpoffset, lpoffset, fpoverlap, lpoverlap;
     int fpblocks, lpblocks;
     tr_bool fpsave, lpsave, fpallpt, lpallpt;
     uint8_t * fpbuf = NULL, * lpbuf = NULL;
@@ -2431,16 +2474,9 @@ deleteDNDFile( tr_torrent * tor, tr_file_index_t file_index )
     fpblocks = tr_cpCompleteBlocksInPiece( &tor->completion, fpindex );
     lpblocks = tr_cpCompleteBlocksInPiece( &tor->completion, lpindex );
 
-    /* The offset in the first/last piece where the file begins. */
-    fpoffset = file->offset - tr_pieceOffset( tor, fpindex, 0, 0 );
-    lpoffset = 0;
-
-    /* This is the number of bytes of the first/last piece that
-     * are contained in the file. */
-    fpoverlap = tr_torPieceCountBytes( tor, fpindex ) - fpoffset;
-    if( fpoverlap > file->length )
-        fpoverlap = file->length;
-    lpoverlap = file->offset + file->length - tr_pieceOffset( tor, lpindex, 0, 0 );
+    getFileOverlap( tor, file_index,
+                    &fpoffset, &fpoverlap,
+                    &lpoffset, &lpoverlap );
 
     /* We need to preserve the overlapping piece parts if they are
      * used by wanted files and have some complete blocks in them. */
