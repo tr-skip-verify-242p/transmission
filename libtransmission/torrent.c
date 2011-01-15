@@ -2397,30 +2397,31 @@ tr_torrentInitFileDLs( tr_torrent             * tor,
 /**
  * Delete a file set to DND, if all pieces making up the file are also
  * set to DND. Otherwise, delete the file and write back the overlapping
- * non-DND piece parts if doing so would free up disk space at least as
- * large as the overlap size.
+ * non-DND piece parts.
  *
  * @note This function assumes it is only called from
  *       tr_torrentDeleteDNDFiles().
  *
  * @return TRUE if the file was deleted.
+ *
+ * @see setFileDND()
  */
 static tr_bool
-deleteDNDFile( tr_torrent * tor, tr_file_index_t fileIndex )
+deleteDNDFile( tr_torrent * tor, tr_file_index_t file_index )
 {
     tr_file * file;
-    tr_piece_index_t fpindex, lpindex;
+    tr_file_index_t fi;
+    tr_piece_index_t fpindex, lpindex, pi;
     uint32_t fpoffset, lpoffset, fpoverlap, lpoverlap;
     int fpblocks, lpblocks;
-    tr_bool fpsave, lpsave;
+    tr_bool fpsave, lpsave, fpallpt, lpallpt;
     uint8_t * fpbuf = NULL, * lpbuf = NULL;
     char * path = NULL;
-    tr_piece_index_t i;
 
-    if( fileIndex >= tor->info.fileCount )
+    if( file_index >= tor->info.fileCount )
         return FALSE;
 
-    file = &tor->info.files[fileIndex];
+    file = &tor->info.files[file_index];
 
     if( !file->dnd || file->usept )
         return FALSE;
@@ -2449,9 +2450,9 @@ deleteDNDFile( tr_torrent * tor, tr_file_index_t fileIndex )
 
     /* Ensure that the data we are about to delete does not
      * remain in the cache. */
-    tr_cacheFlushFile( tor->session->cache, tor, fileIndex );
+    tr_cacheFlushFile( tor->session->cache, tor, file_index );
 
-    path = tr_torrentFindFile( tor, fileIndex );
+    path = tr_torrentFindFile( tor, file_index );
     if( !path )
     {
         /* The file is already gone for some reason. */
@@ -2471,11 +2472,11 @@ deleteDNDFile( tr_torrent * tor, tr_file_index_t fileIndex )
     }
 
     /* Close and delete the file from the file system. */
-    tr_fdFileClose( tor->session, tor, fileIndex, TR_FD_INDEX_FILE );
+    tr_fdFileClose( tor->session, tor, file_index, TR_FD_INDEX_FILE );
     deleteLocalFile( path, remove );
     tr_free( path );
 
-    /* Make subsequent writes to temporary piece files. */
+    /* Make subsequent writes to temporary piece files, if needed. */
     file->usept = TRUE;
 
     /* Write the overlapping piece parts back from the buffers. */
@@ -2491,9 +2492,56 @@ deleteDNDFile( tr_torrent * tor, tr_file_index_t fileIndex )
     }
 
     /* Update the piece status of the deleted pieces. */
-    for( i = fpindex; i <= lpindex; ++i )
-        if( tor->info.pieces[i].dnd )
-            tr_torrentSetHasPiece( tor, i, FALSE );
+    for( pi = fpindex; pi <= lpindex; ++pi )
+        if( tor->info.pieces[pi].dnd )
+            tr_torrentSetHasPiece( tor, pi, FALSE );
+
+    /* Scan for temporary piece files we can remove. */
+    fpallpt = file->usept;
+    if( file_index > 0 )
+    {
+        for( fi = file_index - 1; fpallpt; --fi )
+        {
+            if( tor->info.files[fi].lastPiece != fpindex )
+                break;
+            fpallpt = tor->info.files[fi].usept;
+            if( !fi )
+                break;
+        }
+    }
+
+    lpallpt = file->usept;
+    for( fi = file_index + 1; lpallpt && fi < tor->info.fileCount; ++fi )
+    {
+        if( tor->info.files[fi].firstPiece != lpindex )
+            break;
+        lpallpt = tor->info.files[fi].usept;
+    }
+
+    if( fpindex == lpindex )
+    {
+        if( fpallpt && lpallpt )
+        {
+            tor->info.pieces[fpindex].dnd = TRUE;
+            tr_torrentSetHasPiece( tor, fpindex, FALSE );
+            removePieceTemp( tor, fpindex );
+        }
+    }
+    else
+    {
+        if( fpallpt )
+        {
+            tor->info.pieces[fpindex].dnd = TRUE;
+            tr_torrentSetHasPiece( tor, fpindex, FALSE );
+            removePieceTemp( tor, fpindex );
+        }
+        if( lpallpt )
+        {
+            tor->info.pieces[lpindex].dnd = TRUE;
+            tr_torrentSetHasPiece( tor, lpindex, FALSE );
+            removePieceTemp( tor, lpindex );
+        }
+    }
 
     return TRUE;
 }
