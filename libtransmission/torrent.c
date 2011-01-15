@@ -50,10 +50,6 @@
 #include "verify.h"
 #include "version.h"
 
-
-static void
-deleteLocalFile( const char * filename, tr_fileFunc fileFunc );
-
 /***
 ****
 ***/
