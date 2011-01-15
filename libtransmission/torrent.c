@@ -2431,15 +2431,16 @@ deleteDNDFile( tr_torrent * tor, tr_file_index_t fileIndex )
     fpblocks = tr_cpCompleteBlocksInPiece( &tor->completion, fpindex );
     lpblocks = tr_cpCompleteBlocksInPiece( &tor->completion, lpindex );
 
-    /* The offset in the first/last piece where the file begins/ends. */
-    fpoffset = ( file->offset - tr_pieceOffset( tor, fpindex, 0, 0 ) );
-    lpoffset = ( file->offset + file->length
-                 - tr_pieceOffset( tor, lpindex, 0, 0 ) );
+    /* The offset in the first/last piece where the file begins. */
+    fpoffset = file->offset - tr_pieceOffset( tor, fpindex, 0, 0 );
+    lpoffset = 0;
 
     /* This is the number of bytes of the first/last piece that
      * are contained in the file. */
     fpoverlap = tr_torPieceCountBytes( tor, fpindex ) - fpoffset;
-    lpoverlap = lpoffset;
+    if( fpoverlap > file->length )
+        fpoverlap = file->length;
+    lpoverlap = file->offset + file->length - tr_pieceOffset( tor, lpindex, 0, 0 );
 
     /* We need to preserve the overlapping piece parts if they are
      * used by wanted files and have some complete blocks in them. */
