@@ -2415,7 +2415,6 @@ deleteDNDFile( tr_torrent * tor, tr_file_index_t fileIndex )
     tr_bool fpsave, lpsave;
     uint8_t * fpbuf = NULL, * lpbuf = NULL;
     char * path = NULL;
-    int64_t delsize, rwsize;
     tr_piece_index_t i;
 
     if( fileIndex >= tor->info.fileCount )
@@ -2423,7 +2422,7 @@ deleteDNDFile( tr_torrent * tor, tr_file_index_t fileIndex )
 
     file = &tor->info.files[fileIndex];
 
-    if( !file->dnd )
+    if( !file->dnd || file->usept )
         return FALSE;
 
     fpindex = file->firstPiece;
@@ -2448,27 +2447,6 @@ deleteDNDFile( tr_torrent * tor, tr_file_index_t fileIndex )
     lpsave = ( !tor->info.pieces[lpindex].dnd && lpblocks > 0
                && fpindex != lpindex );
 
-    /* Calculate how many bytes we could gain in the best case
-     * by deleting pieces that are no longer wanted. */
-    delsize = file->length;
-    if( fpsave )
-        delsize -= fpoverlap;
-    if( lpsave )
-        delsize -= lpoverlap;
-
-    /* Calculate how many bytes we need to read and write
-     * back from overlapping pieces if we delete this file. */
-    rwsize = 0;
-    if( fpsave )
-        rwsize += fpoverlap;
-    if( lpsave )
-        rwsize += lpoverlap;
-
-    /* Don't bother deleting the file if it's mostly composed
-     * of overlapping pieces that we do want. */
-    if( rwsize > delsize )
-        return FALSE;
-
     /* Ensure that the data we are about to delete does not
      * remain in the cache. */
     tr_cacheFlushFile( tor->session->cache, tor, fileIndex );
@@ -2489,13 +2467,16 @@ deleteDNDFile( tr_torrent * tor, tr_file_index_t fileIndex )
     if( lpsave )
     {
         lpbuf = tr_malloc( lpoverlap );
-        tr_ioRead( tor, lpindex, 0, lpoverlap, lpbuf );
+        tr_ioRead( tor, lpindex, lpoffset, lpoverlap, lpbuf );
     }
 
     /* Close and delete the file from the file system. */
     tr_fdFileClose( tor->session, tor, fileIndex, TR_FD_INDEX_FILE );
     deleteLocalFile( path, remove );
     tr_free( path );
+
+    /* Make subsequent writes to temporary piece files. */
+    file->usept = TRUE;
 
     /* Write the overlapping piece parts back from the buffers. */
     if( fpsave )
@@ -2505,7 +2486,7 @@ deleteDNDFile( tr_torrent * tor, tr_file_index_t fileIndex )
     }
     if( lpsave )
     {
-        tr_ioWrite( tor, lpindex, 0, lpoverlap, lpbuf );
+        tr_ioWrite( tor, lpindex, lpoffset, lpoverlap, lpbuf );
         tr_free( lpbuf );
     }
 
