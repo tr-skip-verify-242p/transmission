@@ -2463,12 +2463,20 @@ deleteDNDFile( tr_torrent * tor, tr_file_index_t file_index )
     if( fpsave )
     {
         fpbuf = tr_malloc( fpoverlap );
-        tr_ioRead( tor, fpindex, fpoffset, fpoverlap, fpbuf );
+        if( tr_ioRead( tor, fpindex, fpoffset, fpoverlap, fpbuf ) != 0 )
+        {
+            tr_free( fpbuf );
+            fpsave = FALSE;
+        }
     }
     if( lpsave )
     {
         lpbuf = tr_malloc( lpoverlap );
-        tr_ioRead( tor, lpindex, lpoffset, lpoverlap, lpbuf );
+        if( tr_ioRead( tor, lpindex, lpoffset, lpoverlap, lpbuf ) != 0 )
+        {
+            tr_free( lpbuf );
+            lpsave = FALSE;
+        }
     }
 
     /* Close and delete the file from the file system. */
