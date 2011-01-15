@@ -2231,6 +2231,7 @@ usePieceTemp( tr_torrent * tor, tr_file_index_t i )
                              i, TR_FD_INDEX_FILE, FALSE );
     return fd < 0 && !tr_torrentFindFile2( tor, i, NULL, NULL );
 }
+
 /**
  * @note This function assumes @a tor is valid and already locked, and
  *       @a fileIndex is a valid file index for the torrent.
@@ -2405,25 +2406,16 @@ tr_torrentInitFileDLs( tr_torrent             * tor,
  * @return TRUE if the file was deleted.
  */
 static tr_bool
-deleteDNDFile( tr_torrent      * tor,
-               tr_file_index_t   fileIndex )
+deleteDNDFile( tr_torrent * tor, tr_file_index_t fileIndex )
 {
-    tr_file *        file;
-    tr_piece_index_t fpindex;
-    tr_piece_index_t lpindex;
-    uint32_t         fpoffset;
-    uint32_t         lpoffset;
-    uint32_t         fpoverlap;
-    uint32_t         lpoverlap;
-    int              fpblocks;
-    int              lpblocks;
-    tr_bool          fpsave;
-    tr_bool          lpsave;
-    uint8_t *        fpbuf = NULL;
-    uint8_t *        lpbuf = NULL;
-    char *           path = NULL;
-    int64_t          delsize;
-    int64_t          rwsize;
+    tr_file * file;
+    tr_piece_index_t fpindex, lpindex;
+    uint32_t fpoffset, lpoffset, fpoverlap, lpoverlap;
+    int fpblocks, lpblocks;
+    tr_bool fpsave, lpsave;
+    uint8_t * fpbuf = NULL, * lpbuf = NULL;
+    char * path = NULL;
+    int64_t delsize, rwsize;
     tr_piece_index_t i;
 
     if( fileIndex >= tor->info.fileCount )
@@ -2535,8 +2527,7 @@ tr_torrentDeleteDNDFiles( tr_torrent            * tor,
                           const tr_file_index_t * files,
                           tr_file_index_t         fileCount )
 {
-    tr_file_index_t count = 0;
-    tr_file_index_t i;
+    tr_file_index_t count = 0, i;
 
     for( i = 0; i < fileCount; ++i )
         if( deleteDNDFile( tor, files[i] ) )
