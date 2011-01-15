@@ -298,7 +298,7 @@ static tr_option opts[] =
     { 'U', "no-uplimit",             "Disable max upload speed for the current torrent(s) or globally", "U", 0, NULL },
     { 'v', "verify",                 "Verify the current torrent(s)", "v",  0, NULL },
     { 'V', "version",                "Show version number and exit", "V", 0, NULL },
-    { 'w', "download-dir",           "When adding a new torrent, set its download folder.  Otherwise, set the default download folder", "w",  1, "<path>" },
+    { 'w', "download-dir",           "When adding a new torrent, set its download folder. Otherwise, set the default download folder", "w",  1, "<path>" },
     { 'x', "pex",                    "Enable peer exchange (PEX)", "x",  0, NULL },
     { 'X', "no-pex",                 "Disable peer exchange (PEX)", "X",  0, NULL },
     { 'y', "lpd",                    "Enable local peer discovery (LPD)", "y",  0, NULL },
@@ -489,7 +489,11 @@ tr_getcwd( void )
 #ifdef WIN32
     _getcwd( buf, sizeof( buf ) );
 #else
-    getcwd( buf, sizeof( buf ) );
+    if( !getcwd( buf, sizeof( buf ) ) )
+    {
+        fprintf( stderr, "getcwd: %s", strerror( errno ) );
+        buf[0] = '\0';
+    }
 #endif
     return tr_strdup( buf );
 }
@@ -669,6 +673,8 @@ static const char * details_keys[] = {
     "rateDownload",
     "rateUpload",
     "recheckProgress",
+    "secondsDownloading",
+    "secondsSeeding",
     "seedRatioMode",
     "seedRatioLimit",
     "sizeWhenDone",
@@ -948,23 +954,27 @@ printDetails( tr_benc * top )
             if( tr_bencDictFindInt( t, "addedDate", &i ) && i )
             {
                 const time_t tt = i;
-                printf( "  Date added:      %s", ctime( &tt ) );
+                printf( "  Date added:       %s", ctime( &tt ) );
             }
             if( tr_bencDictFindInt( t, "doneDate", &i ) && i )
             {
                 const time_t tt = i;
-                printf( "  Date finished:   %s", ctime( &tt ) );
+                printf( "  Date finished:    %s", ctime( &tt ) );
             }
             if( tr_bencDictFindInt( t, "startDate", &i ) && i )
             {
                 const time_t tt = i;
-                printf( "  Date started:    %s", ctime( &tt ) );
+                printf( "  Date started:     %s", ctime( &tt ) );
             }
             if( tr_bencDictFindInt( t, "activityDate", &i ) && i )
             {
                 const time_t tt = i;
-                printf( "  Latest activity: %s", ctime( &tt ) );
+                printf( "  Latest activity:  %s", ctime( &tt ) );
             }
+            if( tr_bencDictFindInt( t, "secondsDownloading", &i ) && ( i > 0 ) )
+                printf( "  Downloading Time: %s\n", tr_strltime( buf, i, sizeof( buf ) ) );
+            if( tr_bencDictFindInt( t, "secondsSeeding", &i ) && ( i > 0 ) )
+                printf( "  Seeding Time:     %s\n", tr_strltime( buf, i, sizeof( buf ) ) );
             printf( "\n" );
 
             printf( "ORIGINS\n" );
@@ -1456,6 +1466,8 @@ printSession( tr_benc * top )
             printf( "  Configuration directory: %s\n", str );
         if( tr_bencDictFindStr( args,  TR_PREFS_KEY_DOWNLOAD_DIR, &str ) )
             printf( "  Download directory: %s\n", str );
+        if( tr_bencDictFindInt( args,  "download-dir-free-space", &i ) )
+            printf( "  Download directory free space: %s\n",  strlsize( buf, i, sizeof buf ) );
         if( tr_bencDictFindInt( args, TR_PREFS_KEY_PEER_PORT, &i ) )
             printf( "  Listenport: %" PRId64 "\n", i );
         if( tr_bencDictFindBool( args, TR_PREFS_KEY_PORT_FORWARDING, &boolVal ) )
@@ -1728,9 +1740,9 @@ flush( const char * rpcurl, tr_benc ** benc )
                 status |= processResponse( rpcurl, (const char*) evbuffer_pullup( buf, -1 ), evbuffer_get_length( buf ) );
                 break;
             case 409:
-                /* session id failed.  our curl header func has already
-                * pulled the new session id from this response's headers,
-                * build a new CURL* and try again */
+                /* Session id failed. Our curl header func has already
+                 * pulled the new session id from this response's headers,
+                 * build a new CURL* and try again */
                 curl_easy_cleanup( curl );
                 curl = NULL;
                 flush( rpcurl, benc );

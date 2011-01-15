@@ -1,7 +1,7 @@
 /*
  * This file Copyright (C) 2007-2010 Mnemosyne LLC
  *
- * This file is licensed by the GPL version 2.  Works owned by the
+ * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
  * so that the bulk of its code can remain under the MIT license.
  * This exemption does not extend to derived works not owned by
@@ -57,22 +57,36 @@ enum { TR_IO_READ, TR_IO_PREFETCH,
        TR_IO_WRITE
 };
 
-/* returns 0 on success, or an errno on failure */
+/**
+ * @return 0 on success, or an errno on failure.
+ *
+ * @note If @a tor->info.files[fileIndex]->usept is TRUE the IO
+ *       operations will be carried out on a temporary piece file
+ *       instead of the actual file. If you change this behavior,
+ *       you also need to change code in setFileDND().
+ *
+ * @see setFileDND()
+ */
 static int
 readOrWriteBytes( tr_session       * session,
-                  const tr_torrent * tor,
+                  tr_torrent       * tor,
                   int                ioMode,
+                  tr_piece_index_t   pieceIndex,
+                  uint32_t           pieceOffset,
                   tr_file_index_t    fileIndex,
                   uint64_t           fileOffset,
-                  void *             buf,
+                  void             * buf,
                   size_t             buflen )
 {
     const tr_info * info = &tor->info;
     const tr_file * file = &info->files[fileIndex];
-
-    int             fd = -1;
-    int             err = 0;
     const tr_bool doWrite = ioMode >= TR_IO_WRITE;
+    uint64_t offset;
+    uint64_t desiredSize;
+    uint32_t indexNum;
+    tr_fd_index_type indexType;
+    int fd = -1;
+    int err = 0;
 
 //if( doWrite )
 //    fprintf( stderr, "in file %s at offset %zu, writing %zu bytes; file length is %zu\n", file->name, (size_t)fileOffset, buflen, (size_t)file->length );
@@ -84,7 +98,23 @@ readOrWriteBytes( tr_session       * session,
     if( !file->length )
         return 0;
 
-    fd = tr_fdFileGetCached( session, tr_torrentId( tor ), fileIndex, doWrite );
+    if( file->usept )
+    {
+        offset = pieceOffset;
+        desiredSize = tr_torPieceCountBytes( tor, pieceIndex );
+        indexNum = pieceIndex;
+        indexType = TR_FD_INDEX_PIECE;
+    }
+    else
+    {
+        offset = fileOffset;
+        desiredSize = file->length;
+        indexNum = fileIndex;
+        indexType = TR_FD_INDEX_FILE;
+    }
+
+    fd = tr_fdFileGetCached( session, tr_torrentId( tor ),
+                             indexNum, indexType, doWrite );
 
     if( fd < 0 )
     {
@@ -95,16 +125,25 @@ readOrWriteBytes( tr_session       * session,
         tr_bool fileExists;
         tr_preallocation_mode preallocationMode;
 
-        fileExists = tr_torrentFindFile2( tor, fileIndex, &base, &subpath );
-
-        if( !fileExists )
+        if( file->usept )
         {
-            base = tr_torrentGetCurrentDir( tor );
+            fileExists = tr_torrentFindPieceTemp2( tor, pieceIndex,
+                                                   &base, &subpath );
+        }
+        else
+        {
+            fileExists = tr_torrentFindFile2( tor, fileIndex,
+                                              &base, &subpath );
 
-            if( tr_sessionIsIncompleteFileNamingEnabled( tor->session ) )
-                subpath = tr_torrentBuildPartial( tor, fileIndex );
-            else
-                subpath = tr_strdup( file->name );
+            if( !fileExists )
+            {
+                base = tr_torrentGetCurrentDir( tor );
+
+                if( tr_sessionIsIncompleteFileNamingEnabled( tor->session ) )
+                    subpath = tr_torrentBuildPartial( tor, fileIndex );
+                else
+                    subpath = tr_strdup( file->name );
+            }
         }
 
         if( ( file->dnd ) || ( ioMode < TR_IO_WRITE ) )
@@ -120,8 +159,9 @@ readOrWriteBytes( tr_session       * session,
         {
             char * filename = tr_buildPath( base, subpath, NULL );
 
-            if( ( fd = tr_fdFileCheckout( session, tor->uniqueId, fileIndex, filename,
-                                          doWrite, preallocationMode, file->length ) ) < 0 )
+            if( ( fd = tr_fdFileCheckout( session, tor->uniqueId, indexNum,
+                                          indexType, filename, doWrite,
+                                          preallocationMode, desiredSize ) ) < 0 )
             {
                 err = errno;
                 tr_torerr( tor, "tr_fdFileCheckout failed for \"%s\": %s", filename, tr_strerror( err ) );
@@ -138,21 +178,29 @@ readOrWriteBytes( tr_session       * session,
 
     if( !err )
     {
+        /* check & see if someone deleted the file while it was in our cache */
+        struct stat sb;
+        const tr_bool file_disappeared = fstat( fd, &sb ) || sb.st_nlink < 1;
+        if( file_disappeared ) {
+            tr_torrentSetLocalError( tor, "Please Verify Local Data! A file disappeared: \"%s\"", tor->info.files[fileIndex].name );
+            err = ENOENT;
+        }
+
         if( ioMode == TR_IO_READ ) {
-            const int rc = tr_pread( fd, buf, buflen, fileOffset );
+            const int rc = tr_pread( fd, buf, buflen, offset );
             if( rc < 0 ) {
                 err = errno;
                 tr_torerr( tor, "read failed for \"%s\": %s",
                            file->name, tr_strerror( err ) );
             }
         } else if( ioMode == TR_IO_PREFETCH ) {
-            const int rc = tr_prefetch( fd, fileOffset, buflen );
+            const int rc = tr_prefetch( fd, offset, buflen );
             if( rc < 0 ) {
                 tr_tordbg( tor, "prefetch failed for \"%s\": %s",
                            file->name, tr_strerror( err ) );
             }
         } else if( ioMode == TR_IO_WRITE ) {
-            const int rc = tr_pwrite( fd, buf, buflen, fileOffset );
+            const int rc = tr_pwrite( fd, buf, buflen, offset );
             if( rc < 0 ) {
                 err = errno;
                 tr_torerr( tor, "write failed for \"%s\": %s",
@@ -228,17 +276,39 @@ readOrWritePiece( tr_torrent       * tor,
 
     while( buflen && !err )
     {
+        uint32_t leftInPiece;
+        uint32_t bytesThisPass;
+        uint64_t leftInFile;
         const tr_file * file = &info->files[fileIndex];
-        const uint64_t bytesThisPass = MIN( buflen, file->length - fileOffset );
 
-        err = readOrWriteBytes( tor->session, tor, ioMode, fileIndex, fileOffset, buf, bytesThisPass );
+        leftInPiece = tr_torPieceCountBytes( tor, pieceIndex ) - pieceOffset;
+        leftInFile = file->length - fileOffset;
+        bytesThisPass = MIN( leftInFile, leftInPiece );
+        bytesThisPass = MIN( bytesThisPass, buflen );
+
+        err = readOrWriteBytes( tor->session, tor, ioMode,
+                                pieceIndex, pieceOffset,
+                                fileIndex, fileOffset,
+                                buf, bytesThisPass );
         buf += bytesThisPass;
         buflen -= bytesThisPass;
-//fprintf( stderr, "++fileIndex to %d\n", (int)fileIndex );
-        ++fileIndex;
-        fileOffset = 0;
+        leftInPiece -= bytesThisPass;
+        leftInFile -= bytesThisPass;
+        pieceOffset += bytesThisPass;
+        fileOffset += bytesThisPass;
 
-        if( ( err != 0 ) && (ioMode == TR_IO_WRITE ) )
+        if( leftInPiece == 0 )
+        {
+            ++pieceIndex;
+            pieceOffset = 0;
+        }
+        if( leftInFile == 0 )
+        {
+            ++fileIndex;
+            fileOffset = 0;
+        }
+
+        if( ( err != 0 ) && (ioMode == TR_IO_WRITE ) && ( tor->error != TR_STAT_LOCAL_ERROR ) )
         {
             char * path = tr_buildPath( tor->downloadDir, file->name, NULL );
             tr_torrentSetLocalError( tor, "%s (%s)", tr_strerror( err ), path );

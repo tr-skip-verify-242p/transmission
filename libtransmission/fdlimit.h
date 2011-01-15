@@ -1,7 +1,7 @@
 /*
  * This file Copyright (C) 2007-2010 Mnemosyne LLC
  *
- * This file is licensed by the GPL version 2.  Works owned by the
+ * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
  * so that the bulk of its code can remain under the MIT license.
  * This exemption does not extend to derived works not owned by
@@ -24,7 +24,7 @@
 
 void tr_fdSetFileLimit( tr_session * session, int limit );
 
-int tr_fdGetFileLimit( const tr_session * session );
+int tr_fdGetFileLimit( tr_session * session );
 
 void tr_fdSetGlobalPeerLimit( tr_session * session, int limit );
 
@@ -45,6 +45,12 @@ ssize_t tr_pwrite(int fd, const void *buf, size_t count, off_t offset);
 int tr_prefetch(int fd, off_t offset, size_t count);
 
 
+typedef enum
+{
+    TR_FD_INDEX_FILE,
+    TR_FD_INDEX_PIECE
+} tr_fd_index_type;
+
 /**
  * Returns an fd to the specified filename.
  *
@@ -52,17 +58,27 @@ int tr_prefetch(int fd, off_t offset, size_t count);
  * continually opening and closing the same files when downloading
  * piece data.
  *
- * - if doWrite is true, subfolders in torrentFile are created if necessary.
- * - if doWrite is true, the target file is created if necessary.
+ * - if @a doWrite is true, subfolders in @a fileName are created if necessary.
+ * - if @a doWrite is true, the target file is created if necessary.
  *
  * on success, a file descriptor >= 0 is returned.
  * on failure, a -1 is returned and errno is set.
+ *
+ * @param indexNum a numeric tag to distinguish different files. If
+ *                 @a indexType is @a TR_FD_INDEX_FILE, then it should
+ *                 be the index of the file in the torrent. For
+ *                 @a TR_FD_INDEX_PIECE, it should be the piece index.
+ *
+ * @param indexType Either @a TR_FD_INDEX_FILE or @a TR_FD_INDEX_PIECE
+ *                  depending on whether the file is part of the torrent
+ *                  or a temporary piece file.
  *
  * @see tr_fdFileClose
  */
 int  tr_fdFileCheckout( tr_session             * session,
                         int                      torrentId,
-                        tr_file_index_t          fileNum,
+                        uint32_t                 indexNum,
+                        tr_fd_index_type         indexType,
                         const char             * fileName,
                         tr_bool                  doWrite,
                         tr_preallocation_mode    preallocationMode,
@@ -70,7 +86,8 @@ int  tr_fdFileCheckout( tr_session             * session,
 
 int tr_fdFileGetCached( tr_session             * session,
                         int                      torrentId,
-                        tr_file_index_t          fileNum,
+                        uint32_t                 indexNum,
+                        tr_fd_index_type         indexType,
                         tr_bool                  doWrite );
 
 /**
@@ -79,11 +96,14 @@ int tr_fdFileGetCached( tr_session             * session,
  * If the file isn't checked out, it's closed immediately.
  * If the file is currently checked out, it will be closed upon its return.
  *
+ * @note @a indexNum and @a indexType should be set as for tr_fdFileCheckout().
+ *
  * @see tr_fdFileCheckout
  */
 void tr_fdFileClose( tr_session        * session,
                      const tr_torrent  * tor,
-                     tr_file_index_t     fileNo );
+                     uint32_t            indexNum,
+                     tr_fd_index_type    indexType );
 
 
 /**
@@ -98,7 +118,7 @@ void tr_fdTorrentClose( tr_session * session, int torrentId );
 int      tr_fdSocketCreate( tr_session * session, int domain, int type );
 
 int      tr_fdSocketAccept( tr_session  * session,
-                            int           b,
+                            int           listening_sockfd,
                             tr_address  * addr,
                             tr_port     * port );
 

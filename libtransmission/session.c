@@ -1,7 +1,7 @@
 /*
  * This file Copyright (C) 2008-2010 Mnemosyne LLC
  *
- * This file is licensed by the GPL version 2.  Works owned by the
+ * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
  * so that the bulk of its code can remain under the MIT license.
  * This exemption does not extend to derived works not owned by
@@ -43,7 +43,7 @@
 #include "session.h"
 #include "stats.h"
 #include "torrent.h"
-#include "tr-dht.h"
+#include "tr-udp.h"
 #include "tr-lpd.h"
 #include "trevent.h"
 #include "utils.h"
@@ -218,16 +218,31 @@ open_incoming_peer_port( tr_session * session )
 }
 
 const tr_address*
-tr_sessionGetPublicAddress( const tr_session * session, int tr_af_type )
+tr_sessionGetPublicAddress( const tr_session * session, int tr_af_type, tr_bool * is_default_value )
 {
+    const char * default_value;
     const struct tr_bindinfo * bindinfo;
 
     switch( tr_af_type )
     {
-        case TR_AF_INET:  bindinfo = session->public_ipv4; break;
-        case TR_AF_INET6: bindinfo = session->public_ipv6; break;
-        default:          bindinfo = NULL;                 break;
+        case TR_AF_INET:
+            bindinfo = session->public_ipv4;
+            default_value = TR_DEFAULT_BIND_ADDRESS_IPV4;
+            break;
+
+        case TR_AF_INET6:
+            bindinfo = session->public_ipv6;
+            default_value = TR_DEFAULT_BIND_ADDRESS_IPV6;
+            break;
+
+        default:
+            bindinfo = NULL;
+            default_value = "";
+            break;
     }
+
+    if( is_default_value && bindinfo )
+        *is_default_value = !tr_strcmp0( default_value, tr_ntop_non_ts( &bindinfo->addr ) );
 
     return bindinfo ? &bindinfo->addr : NULL;
 }
@@ -471,7 +486,7 @@ tr_sessionSaveSettings( tr_session    * session,
 
 /**
  * Periodically save the .resume files of any torrents whose
- * status has recently changed.  This prevents loss of metadata
+ * status has recently changed. This prevents loss of metadata
  * in the case of a crash, unclean shutdown, clumsy user, etc.
  */
 static void
@@ -522,6 +537,8 @@ tr_sessionInit( const char  * tag,
 
     /* initialize the bare skeleton of the session object */
     session = tr_new0( tr_session, 1 );
+    session->udp_socket = -1;
+    session->udp6_socket = -1;
     session->bandwidth = tr_bandwidthNew( session, NULL );
     session->lock = tr_lockNew( );
     session->cache = tr_cacheNew( 1024*1024*2 );
@@ -663,8 +680,7 @@ tr_sessionInitImpl( void * vdata )
 
     tr_sessionSet( session, &settings );
 
-    if( session->isDHTEnabled )
-        tr_dhtInit( session, &session->public_ipv4->addr );
+    tr_udpInit( session, &session->public_ipv4->addr );
 
     if( session->isLPDEnabled )
         tr_lpdInit( session, &session->public_ipv4->addr );
@@ -895,6 +911,14 @@ tr_sessionGetDownloadDir( const tr_session * session )
     assert( tr_isSession( session ) );
 
     return session->downloadDir;
+}
+
+int64_t
+tr_sessionGetDownloadDirFreeSpace( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+
+    return tr_getFreeSpace( session->downloadDir );
 }
 
 /***
@@ -1693,8 +1717,7 @@ sessionCloseImpl( void * vsession )
     if( session->isLPDEnabled )
         tr_lpdUninit( session );
 
-    if( session->isDHTEnabled )
-        tr_dhtUninit( session );
+    tr_udpUninit( session );
 
     event_free( session->saveTimer );
     session->saveTimer = NULL;
@@ -1706,7 +1729,7 @@ sessionCloseImpl( void * vsession )
     tr_sharedClose( session );
     tr_rpcClose( &session->rpcServer );
 
-    /* close the torrents.  get the most active ones first so that
+    /* Close the torrents. Get the most active ones first so that
      * if we can't get them all closed in a reasonable amount of time,
      * at least we get the most important ones first. */
     tor = NULL;
@@ -1806,6 +1829,7 @@ tr_sessionClose( tr_session * session )
     tr_free( session->tag );
     tr_free( session->configDir );
     tr_free( session->resumeDir );
+    tr_free( session->pieceDir );
     tr_free( session->torrentDir );
     tr_free( session->downloadDir );
     tr_free( session->incompleteDir );
@@ -1912,13 +1936,9 @@ toggleDHTImpl(  void * data )
     tr_session * session = data;
     assert( tr_isSession( session ) );
 
-    if( session->isDHTEnabled )
-        tr_dhtUninit( session );
-
+    tr_udpUninit( session );
     session->isDHTEnabled = !session->isDHTEnabled;
-
-    if( session->isDHTEnabled )
-        tr_dhtInit( session, &session->public_ipv4->addr );
+    tr_udpInit( session, &session->public_ipv4->addr );
 }
 
 void

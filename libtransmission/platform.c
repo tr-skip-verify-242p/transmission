@@ -1,7 +1,7 @@
 /*
  * This file Copyright (C) 2008-2010 Mnemosyne LLC
  *
- * This file is licensed by the GPL version 2.  Works owned by the
+ * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
  * so that the bulk of its code can remain under the MIT license.
  * This exemption does not extend to derived works not owned by
@@ -34,8 +34,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef SYS_DARWIN
+ #define HAVE_SYS_STATVFS_H
+ #define HAVE_STATVFS
+#endif
+
 #include <sys/stat.h>
 #include <sys/types.h>
+#ifdef HAVE_SYS_STATVFS_H
+ #include <sys/statvfs.h>
+#endif
 #ifdef WIN32
 #include <libgen.h>
 #endif
@@ -293,9 +301,11 @@ getOldConfigDir( void )
 #if defined(SYS_DARWIN) || defined(WIN32)
  #define RESUME_SUBDIR  "Resume"
  #define TORRENT_SUBDIR "Torrents"
+ #define PIECE_SUBDIR   "Pieces"
 #else
  #define RESUME_SUBDIR  "resume"
  #define TORRENT_SUBDIR "torrents"
+ #define PIECE_SUBDIR   "pieces"
 #endif
 
 static const char *
@@ -397,6 +407,10 @@ tr_setConfigDir( tr_session * session, const char * configDir )
     tr_mkdirp( path, 0777 );
     session->torrentDir = path;
 
+    path = tr_buildPath( configDir, PIECE_SUBDIR, NULL );
+    tr_mkdirp( path, 0777 );
+    session->pieceDir = path;
+
     migrateFiles( session );
 }
 
@@ -416,6 +430,12 @@ const char *
 tr_getResumeDir( const tr_session * session )
 {
     return session->resumeDir;
+}
+
+const char *
+tr_getPieceDir( const tr_session * session )
+{
+    return session->pieceDir;
 }
 
 const char*
@@ -678,6 +698,27 @@ tr_getWebClientDir( const tr_session * session UNUSED )
 ****
 ***/
 
+int64_t
+tr_getFreeSpace( const char * path )
+{
+#ifdef WIN32
+    uint64_t freeBytesAvailable = 0;
+    return GetDiskFreeSpaceEx( path, &freeBytesAvailable, NULL, NULL)
+        ? (int64_t)freeBytesAvailable
+        : -1;
+#elif defined(HAVE_STATVFS)
+    struct statvfs buf;
+    return statvfs( path, &buf ) ? -1 : (int64_t)buf.f_bavail * (int64_t)buf.f_bsize;
+#else
+    #warning FIXME: not implemented
+    return -1;
+#endif
+}
+
+/***
+****
+***/
+
 #ifdef WIN32
 
 /* The following mmap functions are by Joerg Walter, and were taken from
@@ -797,4 +838,3 @@ munmap_exit:
 }
 
 #endif
-

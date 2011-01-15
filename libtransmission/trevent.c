@@ -1,7 +1,7 @@
 /*
  * This file Copyright (C) 2007-2010 Mnemosyne LLC
  *
- * This file is licensed by the GPL version 2.  Works owned by the
+ * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
  * so that the bulk of its code can remain under the MIT license.
  * This exemption does not extend to derived works not owned by
@@ -261,7 +261,11 @@ tr_eventInit( tr_session * session )
 
     eh = tr_new0( tr_event_handle, 1 );
     eh->lock = tr_lockNew( );
-    pipe( eh->fds );
+    if( pipe( eh->fds ) == -1 )
+    {
+        const int err = errno;
+        tr_err( _( "Pipe creation failed: %s" ), tr_strerror( err ) );
+    }
     eh->session = session;
     eh->thread = tr_threadNew( libeventThreadFunc, eh );
 
@@ -316,10 +320,18 @@ tr_runInEventThread( tr_session * session,
         struct tr_run_data data;
 
         tr_lockLock( lock );
-        pipewrite( fd, &ch, 1 );
+        if( pipewrite( fd, &ch, 1 ) == -1 )
+        {
+            const int err = errno;
+            tr_err( _( "Pipe write error: %s" ), tr_strerror( err ) );
+        }
         data.func = func;
         data.user_data = user_data;
-        pipewrite( fd, &data, sizeof( data ) );
+        if( pipewrite( fd, &data, sizeof( data ) ) == -1 )
+        {
+            const int err = errno;
+            tr_err( _( "Pipe write error: %s" ), tr_strerror( err ) );
+        }
         tr_lockUnlock( lock );
     }
 }

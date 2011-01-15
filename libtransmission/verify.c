@@ -1,7 +1,7 @@
 /*
  * This file Copyright (C) 2007-2010 Mnemosyne LLC
  *
- * This file is licensed by the GPL version 2.  Works owned by the
+ * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
  * so that the bulk of its code can remain under the MIT license.
  * This exemption does not extend to derived works not owned by
@@ -68,6 +68,16 @@ verifyTorrent( tr_torrent * tor, tr_bool * stopFlag )
         if( piecePos == 0 )
             hadPiece = tr_cpPieceIsComplete( &tor->completion, pieceIndex );
 
+        /* check for temporary piece files */
+        if( file->usept && ( !piecePos || !filePos ) && fd < 0
+            && ( pieceIndex == file->firstPiece
+                 || pieceIndex == file->lastPiece ) )
+        {
+            char * filename = tr_torrentFindPieceTemp( tor, pieceIndex );
+            fd = filename == NULL ? -1 : tr_open_file_for_scanning( filename );
+            tr_free( filename );
+        }
+
         /* if we're starting a new file... */
         if( !filePos && (fd<0) && (fileIndex!=prevFileIndex) )
         {
@@ -85,12 +95,13 @@ verifyTorrent( tr_torrent * tor, tr_bool * stopFlag )
 
         /* read a bit */
         if( fd >= 0 ) {
-            const ssize_t numRead = tr_pread( fd, buffer, bytesThisPass, filePos );
+            const uint64_t readPos = file->usept ? piecePos : filePos;
+            const ssize_t numRead = tr_pread( fd, buffer, bytesThisPass, readPos );
             if( numRead > 0 ) {
                 bytesThisPass = (uint32_t)numRead;
                 SHA1_Update( &sha, buffer, bytesThisPass );
 #if defined HAVE_POSIX_FADVISE && defined POSIX_FADV_DONTNEED
-                posix_fadvise( fd, filePos, bytesThisPass, POSIX_FADV_DONTNEED );
+                posix_fadvise( fd, readPos, bytesThisPass, POSIX_FADV_DONTNEED );
 #endif
             }
         }
@@ -107,6 +118,13 @@ verifyTorrent( tr_torrent * tor, tr_bool * stopFlag )
             time_t now;
             tr_bool hasPiece;
             uint8_t hash[SHA_DIGEST_LENGTH];
+
+            /* close temporary piece file */
+            if( file->usept && fd >= 0 )
+            {
+                tr_close_file( fd );
+                fd = -1;
+            }
 
             SHA1_Final( hash, &sha );
             hasPiece = !memcmp( hash, tor->info.pieces[pieceIndex].hash, SHA_DIGEST_LENGTH );
@@ -147,7 +165,7 @@ verifyTorrent( tr_torrent * tor, tr_bool * stopFlag )
 
     /* stopwatch */
     end = tr_time( );
-    tr_tordbg( tor, "Verification is done.  It took %d seconds to verify %"PRIu64" bytes (%"PRIu64" bytes per second)",
+    tr_tordbg( tor, "Verification is done. It took %d seconds to verify %"PRIu64" bytes (%"PRIu64" bytes per second)",
                (int)(end-begin), tor->info.totalSize,
                (uint64_t)(tor->info.totalSize/(1+(end-begin))) );
 
