@@ -10,12 +10,12 @@
  * $Id$
  */
 
-#ifndef WIN32 /* FIXME: port quota check to Windows */
+#ifndef WIN32
 #include <sys/quota.h> /* quotactl */
 #include <mntent.h>
-#include <errno.h>
 #include <paths.h> /* _PATH_MOUNTED */
 #endif
+
 
 #ifdef WIN32
  #include <w32api.h>
@@ -699,43 +699,38 @@ tr_getWebClientDir( const tr_session * session UNUSED )
 ****
 ***/
 
-#ifndef WIN32 /* FIXME: port quota check to Windows */
-int
-getdev( const char * path, char * device )
+#ifndef WIN32
+static char *
+getdev( const char * path )
 {
 	FILE *fp;
 	struct mntent *mnt;
-	int len=0;
 
 	if ((fp = setmntent(_PATH_MOUNTED, "r")) == NULL)
 	{
-		return len;
+		return NULL;
 	}
 	while ((mnt = getmntent(fp)) != NULL)
 	{
 		if (strcmp(path, mnt->mnt_dir) == 0)
 		{
-			strcpy(device, mnt->mnt_fsname);
-			len = strlen(device);
 			break;
 		}
 	}
 	endmntent(fp);
-	return len;
+	return mnt ? mnt->mnt_fsname : NULL;
 }
 
-/* Dirty code to determine special block device */
-int
-getblkdev( const char * path, char * device )
+static char *
+getblkdev( const char * path )
 {
-	int len=0;
 	char *dir, *c;
+	char *device;
 
-	dir = malloc(strlen(path) + 1);
-	strcpy(dir, path);
+	dir = tr_strdup(path);
 	while (1)
 	{
-		if ((len = getdev(dir, device)) > 0)
+		if ((device = getdev(dir)) != NULL)
 		{
 			break;
 		}
@@ -748,17 +743,17 @@ getblkdev( const char * path, char * device )
 			break;
 		}
 	}
-	free(dir);
-	return len;
+	tr_free(dir);
+	return device;
 }
 
-int64_t
-getquota( char * device, uid_t uid )
+static int64_t
+getquota( char * device )
 {
 	struct dqblk dq;
 	int64_t freespace, limit;
 
-	if (quotactl(QCMD(Q_GETQUOTA, USRQUOTA), device, uid,
+	if (quotactl(QCMD(Q_GETQUOTA, USRQUOTA), device, getuid(),
 			(caddr_t) & dq) == 0)
 	{
 		if (dq.dqb_bsoftlimit > 0)
@@ -791,15 +786,11 @@ tr_getQuotaFreeSpace( const char * path )
 #ifndef WIN32
     char *device;
 
-    /* Should be enough */
-    device = malloc(pathconf(path, _PC_PATH_MAX));
-    memset(device, 0, sizeof(device));
-    if (getblkdev(path, device) != 0)
+    if ((device = getblkdev(path)) != NULL)
     {
-	ret = getquota(device, getuid());
+	ret = getquota(device);
     }
-    free(device);
-#endif /* FIXME: port quota check to Windows */
+#endif
     return ret;
 }
 
