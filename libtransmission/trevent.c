@@ -1,7 +1,7 @@
 /*
  * This file Copyright (C) 2007-2010 Mnemosyne LLC
  *
- * This file is licensed by the GPL version 2.  Works owned by the
+ * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
  * so that the bulk of its code can remain under the MIT license.
  * This exemption does not extend to derived works not owned by
@@ -18,7 +18,7 @@
 
 #include <signal.h>
 
-#include <event.h>
+#include <event2/event.h>
 
 #include "transmission.h"
 #include "net.h"
@@ -126,8 +126,6 @@ piperead( int s, char *buf, int len )
 
 #include <unistd.h>
 
-#include <event.h>
-
 #include "transmission.h"
 #include "platform.h"
 #include "trevent.h"
@@ -145,7 +143,7 @@ typedef struct tr_event_handle
     tr_session *  session;
     tr_thread *  thread;
     struct event_base * base;
-    struct event pipeEvent;
+    struct event * pipeEvent;
 }
 tr_event_handle;
 
@@ -200,7 +198,7 @@ readFromPipe( int    fd,
         case '\0': /* eof */
         {
             dbgmsg( "pipe eof reached... removing event listener" );
-            event_del( &eh->pipeEvent );
+            event_free( eh->pipeEvent );
             break;
         }
 
@@ -224,6 +222,7 @@ logFunc( int severity, const char * message )
 static void
 libeventThreadFunc( void * veh )
 {
+    struct event_base * base;
     tr_event_handle * eh = veh;
 
 #ifndef WIN32
@@ -231,21 +230,23 @@ libeventThreadFunc( void * veh )
     signal( SIGPIPE, SIG_IGN );
 #endif
 
-    eh->base = event_init( );
+    base = event_base_new( );
+    eh->base = base;
+    eh->session->event_base = base;
     eh->session->events = eh;
 
     /* listen to the pipe's read fd */
-    event_set( &eh->pipeEvent, eh->fds[0], EV_READ | EV_PERSIST, readFromPipe, veh );
-    event_add( &eh->pipeEvent, NULL );
+    eh->pipeEvent = event_new( base, eh->fds[0], EV_READ | EV_PERSIST, readFromPipe, veh );
+    event_add( eh->pipeEvent, NULL );
     event_set_log_callback( logFunc );
 
     /* loop until all the events are done */
     while( !eh->die )
-        event_dispatch( );
+        event_base_dispatch( base );
 
     /* shut down the thread */
     tr_lockFree( eh->lock );
-    event_base_free( eh->base );
+    event_base_free( base );
     eh->session->events = NULL;
     tr_free( eh );
     tr_dbg( "Closing libevent thread" );
@@ -260,7 +261,11 @@ tr_eventInit( tr_session * session )
 
     eh = tr_new0( tr_event_handle, 1 );
     eh->lock = tr_lockNew( );
-    pipe( eh->fds );
+    if( pipe( eh->fds ) == -1 )
+    {
+        const int err = errno;
+        tr_err( _( "Pipe creation failed: %s" ), tr_strerror( err ) );
+    }
     eh->session = session;
     eh->thread = tr_threadNew( libeventThreadFunc, eh );
 
@@ -315,18 +320,18 @@ tr_runInEventThread( tr_session * session,
         struct tr_run_data data;
 
         tr_lockLock( lock );
-        pipewrite( fd, &ch, 1 );
+        if( pipewrite( fd, &ch, 1 ) == -1 )
+        {
+            const int err = errno;
+            tr_err( _( "Pipe write error: %s" ), tr_strerror( err ) );
+        }
         data.func = func;
         data.user_data = user_data;
-        pipewrite( fd, &data, sizeof( data ) );
+        if( pipewrite( fd, &data, sizeof( data ) ) == -1 )
+        {
+            const int err = errno;
+            tr_err( _( "Pipe write error: %s" ), tr_strerror( err ) );
+        }
         tr_lockUnlock( lock );
     }
-}
-
-struct event_base *
-tr_eventGetBase( tr_session * session )
-{
-    assert( tr_isSession( session ) );
-
-    return session->events->base;
 }

@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2010 Transmission authors and contributors
+ * Copyright (c) 2005-2011 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -444,6 +444,9 @@ tr_session * fHandle;
         case PORT_STATUS_ERROR:
             [fPortStatusField setStringValue: NSLocalizedString(@"Port check site is down", "Preferences -> Network -> port status")];
             [fPortStatusImage setImage: [NSImage imageNamed: @"YellowDot.png"]];
+            break;
+        default:
+            NSAssert1(NO, @"Port checker returned invalid status: %d", [fPortChecker status]);
             break;
     }
     [fPortChecker release];

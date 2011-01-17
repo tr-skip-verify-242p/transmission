@@ -1,7 +1,7 @@
 /*
  * This file Copyright (C) 2007-2010 Mnemosyne LLC
  *
- * This file is licensed by the GPL version 2.  Works owned by the
+ * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
  * so that the bulk of its code can remain under the MIT license.
  * This exemption does not extend to derived works not owned by
@@ -201,10 +201,10 @@ getHashInfo( tr_metainfo_builder * b )
     uint32_t fileIndex = 0;
     uint8_t *ret = tr_new0( uint8_t, SHA_DIGEST_LENGTH * b->pieceCount );
     uint8_t *walk = ret;
-    uint8_t *buf;
+    uint8_t *buf = NULL;
     uint64_t totalRemain;
     uint64_t off = 0;
-    int fd;
+    int fd = -1;
 
     if( !b->totalSize )
         return ret;
@@ -216,13 +216,7 @@ getHashInfo( tr_metainfo_builder * b )
     if( fd < 0 )
     {
         b->my_errno = errno;
-        tr_strlcpy( b->errfile,
-                    b->files[fileIndex].filename,
-                    sizeof( b->errfile ) );
-        b->result = TR_MAKEMETA_IO_READ;
-        tr_free( buf );
-        tr_free( ret );
-        return NULL;
+        goto FAILED;
     }
     while( totalRemain )
     {
@@ -235,7 +229,13 @@ getHashInfo( tr_metainfo_builder * b )
         while( leftInPiece )
         {
             const size_t n_this_pass = (size_t) MIN( ( b->files[fileIndex].size - off ), leftInPiece );
-            read( fd, bufptr, n_this_pass );
+            ssize_t n_read = read( fd, bufptr, n_this_pass );
+            if( n_read == -1 )
+            {
+                b->my_errno = errno;
+                goto FAILED;
+            }
+            /* NB: Assume a short read does not occur. */
             bufptr += n_this_pass;
             off += n_this_pass;
             leftInPiece -= n_this_pass;
@@ -250,13 +250,7 @@ getHashInfo( tr_metainfo_builder * b )
                     if( fd < 0 )
                     {
                         b->my_errno = errno;
-                        tr_strlcpy( b->errfile,
-                                    b->files[fileIndex].filename,
-                                    sizeof( b->errfile ) );
-                        b->result = TR_MAKEMETA_IO_READ;
-                        tr_free( buf );
-                        tr_free( ret );
-                        return NULL;
+                        goto FAILED;
                     }
                 }
             }
@@ -286,6 +280,17 @@ getHashInfo( tr_metainfo_builder * b )
 
     tr_free( buf );
     return ret;
+
+FAILED:
+    if( fd >= 0 )
+        tr_close_file( fd );
+    tr_strlcpy( b->errfile,
+                b->files[fileIndex].filename,
+                sizeof( b->errfile ) );
+    b->result = TR_MAKEMETA_IO_READ;
+    tr_free( buf );
+    tr_free( ret );
+    return NULL;
 }
 
 static void

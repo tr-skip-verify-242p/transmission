@@ -1,7 +1,7 @@
 /*
  * This file Copyright (C) 2008-2010 Mnemosyne LLC
  *
- * This file is licensed by the GPL version 2.  Works owned by the
+ * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
  * so that the bulk of its code can remain under the MIT license.
  * This exemption does not extend to derived works not owned by
@@ -232,11 +232,11 @@ appendColumn( GtkTreeView * view,
         case COL_SEQUENCE:
             title = _( "Time" ); break;
 
-        /* noun.  column title for a list */
+        /* noun. column title for a list */
         case COL_NAME:
             title = _( "Name" ); break;
 
-        /* noun.  column title for a list */
+        /* noun. column title for a list */
         case COL_MESSAGE:
             title = _( "Message" ); break;
 
@@ -365,7 +365,7 @@ debug_level_combo_new( void )
                                             _( "Information" ), TR_MSG_INF,
                                             _( "Debug" ),       TR_MSG_DBG,
                                             NULL );
-    gtr_combo_box_set_active_enum( GTK_COMBO_BOX( w ), pref_int_get( TR_PREFS_KEY_MSGLEVEL ) );
+    gtr_combo_box_set_active_enum( GTK_COMBO_BOX( w ), gtr_pref_int_get( TR_PREFS_KEY_MSGLEVEL ) );
     return w;
 }
 
@@ -374,7 +374,7 @@ debug_level_combo_new( void )
 **/
 
 GtkWidget *
-msgwin_new( TrCore * core, GtkWindow * parent )
+gtr_message_log_window_new( GtkWindow * parent, TrCore * core )
 {
     GtkWidget *      win;
     GtkWidget *      vbox;
@@ -399,7 +399,6 @@ msgwin_new( TrCore * core, GtkWindow * parent )
     **/
 
     toolbar = gtk_toolbar_new( );
-    gtr_toolbar_set_orientation( GTK_TOOLBAR( toolbar ), GTK_ORIENTATION_HORIZONTAL );
     gtk_toolbar_set_style( GTK_TOOLBAR( toolbar ), GTK_TOOLBAR_BOTH_HORIZ );
 
     item = gtk_tool_button_new_from_stock( GTK_STOCK_SAVE_AS );
@@ -457,7 +456,7 @@ msgwin_new( TrCore * core, GtkWindow * parent )
     gtk_tree_sortable_set_sort_column_id( GTK_TREE_SORTABLE( data->sort ),
                                           COL_SEQUENCE,
                                           GTK_SORT_ASCENDING );
-    data->maxLevel = pref_int_get( TR_PREFS_KEY_MSGLEVEL );
+    data->maxLevel = gtr_pref_int_get( TR_PREFS_KEY_MSGLEVEL );
     gtk_tree_model_filter_set_visible_func( GTK_TREE_MODEL_FILTER( data->
                                                                    filter ),
                                             isRowVisible, data, NULL );

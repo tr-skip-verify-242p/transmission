@@ -1,7 +1,7 @@
 /*
  * This file Copyright (C) 2007-2010 Mnemosyne LLC
  *
- * This file is licensed by the GPL version 2.  Works owned by the
+ * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
  * so that the bulk of its code can remain under the MIT license.
  * This exemption does not extend to derived works not owned by
@@ -105,7 +105,7 @@ dialogResponse( GtkDialog * dialog,
     if( response == TR_RESPONSE_RESET )
     {
         const char * primary = _( "Reset your statistics?" );
-        const char * secondary = _( "These statistics are for your information only.  "
+        const char * secondary = _( "These statistics are for your information only. "
                                     "Resetting them doesn't affect the statistics logged by your BitTorrent trackers." );
         const int flags = GTK_DIALOG_DESTROY_WITH_PARENT
                         | GTK_DIALOG_MODAL;
@@ -134,8 +134,7 @@ dialogResponse( GtkDialog * dialog,
 }
 
 GtkWidget*
-stats_dialog_create( GtkWindow * parent,
-                     TrCore *    core )
+gtr_stats_dialog_new( GtkWindow * parent, TrCore * core )
 {
     guint            i;
     int              row = 0;
@@ -146,8 +145,7 @@ stats_dialog_create( GtkWindow * parent,
 
     d = gtk_dialog_new_with_buttons( _( "Statistics" ),
                                      parent,
-                                     GTK_DIALOG_DESTROY_WITH_PARENT |
-                                     GTK_DIALOG_NO_SEPARATOR,
+                                     GTK_DIALOG_DESTROY_WITH_PARENT,
                                      _( "_Reset" ), TR_RESPONSE_RESET,
                                      GTK_STOCK_CLOSE, GTK_RESPONSE_CLOSE,
                                      NULL );
@@ -158,7 +156,6 @@ stats_dialog_create( GtkWindow * parent,
                                              TR_RESPONSE_RESET,
                                              -1 );
     t = hig_workarea_create( );
-    gtk_box_pack_start( GTK_BOX( GTK_DIALOG( d )->vbox ), t, TRUE, TRUE, 0 );
     ui->core = core;
 
     hig_workarea_add_section_title( t, &row, _( "Current Session" ) );
@@ -183,7 +180,7 @@ stats_dialog_create( GtkWindow * parent,
     l = ui->all_time_lb = gtk_label_new( NULL );
     hig_workarea_add_row( t, &row, _( "Duration:" ), l, NULL );
     hig_workarea_finish( t, &row );
-    gtk_widget_show_all( t );
+    gtr_dialog_set_content( GTK_DIALOG( d ), t );
 
     updateStats( ui );
     g_object_set_data_full( G_OBJECT( d ), "data", ui, g_free );

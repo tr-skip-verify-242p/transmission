@@ -1,7 +1,7 @@
 /*
  * This file Copyright (C) 2008-2010 Mnemosyne LLC
  *
- * This file is licensed by the GPL version 2.  Works owned by the
+ * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
  * so that the bulk of its code can remain under the MIT license.
  * This exemption does not extend to derived works not owned by
@@ -10,21 +10,16 @@
  * $Id$
  */
 
-#ifndef TR_GTK_ADD_DIALOG_H
-#define TR_GTK_ADD_DIALOG_H
+#ifndef GTR_ADD_DIALOG_H
+#define GTR_ADD_DIALOG_H
 
 #include <gtk/gtk.h>
 #include "tr-core.h"
 
+GtkWidget* gtr_torrent_add_from_url_dialog_new ( GtkWindow * parent, TrCore * core );
+GtkWidget* gtr_torrent_add_from_file_dialog_new( GtkWindow * parent, TrCore * core );
+
 /* This dialog assumes ownership of the ctor */
-GtkWidget* addSingleTorrentDialog( GtkWindow * parent,
-                                   TrCore *    core,
-                                   tr_ctor *   ctor );
+GtkWidget* gtr_torrent_options_dialog_new( GtkWindow * parent, TrCore * core, tr_ctor * ctor );
 
-GtkWidget* addDialog( GtkWindow * parent,
-                      TrCore *    core );
-
-GtkWidget* addURLDialog( GtkWindow * parent,
-                         TrCore *    core );
-
-#endif /* TR_GTK_ADD_DIALOG */
+#endif /* GTR_ADD_DIALOG */
