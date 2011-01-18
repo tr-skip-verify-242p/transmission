@@ -800,7 +800,7 @@ setDeleteFiles( tr_torrent * tor,
     }
 
     if( !errmsg )
-        tr_torrentDeleteFiles( tor, files, fileCount );
+        tr_torrentDeleteFiles( tor, files, fileCount, remove );
 
     tr_free( files );
     return errmsg;

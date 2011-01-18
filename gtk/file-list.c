@@ -737,7 +737,8 @@ fileMenuDelete( GtkWidget * item UNUSED, gpointer userdata )
     indices = getSelectedFilesAndDescendants( view );
     tr_torrentDeleteFiles( tor,
                            (tr_file_index_t *) indices->data,
-                           (tr_file_index_t) indices->len );
+                           (tr_file_index_t) indices->len,
+                           gtr_file_trash_or_remove );
     g_array_free( indices, TRUE );
     refresh( filedata );
 }
