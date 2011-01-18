@@ -63,6 +63,8 @@ const tr_stat *tr_torrent_stat( TrTorrent *tor );
 
 const tr_info *tr_torrent_info( TrTorrent *tor );
 
+const int8_t * tr_torrent_availability( TrTorrent *tor, int size );
+
 void           tr_torrent_open_folder( TrTorrent * tor );
 
 TrTorrent *    tr_torrent_new_preexisting( tr_torrent * tor );

@@ -61,8 +61,6 @@ static PiecesCellRendererClassPrivate * cpriv = &cpriv_data;
 struct _PiecesCellRendererPrivate
 {
     TrTorrent       * gtor;
-    int8_t          * tab;
-    int               tabsize;
     cairo_surface_t * offscreen;
     int               offscreen_w;
     int               offscreen_h;
@@ -116,32 +114,15 @@ get_offscreen_context( PiecesCellRendererPrivate * priv,
     return cairo_create( priv->offscreen );
 }
 
-/**
- * Return an array usable for tr_torrentAvailability() with size
- * at least equal to @a minsize.
- */
-static int8_t *
-get_temp_table( PiecesCellRendererPrivate * priv, int minsize )
-{
-    if( !priv->tab || priv->tabsize < minsize )
-    {
-        tr_free( priv->tab );
-        priv->tab = tr_malloc( minsize );
-        priv->tabsize = minsize;
-    }
-    return priv->tab;
-}
-
 static void
 render_progress( PiecesCellRendererPrivate * priv,
                  cairo_t * cr, int x, int y, int w, int h )
 {
-    tr_torrent * tor = tr_torrent_handle( priv->gtor );
-    const tr_stat * st;
+    const tr_stat * st = tr_torrent_stat( priv->gtor );
     GdkColor * bg_color, * bar_color;
     double progress;
 
-    if( !tor )
+    if( !st )
     {
         gdk_cairo_set_source_color( cr, &cpriv->progress_bg_color );
         cairo_rectangle( cr, x, y, w, h );
@@ -149,7 +130,6 @@ render_progress( PiecesCellRendererPrivate * priv,
         return;
     }
 
-    st = tr_torrentStatCached( tor );
     if( st->percentDone >= 1.0 )
     {
         progress = MIN( 1.0, MAX( 0.0, st->seedRatioPercentDone ) );
@@ -188,8 +168,8 @@ static void
 render_pieces( PiecesCellRendererPrivate * priv,
                cairo_t * cr, int x, int y, int w, int h )
 {
-    tr_torrent * tor = tr_torrent_handle( priv->gtor );
-    int8_t * avtab = NULL;
+    const tr_stat * st;
+    const int8_t * avtab;
 
     if (w < 1 || h < 1)
         return;
@@ -198,10 +178,10 @@ render_pieces( PiecesCellRendererPrivate * priv,
     cairo_rectangle( cr, x, y, w, h );
     cairo_fill( cr );
 
-    avtab = get_temp_table( priv, w );
-    if( tor && avtab )
+    st = tr_torrent_stat( priv->gtor );
+    avtab = tr_torrent_availability( priv->gtor, w );
+    if( st && avtab )
     {
-        const tr_stat * st = tr_torrentStat( tor );
         const tr_bool connected = ( st->peersConnected > 0 );
         const tr_bool seeding = ( st->percentDone >= 1.0 );
         GdkColor * piece_have_color;
@@ -218,8 +198,6 @@ render_pieces( PiecesCellRendererPrivate * priv,
             piece_missing_color = &cpriv->piece_missing_color;
         else
             piece_missing_color = &cpriv->piece_bg_color;
-
-        tr_torrentAvailability( tor, avtab, w );
 
         for( i = 0; i < w; )
         {
@@ -338,9 +316,6 @@ pieces_cell_renderer_finalize( GObject * object )
     PiecesCellRendererPrivate * priv = self->priv;
     GObjectClass * parent;
 
-    tr_free( priv->tab );
-    priv->tab = NULL;
-    priv->tabsize = 0;
     if( priv->offscreen )
     {
         cairo_surface_destroy( priv->offscreen );
@@ -394,8 +369,6 @@ pieces_cell_renderer_init( GTypeInstance * instance,
                                        PiecesCellRendererPrivate );
     priv->gtor = NULL;
     priv->offscreen = NULL;
-    priv->tab = NULL;
-    priv->tabsize = 0;
 
     self->priv = priv;
 }

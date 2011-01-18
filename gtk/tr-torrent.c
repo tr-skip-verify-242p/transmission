@@ -39,9 +39,12 @@
 
 struct TrTorrentPrivate
 {
-    tr_torrent *  handle;
-    gboolean      do_remove;
-    gboolean      delete_local_data;
+    tr_torrent * handle;
+    gboolean     do_remove;
+    gboolean     delete_local_data;
+    int8_t     * avtab;
+    int          avtabsz;
+    time_t       avtabts;
 };
 
 
@@ -55,6 +58,8 @@ tr_torrent_init( GTypeInstance * instance, gpointer g_class UNUSED )
     p->handle = NULL;
     p->do_remove = FALSE;
     p->delete_local_data = FALSE;
+    p->avtab = NULL;
+    p->avtabsz = 0;
 
     self->priv = p;
 }
@@ -73,13 +78,19 @@ tr_torrent_dispose( GObject * o )
 
     if( !isDisposed( self ) )
     {
-        if( self->priv->handle )
+        struct TrTorrentPrivate * priv = self->priv;
+        if( priv->handle )
         {
-            if( self->priv->do_remove )
-                tr_torrentRemove( self->priv->handle, self->priv->delete_local_data, gtr_file_trash_or_remove );
+            if( priv->do_remove )
+                tr_torrentRemove( priv->handle, priv->delete_local_data,
+                                  gtr_file_trash_or_remove );
             else
-                tr_torrentFree( self->priv->handle );
+                tr_torrentFree( priv->handle );
         }
+
+        tr_free( priv->avtab );
+        priv->avtab = NULL;
+        priv->avtabsz = 0;
 
         self->priv = NULL;
     }
@@ -142,6 +153,44 @@ tr_torrent_info( TrTorrent * tor )
     tr_torrent * handle = tr_torrent_handle( tor );
 
     return handle ? tr_torrentInfo( handle ) : NULL;
+}
+
+const int8_t *
+tr_torrent_availability( TrTorrent * gtor, int size )
+{
+    struct TrTorrentPrivate * priv;
+    tr_torrent * tor;
+    tr_bool refresh = FALSE;
+    time_t now;
+
+    if( !gtor || size < 1 )
+        return NULL;
+
+    tor = tr_torrent_handle( gtor );
+    if( !tor )
+        return NULL;
+
+    priv = gtor->priv;
+    now = tr_time( );
+
+    if( !priv->avtab || priv->avtabsz < size )
+    {
+        priv->avtab = tr_malloc0( size );
+        priv->avtabsz = size;
+        refresh = TRUE;
+    }
+    else
+    {
+        refresh = ( now != priv->avtabts );
+    }
+
+    if( refresh )
+    {
+        tr_torrentAvailability( tor, priv->avtab, priv->avtabsz );
+        priv->avtabts = now;
+    }
+
+    return priv->avtab;
 }
 
 static gboolean
