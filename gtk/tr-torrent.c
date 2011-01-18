@@ -159,7 +159,7 @@ const int8_t *
 tr_torrent_availability( TrTorrent * gtor, int size )
 {
     struct TrTorrentPrivate * priv;
-    tr_torrent * tor;
+    const tr_torrent * tor;
     tr_bool refresh = FALSE;
     time_t now;
 
@@ -181,12 +181,12 @@ tr_torrent_availability( TrTorrent * gtor, int size )
     }
     else
     {
-        refresh = ( now != priv->avtabts );
+        refresh = ( now != priv->avtabts || size != priv->avtabsz );
     }
 
     if( refresh )
     {
-        tr_torrentAvailability( tor, priv->avtab, priv->avtabsz );
+        tr_torrentAvailability( tor, priv->avtab, size );
         priv->avtabts = now;
     }
 
