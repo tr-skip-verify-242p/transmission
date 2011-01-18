@@ -1399,6 +1399,10 @@ networkPage( GObject * core )
     w = new_check_button( s, TR_PREFS_KEY_PORT_FORWARDING, core );
     hig_workarea_add_wide_control( t, &row, w );
 
+    s = _( "Bind to network _interface" );
+    w = new_entry( TR_PREFS_KEY_PEER_SOCKET_INTERFACE, core );
+    hig_workarea_add_row( t, &row, s, w, NULL );
+
     hig_workarea_add_section_divider( t, &row );
     hig_workarea_add_section_title( t, &row, _( "Peer Limits" ) );
 

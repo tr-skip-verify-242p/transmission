@@ -247,6 +247,26 @@ tr_sessionGetPublicAddress( const tr_session * session, int tr_af_type, tr_bool 
     return bindinfo ? &bindinfo->addr : NULL;
 }
 
+const char *
+tr_sessionGetBindInterface( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+    return session->bind_interface;
+}
+
+void
+tr_sessionSetBindInterface( tr_session * session, const char * ifname )
+{
+    assert( tr_isSession( session ) );
+    if( !ifname )
+    {
+        session->bind_interface[0] = '\0';
+        return;
+    }
+    tr_strlcpy( session->bind_interface, ifname,
+                sizeof( session->bind_interface ) );
+}
+
 /***
 ****
 ***/
@@ -287,6 +307,7 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PORT_RANDOM_LOW,     49152 );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PORT_RANDOM_HIGH,    65535 );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_SOCKET_TOS,          atoi( TR_DEFAULT_PEER_SOCKET_TOS_STR ) );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_SOCKET_INTERFACE,    "" );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PEX_ENABLED,              TRUE );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PORT_FORWARDING,          TRUE );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PREALLOCATION,            TR_PREALLOCATE_SPARSE );
@@ -368,6 +389,7 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_SOCKET_TOS,          s->peerSocketTOS );
     if(s->peer_congestion_algorithm && s->peer_congestion_algorithm[0])
         tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_CONGESTION_ALGORITHM, s->peer_congestion_algorithm );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_SOCKET_INTERFACE,    tr_sessionGetBindInterface( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PEX_ENABLED,              s->isPexEnabled );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PORT_FORWARDING,          tr_sessionIsPortForwardingEnabled( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PREALLOCATION,            s->preallocationMode );
@@ -753,6 +775,8 @@ sessionSetImpl( void * vdata )
         tr_sessionSetEncryption( session, i );
     if( tr_bencDictFindInt( settings, TR_PREFS_KEY_PEER_SOCKET_TOS, &i ) )
         session->peerSocketTOS = i;
+    if( tr_bencDictFindStr( settings, TR_PREFS_KEY_PEER_SOCKET_INTERFACE, &str ) )
+        tr_sessionSetBindInterface( session, str );
     if( tr_bencDictFindStr( settings, TR_PREFS_KEY_PEER_CONGESTION_ALGORITHM, &str ) )
         session->peer_congestion_algorithm = tr_strdup(str);
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_BLOCKLIST_ENABLED, &boolVal ) )

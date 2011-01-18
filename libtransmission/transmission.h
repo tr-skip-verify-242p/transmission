@@ -188,6 +188,7 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_PEER_PORT_RANDOM_LOW          "peer-port-random-low"
 #define TR_PREFS_KEY_PEER_PORT_RANDOM_HIGH         "peer-port-random-high"
 #define TR_PREFS_KEY_PEER_SOCKET_TOS               "peer-socket-tos"
+#define TR_PREFS_KEY_PEER_SOCKET_INTERFACE         "peer-socket-interface"
 #define TR_PREFS_KEY_PEER_CONGESTION_ALGORITHM     "peer-congestion-algorithm"
 #define TR_PREFS_KEY_PEX_ENABLED                   "pex-enabled"
 #define TR_PREFS_KEY_PORT_FORWARDING               "port-forwarding-enabled"
@@ -684,6 +685,9 @@ tr_encryption_mode tr_sessionGetEncryption( tr_session * session );
 void               tr_sessionSetEncryption( tr_session * session,
                                             tr_encryption_mode    mode );
 
+const char * tr_sessionGetBindInterface( const tr_session * session );
+void         tr_sessionSetBindInterface( tr_session * session,
+                                         const char * ifname );
 
 /***********************************************************************
 ** Incoming Peer Connections Port

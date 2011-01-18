@@ -120,6 +120,9 @@ int  tr_netAccept( tr_session * session,
 int  tr_netSetTOS( int s,
                    int tos );
 
+int  tr_netSetBindToDevice( int          socket,
+                            const char * interface_name );
+
 int tr_netSetCongestionControl( int s, const char *algorithm );
 
 void tr_netClose( tr_session * session, int s );
