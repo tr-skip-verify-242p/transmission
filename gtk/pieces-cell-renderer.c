@@ -25,6 +25,7 @@
 #include <libtransmission/transmission.h>
 #include <libtransmission/utils.h>
 #include "pieces-cell-renderer.h"
+#include "tr-torrent.h"
 #include "util.h"
 
 enum
@@ -59,7 +60,7 @@ static PiecesCellRendererClassPrivate * cpriv = &cpriv_data;
 
 struct _PiecesCellRendererPrivate
 {
-    tr_torrent      * tor;
+    TrTorrent       * gtor;
     int8_t          * tab;
     int               tabsize;
     cairo_surface_t * offscreen;
@@ -122,11 +123,6 @@ get_offscreen_context( PiecesCellRendererPrivate * priv,
 static int8_t *
 get_temp_table( PiecesCellRendererPrivate * priv, int minsize )
 {
-    tr_torrent * tor = priv->tor;
-
-    if( !tor )
-        return NULL;
-
     if( !priv->tab || priv->tabsize < minsize )
     {
         tr_free( priv->tab );
@@ -140,7 +136,7 @@ static void
 render_progress( PiecesCellRendererPrivate * priv,
                  cairo_t * cr, int x, int y, int w, int h )
 {
-    tr_torrent * tor = priv->tor;
+    tr_torrent * tor = tr_torrent_handle( priv->gtor );
     const tr_stat * st;
     GdkColor * bg_color, * bar_color;
     double progress;
@@ -192,7 +188,7 @@ static void
 render_pieces( PiecesCellRendererPrivate * priv,
                cairo_t * cr, int x, int y, int w, int h )
 {
-    tr_torrent * tor = priv->tor;
+    tr_torrent * tor = tr_torrent_handle( priv->gtor );
     int8_t * avtab = NULL;
 
     if (w < 1 || h < 1)
@@ -307,7 +303,7 @@ pieces_cell_renderer_set_property( GObject      * object,
     switch( property_id )
     {
         case PROP_TORRENT:
-            priv->tor = g_value_get_pointer( v );
+            priv->gtor = g_value_get_object( v );
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID( object, property_id, pspec );
@@ -327,7 +323,7 @@ pieces_cell_renderer_get_property( GObject    * object,
     switch( property_id )
     {
         case PROP_TORRENT:
-            g_value_set_pointer( v, priv->tor );
+            g_value_set_object( v, priv->gtor );
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID( object, property_id, pspec );
@@ -370,9 +366,10 @@ pieces_cell_renderer_class_init( PiecesCellRendererClass * klass )
     gobject_class->finalize     = pieces_cell_renderer_finalize;
 
     g_object_class_install_property( gobject_class, PROP_TORRENT,
-                                     g_param_spec_pointer( "torrent", NULL,
-                                                           "tr_torrent*",
-                                                           G_PARAM_READWRITE ) );
+                                     g_param_spec_object( "torrent", NULL,
+                                                          "TrTorrent*",
+                                                          TR_TORRENT_TYPE,
+                                                          G_PARAM_READWRITE ) );
 
     gdk_color_parse( "#efefff", &cpriv->piece_bg_color );
     gdk_color_parse( "#2975d6", &cpriv->piece_have_color );
@@ -395,7 +392,7 @@ pieces_cell_renderer_init( GTypeInstance * instance,
 
     priv = G_TYPE_INSTANCE_GET_PRIVATE(self, PIECES_CELL_RENDERER_TYPE,
                                        PiecesCellRendererPrivate );
-    priv->tor = NULL;
+    priv->gtor = NULL;
     priv->offscreen = NULL;
     priv->tab = NULL;
     priv->tabsize = 0;

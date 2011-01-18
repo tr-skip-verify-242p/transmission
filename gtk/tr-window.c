@@ -134,7 +134,7 @@ makeview( PrivateData * p )
 
     p->renderer = r = torrent_cell_renderer_new( );
     gtk_tree_view_column_pack_start( col, r, FALSE );
-    gtk_tree_view_column_add_attribute( col, r, "torrent", MC_TORRENT_RAW );
+    gtk_tree_view_column_add_attribute( col, r, "torrent", MC_TORRENT );
     gtk_tree_view_column_add_attribute( col, r, "piece-upload-speed", MC_SPEED_UP );
     gtk_tree_view_column_add_attribute( col, r, "piece-download-speed", MC_SPEED_DOWN );
 

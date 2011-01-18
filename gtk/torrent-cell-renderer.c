@@ -325,7 +325,7 @@ static GtkCellRendererClass * parent_class = NULL;
 
 struct TorrentCellRendererPrivate
 {
-    tr_torrent       * tor;
+    TrTorrent        * gtor;
     GtkCellRenderer  * text_renderer;
     GtkCellRenderer  * text_renderer_err;
     GtkCellRenderer  * pbar_renderer;
@@ -401,7 +401,7 @@ get_size_compact( TorrentCellRenderer * cell,
     GtkCellRenderer * text_renderer;
 
     struct TorrentCellRendererPrivate * p = cell->priv;
-    const tr_torrent * tor = p->tor;
+    const tr_torrent * tor = tr_torrent_handle( p->gtor );
     const tr_stat * st = tr_torrentStatCached( (tr_torrent*)tor );
 
     icon = get_icon( tor, COMPACT_ICON_SIZE, widget );
@@ -460,7 +460,7 @@ get_size_full( TorrentCellRenderer * cell,
     GtkCellRenderer * text_renderer;
 
     struct TorrentCellRendererPrivate * p = cell->priv;
-    const tr_torrent * tor = p->tor;
+    const tr_torrent * tor = tr_torrent_handle( p->gtor );
     const tr_stat * st = tr_torrentStatCached( (tr_torrent*)tor );
     const tr_info * inf = tr_torrentInfo( tor );
 
@@ -516,7 +516,8 @@ torrent_cell_renderer_get_size( GtkCellRenderer  * cell,
 {
     TorrentCellRenderer * self = TORRENT_CELL_RENDERER( cell );
 
-    if( self && self->priv->tor )
+
+    if( self && self->priv->gtor )
     {
         int w, h;
         struct TorrentCellRendererPrivate * p = self->priv;
@@ -564,7 +565,7 @@ render_compact( TorrentCellRenderer   * cell,
     GtkCellRenderer * text_renderer;
 
     struct TorrentCellRendererPrivate * p = cell->priv;
-    const tr_torrent * tor = p->tor;
+    const tr_torrent * tor = tr_torrent_handle( p->gtor );
     const tr_stat * st = tr_torrentStatCached( (tr_torrent*)tor );
     const gboolean active = st->activity != TR_STATUS_STOPPED;
     const gboolean sensitive = active || st->error;
@@ -648,7 +649,7 @@ render_full( TorrentCellRenderer   * cell,
     GtkCellRenderer * text_renderer;
 
     struct TorrentCellRendererPrivate * p = cell->priv;
-    const tr_torrent * tor = p->tor;
+    const tr_torrent * tor = tr_torrent_handle( p->gtor );
     const tr_stat * st = tr_torrentStatCached( (tr_torrent*)tor );
     const tr_info * inf = tr_torrentInfo( tor );
     const gboolean active = st->activity != TR_STATUS_STOPPED;
@@ -760,7 +761,7 @@ torrent_cell_renderer_render( GtkCellRenderer       * cell,
     gtk_widget_set_direction( widget, GTK_TEXT_DIR_RTL );
 #endif
 
-    if( self && self->priv->tor )
+    if( self && self->priv->gtor )
     {
         struct TorrentCellRendererPrivate * p = self->priv;
         if( p->compact )
@@ -786,8 +787,8 @@ torrent_cell_renderer_set_property( GObject      * object,
     switch( property_id )
     {
         case P_TORRENT:
-            p->tor = g_value_get_pointer( v );
-            g_object_set( p->pbar_renderer, "torrent", p->tor, NULL );
+            p->gtor = g_value_get_object( v );
+            g_object_set( p->pbar_renderer, "torrent", p->gtor, NULL );
             break;
         case P_UPLOAD_SPEED:   p->upload_speed_KBps   = g_value_get_double( v ); break;
         case P_DOWNLOAD_SPEED: p->download_speed_KBps = g_value_get_double( v ); break;
@@ -809,7 +810,7 @@ torrent_cell_renderer_get_property( GObject     * object,
 
     switch( property_id )
     {
-        case P_TORRENT:        g_value_set_pointer( v, p->tor ); break;
+        case P_TORRENT:        g_value_set_object( v, p->gtor ); break;
         case P_UPLOAD_SPEED:   g_value_set_double( v, p->upload_speed_KBps ); break;
         case P_DOWNLOAD_SPEED: g_value_set_double( v, p->download_speed_KBps ); break;
         case P_BAR_HEIGHT:     g_value_set_int( v, p->bar_height ); break;
@@ -857,8 +858,9 @@ torrent_cell_renderer_class_init( TorrentCellRendererClass * klass )
     gobject_class->dispose = torrent_cell_renderer_dispose;
 
     g_object_class_install_property( gobject_class, P_TORRENT,
-                                    g_param_spec_pointer( "torrent", NULL,
-                                                          "tr_torrent*",
+                                     g_param_spec_object( "torrent", NULL,
+                                                          "TrTorrent*",
+                                                          TR_TORRENT_TYPE,
                                                           G_PARAM_READWRITE ) );
 
     g_object_class_install_property( gobject_class, P_UPLOAD_SPEED,
@@ -907,7 +909,7 @@ torrent_cell_renderer_init( GTypeInstance *  instance,
             struct
             TorrentCellRendererPrivate );
 
-    p->tor = NULL;
+    p->gtor = NULL;
     p->text_renderer = gtk_cell_renderer_text_new( );
     g_object_set( p->text_renderer, "xpad", 0, "ypad", 0, NULL );
     p->text_renderer_err = gtk_cell_renderer_text_new(  );
