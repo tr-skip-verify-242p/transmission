@@ -2138,15 +2138,16 @@ tr_peerMgrRemoveTorrent( tr_torrent * tor )
 }
 
 void
-tr_peerMgrTorrentAvailability( const tr_torrent * tor,
+tr_peerMgrTorrentAvailability( const tr_torrent * torrent,
                                int8_t           * tab,
                                int                tabCount )
 {
     tr_piece_index_t i;
-    const Torrent *  t;
-    float            interval;
-    tr_bool          isSeed;
-    int              peerCount;
+    const Torrent * t;
+    const tr_torrent * tor;
+    float interval;
+    tr_bool isSeed;
+    int peerCount;
     const tr_peer ** peers;
 
     if( !tab || tabCount < 1 )
@@ -2154,10 +2155,21 @@ tr_peerMgrTorrentAvailability( const tr_torrent * tor,
 
     memset( tab, 0, tabCount );
 
+    assert( tr_isTorrent( torrent ) );
+    tr_torrentLock( torrent );
+
+    t = torrent->torrentPeers;
+    tor = t->tor;
+
+    if( !tor )
+        goto OUT;
+
     assert( tr_isTorrent( tor ) );
     tr_torrentLock( tor );
 
-    t = tor->torrentPeers;
+    if( !tr_torrentHasMetadata( tor ) )
+        goto OUT2;
+
     interval = tor->info.pieceCount / (float) tabCount;
     isSeed = ( tr_cpGetStatus ( &tor->completion ) == TR_SEED );
     peers = (const tr_peer **) tr_ptrArrayBase( &t->peers );
@@ -2180,7 +2192,10 @@ tr_peerMgrTorrentAvailability( const tr_torrent * tor,
         }
     }
 
+OUT2:
     tr_torrentUnlock( tor );
+OUT:
+    tr_torrentUnlock( torrent );
 }
 
 /* Returns the pieces that are available from peers */
