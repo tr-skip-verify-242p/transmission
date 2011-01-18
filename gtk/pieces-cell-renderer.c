@@ -53,6 +53,7 @@ typedef struct _PiecesCellRendererClassPrivate
     GdkColor ratio_bar_color;
     GdkColor border_color;
     GdkColor paused_bar_color;
+    GdkColor magnet_color;
 } PiecesCellRendererClassPrivate;
 
 static PiecesCellRendererClassPrivate cpriv_data;
@@ -182,6 +183,8 @@ render_pieces( PiecesCellRendererPrivate * priv,
     avtab = tr_torrent_availability( priv->gtor, w );
     if( st && avtab )
     {
+        const tr_torrent * tor = tr_torrent_handle( priv->gtor );
+        const tr_bool magnet = !tr_torrentHasMetadata( tor );
         const tr_bool connected = ( st->peersConnected > 0 );
         const tr_bool seeding = ( st->percentDone >= 1.0 );
         GdkColor * piece_have_color;
@@ -195,9 +198,16 @@ render_pieces( PiecesCellRendererPrivate * priv,
             piece_have_color = &cpriv->piece_have_color;
 
         if( connected )
-            piece_missing_color = &cpriv->piece_missing_color;
+        {
+            if( magnet )
+                piece_missing_color = &cpriv->magnet_color;
+            else
+                piece_missing_color = &cpriv->piece_missing_color;
+        }
         else
+        {
             piece_missing_color = &cpriv->piece_bg_color;
+        }
 
         for( i = 0; i < w; )
         {
@@ -356,6 +366,7 @@ pieces_cell_renderer_class_init( PiecesCellRendererClass * klass )
     gdk_color_parse( "#448632", &cpriv->ratio_bar_color );
     gdk_color_parse( "#888888", &cpriv->border_color );
     gdk_color_parse( "#aaaaaa", &cpriv->paused_bar_color );
+    gdk_color_parse( "#a33dac", &cpriv->magnet_color );
 }
 
 static void
