@@ -198,7 +198,7 @@ render_pieces( PiecesCellRendererPrivate * priv,
     avtab = get_temp_table( priv, w );
     if( tor && avtab )
     {
-        const tr_stat * st = tr_torrentStatCached( tor );
+        const tr_stat * st = tr_torrentStat( tor );
         const tr_bool connected = ( st->peersConnected > 0 );
         const tr_bool seeding = ( st->percentDone >= 1.0 );
         GdkColor * piece_have_color;
