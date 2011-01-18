@@ -204,6 +204,7 @@ struct tr_session
 
     struct tr_bindinfo         * public_ipv4;
     struct tr_bindinfo         * public_ipv6;
+    char                         bind_interface[16];
 
     /* a page-aligned buffer for use by the libtransmission thread.
      * @see SESSION_BUFFER_SIZE */
