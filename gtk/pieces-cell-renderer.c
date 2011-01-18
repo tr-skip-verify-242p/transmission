@@ -114,33 +114,24 @@ get_offscreen_context( PiecesCellRendererPrivate * priv,
     return cairo_create( priv->offscreen );
 }
 
+/**
+ * Return an array usable for tr_torrentAvailability() with size
+ * at least equal to @a minsize.
+ */
 static int8_t *
-get_pieces_tab( PiecesCellRendererPrivate * priv,
-                int * setmePieceCount )
+get_temp_table( PiecesCellRendererPrivate * priv, int minsize )
 {
     tr_torrent * tor = priv->tor;
-    int count;
 
     if( !tor )
-    {
-        *setmePieceCount = 0;
         return NULL;
-    }
 
-    count = tr_torrentInfo( tor )->pieceCount;
-    if( count < 1 )
-    {
-        *setmePieceCount = 0;
-        return NULL;
-    }
-
-    if( !priv->tab || priv->tabsize < count )
+    if( !priv->tab || priv->tabsize < minsize )
     {
         tr_free( priv->tab );
-        priv->tab = tr_malloc( count );
-        priv->tabsize = count;
+        priv->tab = tr_malloc( minsize );
+        priv->tabsize = minsize;
     }
-    *setmePieceCount = count;
     return priv->tab;
 }
 
@@ -195,8 +186,7 @@ render_pieces( PiecesCellRendererPrivate * priv,
                cairo_t * cr, int x, int y, int w, int h )
 {
     tr_torrent * tor = priv->tor;
-    int8_t * pieces = NULL;
-    int pieceCount = 0;
+    int8_t * avtab = NULL;
 
     if (w < 1 || h < 1)
         return;
@@ -205,13 +195,12 @@ render_pieces( PiecesCellRendererPrivate * priv,
     cairo_rectangle( cr, x, y, w, h );
     cairo_fill( cr );
 
-    pieces = get_pieces_tab( priv, &pieceCount );
-    if( tor && pieces && pieceCount > 0 )
+    avtab = get_temp_table( priv, w );
+    if( tor && avtab )
     {
         const tr_stat * st = tr_torrentStatCached( tor );
         const tr_bool connected = ( st->peersConnected > 0 );
         const tr_bool seeding = ( st->percentDone >= 1.0 );
-        const double pw = (double) w / (double) pieceCount;
         GdkColor * piece_have_color;
         GdkColor * piece_missing_color;
         int i, j;
@@ -227,24 +216,24 @@ render_pieces( PiecesCellRendererPrivate * priv,
         else
             piece_missing_color = &cpriv->piece_bg_color;
 
-        tr_torrentAvailability( tor, pieces, pieceCount );
+        tr_torrentAvailability( tor, avtab, w );
 
-        for( i = 0; i < pieceCount; )
+        for( i = 0; i < w; )
         {
-            if( pieces[i] > 0 )
+            if( avtab[i] > 0 )
             {
                 ++i;
                 continue;
             }
-            avail = pieces[i];
-            for( j = i + 1; j < pieceCount; ++j )
-                if( pieces[j] != avail )
+            avail = avtab[i];
+            for( j = i + 1; j < w; ++j )
+                if( avtab[j] != avail )
                     break;
             if( avail == 0 )
                 gdk_cairo_set_source_color( cr, piece_missing_color );
             else
                 gdk_cairo_set_source_color( cr, piece_have_color );
-            cairo_rectangle( cr, x + pw * i, y, pw * (j - i), h );
+            cairo_rectangle( cr, x + i, y, j - i, h );
             cairo_fill( cr );
             i = j;
         }
