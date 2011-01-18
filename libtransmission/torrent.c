@@ -2523,7 +2523,9 @@ tr_torrentInitFileDLs( tr_torrent             * tor,
  * @see setFileDND()
  */
 static tr_bool
-deleteDNDFile( tr_torrent * tor, tr_file_index_t file_index )
+deleteDNDFile( tr_torrent      * tor,
+               tr_file_index_t   file_index,
+               tr_fileFunc       removeFunc )
 {
     tr_file * file;
     tr_file_index_t fi;
@@ -2590,7 +2592,7 @@ deleteDNDFile( tr_torrent * tor, tr_file_index_t file_index )
 
     /* Close and delete the file from the file system. */
     tr_fdFileClose( tor->session, tor, file_index, TR_FD_INDEX_FILE );
-    deleteLocalFile( path, remove );
+    deleteLocalFile( path, removeFunc );
     tr_free( path );
 
     /* Make subsequent writes to temporary piece files, if needed. */
@@ -2672,12 +2674,13 @@ deleteDNDFile( tr_torrent * tor, tr_file_index_t file_index )
 static tr_file_index_t
 tr_torrentDeleteDNDFiles( tr_torrent            * tor,
                           const tr_file_index_t * files,
-                          tr_file_index_t         fileCount )
+                          tr_file_index_t         fileCount,
+                          tr_fileFunc             removeFunc )
 {
     tr_file_index_t count = 0, i;
 
     for( i = 0; i < fileCount; ++i )
-        if( deleteDNDFile( tor, files[i] ) )
+        if( deleteDNDFile( tor, files[i], removeFunc ) )
             ++count;
 
     return count;
@@ -2689,7 +2692,8 @@ tr_torrentSetFileDLsImpl( tr_torrent             * tor,
                           tr_file_index_t          fileCount,
                           tr_bool                  doDownload,
                           tr_bool                  deleteData,
-                          tr_file_index_t        * setmeDeleteCount )
+                          tr_file_index_t        * setmeDeleteCount,
+                          tr_fileFunc              removeFunc )
 {
     assert( tr_isTorrent( tor ) );
     tr_torrentLock( tor );
@@ -2698,7 +2702,7 @@ tr_torrentSetFileDLsImpl( tr_torrent             * tor,
     if( !doDownload && deleteData )
     {
         tr_file_index_t count;
-        count = tr_torrentDeleteDNDFiles( tor, files, fileCount );
+        count = tr_torrentDeleteDNDFiles( tor, files, fileCount, removeFunc );
         if( setmeDeleteCount )
             *setmeDeleteCount = count;
     }
@@ -2714,16 +2718,19 @@ tr_torrentSetFileDLs( tr_torrent             * tor,
                       tr_file_index_t          fileCount,
                       tr_bool                  doDownload )
 {
-    tr_torrentSetFileDLsImpl( tor, files, fileCount, doDownload, FALSE, NULL );
+    tr_torrentSetFileDLsImpl( tor, files, fileCount, doDownload,
+                              FALSE, NULL, NULL );
 }
 
 tr_file_index_t
 tr_torrentDeleteFiles( tr_torrent            * torrent,
                        const tr_file_index_t * files,
-                       tr_file_index_t         fileCount )
+                       tr_file_index_t         fileCount,
+                       tr_fileFunc             removeFunc )
 {
     tr_file_index_t count = 0;
-    tr_torrentSetFileDLsImpl( torrent, files, fileCount, FALSE, TRUE, &count );
+    tr_torrentSetFileDLsImpl( torrent, files, fileCount, FALSE,
+                              TRUE, &count, removeFunc );
     return count;
 }
 
