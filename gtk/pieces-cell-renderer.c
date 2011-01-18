@@ -51,6 +51,7 @@ typedef struct _PiecesCellRendererClassPrivate
     GdkColor ratio_bg_color;
     GdkColor ratio_bar_color;
     GdkColor border_color;
+    GdkColor paused_bar_color;
 } PiecesCellRendererClassPrivate;
 
 static PiecesCellRendererClassPrivate cpriv_data;
@@ -164,6 +165,12 @@ render_progress( PiecesCellRendererPrivate * priv,
         progress = MIN( 1.0, MAX( 0.0, st->percentDone ) );
         bg_color = &cpriv->progress_bg_color;
         bar_color = &cpriv->progress_bar_color;
+    }
+
+    if( st->activity == TR_STATUS_STOPPED )
+    {
+        bg_color = &cpriv->progress_bg_color;
+        bar_color = &cpriv->paused_bar_color;
     }
 
     if( progress < 1.0 )
@@ -376,6 +383,7 @@ pieces_cell_renderer_class_init( PiecesCellRendererClass * klass )
     gdk_color_parse( "#a6e3b4", &cpriv->ratio_bg_color );
     gdk_color_parse( "#448632", &cpriv->ratio_bar_color );
     gdk_color_parse( "#888888", &cpriv->border_color );
+    gdk_color_parse( "#aaaaaa", &cpriv->paused_bar_color );
 }
 
 static void
