@@ -212,7 +212,7 @@ void tr_peerMgrRemoveTorrent( tr_torrent * tor );
 
 void tr_peerMgrTorrentAvailability( const tr_torrent * tor,
                                     int8_t           * tab,
-                                    unsigned int       tabCount );
+                                    int                tabCount );
 
 struct tr_bitfield* tr_peerMgrGetAvailable( const tr_torrent * tor );
 
