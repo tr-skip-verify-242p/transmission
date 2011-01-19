@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2011 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 #include <libtransmission/transmission.h>
 #include <libtransmission/utils.h>
 #include "pieces-cell-renderer.h"
+#include "tr-torrent.h"
 #include "util.h"
 
 enum
@@ -51,6 +52,8 @@ typedef struct _PiecesCellRendererClassPrivate
     GdkColor ratio_bg_color;
     GdkColor ratio_bar_color;
     GdkColor border_color;
+    GdkColor paused_bar_color;
+    GdkColor magnet_color;
 } PiecesCellRendererClassPrivate;
 
 static PiecesCellRendererClassPrivate cpriv_data;
@@ -58,9 +61,7 @@ static PiecesCellRendererClassPrivate * cpriv = &cpriv_data;
 
 struct _PiecesCellRendererPrivate
 {
-    tr_torrent      * tor;
-    int8_t          * tab;
-    int               tabsize;
+    TrTorrent       * gtor;
     cairo_surface_t * offscreen;
     int               offscreen_w;
     int               offscreen_h;
@@ -114,37 +115,15 @@ get_offscreen_context( PiecesCellRendererPrivate * priv,
     return cairo_create( priv->offscreen );
 }
 
-/**
- * Return an array usable for tr_torrentAvailability() with size
- * at least equal to @a minsize.
- */
-static int8_t *
-get_temp_table( PiecesCellRendererPrivate * priv, int minsize )
-{
-    tr_torrent * tor = priv->tor;
-
-    if( !tor )
-        return NULL;
-
-    if( !priv->tab || priv->tabsize < minsize )
-    {
-        tr_free( priv->tab );
-        priv->tab = tr_malloc( minsize );
-        priv->tabsize = minsize;
-    }
-    return priv->tab;
-}
-
 static void
 render_progress( PiecesCellRendererPrivate * priv,
                  cairo_t * cr, int x, int y, int w, int h )
 {
-    tr_torrent * tor = priv->tor;
-    const tr_stat * st;
+    const tr_stat * st = tr_torrent_stat( priv->gtor );
     GdkColor * bg_color, * bar_color;
     double progress;
 
-    if( !tor )
+    if( !st )
     {
         gdk_cairo_set_source_color( cr, &cpriv->progress_bg_color );
         cairo_rectangle( cr, x, y, w, h );
@@ -152,7 +131,6 @@ render_progress( PiecesCellRendererPrivate * priv,
         return;
     }
 
-    st = tr_torrentStatCached( tor );
     if( st->percentDone >= 1.0 )
     {
         progress = MIN( 1.0, MAX( 0.0, st->seedRatioPercentDone ) );
@@ -164,6 +142,12 @@ render_progress( PiecesCellRendererPrivate * priv,
         progress = MIN( 1.0, MAX( 0.0, st->percentDone ) );
         bg_color = &cpriv->progress_bg_color;
         bar_color = &cpriv->progress_bar_color;
+    }
+
+    if( st->activity == TR_STATUS_STOPPED )
+    {
+        bg_color = &cpriv->progress_bg_color;
+        bar_color = &cpriv->paused_bar_color;
     }
 
     if( progress < 1.0 )
@@ -185,8 +169,8 @@ static void
 render_pieces( PiecesCellRendererPrivate * priv,
                cairo_t * cr, int x, int y, int w, int h )
 {
-    tr_torrent * tor = priv->tor;
-    int8_t * avtab = NULL;
+    const tr_stat * st;
+    const int8_t * avtab;
 
     if (w < 1 || h < 1)
         return;
@@ -195,10 +179,12 @@ render_pieces( PiecesCellRendererPrivate * priv,
     cairo_rectangle( cr, x, y, w, h );
     cairo_fill( cr );
 
-    avtab = get_temp_table( priv, w );
-    if( tor && avtab )
+    st = tr_torrent_stat( priv->gtor );
+    avtab = tr_torrent_availability( priv->gtor, w );
+    if( st && avtab )
     {
-        const tr_stat * st = tr_torrentStat( tor );
+        const tr_torrent * tor = tr_torrent_handle( priv->gtor );
+        const tr_bool magnet = !tr_torrentHasMetadata( tor );
         const tr_bool connected = ( st->peersConnected > 0 );
         const tr_bool seeding = ( st->percentDone >= 1.0 );
         GdkColor * piece_have_color;
@@ -212,11 +198,16 @@ render_pieces( PiecesCellRendererPrivate * priv,
             piece_have_color = &cpriv->piece_have_color;
 
         if( connected )
-            piece_missing_color = &cpriv->piece_missing_color;
+        {
+            if( magnet )
+                piece_missing_color = &cpriv->magnet_color;
+            else
+                piece_missing_color = &cpriv->piece_missing_color;
+        }
         else
+        {
             piece_missing_color = &cpriv->piece_bg_color;
-
-        tr_torrentAvailability( tor, avtab, w );
+        }
 
         for( i = 0; i < w; )
         {
@@ -300,7 +291,7 @@ pieces_cell_renderer_set_property( GObject      * object,
     switch( property_id )
     {
         case PROP_TORRENT:
-            priv->tor = g_value_get_pointer( v );
+            priv->gtor = g_value_get_object( v );
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID( object, property_id, pspec );
@@ -320,7 +311,7 @@ pieces_cell_renderer_get_property( GObject    * object,
     switch( property_id )
     {
         case PROP_TORRENT:
-            g_value_set_pointer( v, priv->tor );
+            g_value_set_object( v, priv->gtor );
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID( object, property_id, pspec );
@@ -335,9 +326,6 @@ pieces_cell_renderer_finalize( GObject * object )
     PiecesCellRendererPrivate * priv = self->priv;
     GObjectClass * parent;
 
-    tr_free( priv->tab );
-    priv->tab = NULL;
-    priv->tabsize = 0;
     if( priv->offscreen )
     {
         cairo_surface_destroy( priv->offscreen );
@@ -363,9 +351,10 @@ pieces_cell_renderer_class_init( PiecesCellRendererClass * klass )
     gobject_class->finalize     = pieces_cell_renderer_finalize;
 
     g_object_class_install_property( gobject_class, PROP_TORRENT,
-                                     g_param_spec_pointer( "torrent", NULL,
-                                                           "tr_torrent*",
-                                                           G_PARAM_READWRITE ) );
+                                     g_param_spec_object( "torrent", NULL,
+                                                          "TrTorrent*",
+                                                          TR_TORRENT_TYPE,
+                                                          G_PARAM_READWRITE ) );
 
     gdk_color_parse( "#efefff", &cpriv->piece_bg_color );
     gdk_color_parse( "#2975d6", &cpriv->piece_have_color );
@@ -376,6 +365,8 @@ pieces_cell_renderer_class_init( PiecesCellRendererClass * klass )
     gdk_color_parse( "#a6e3b4", &cpriv->ratio_bg_color );
     gdk_color_parse( "#448632", &cpriv->ratio_bar_color );
     gdk_color_parse( "#888888", &cpriv->border_color );
+    gdk_color_parse( "#aaaaaa", &cpriv->paused_bar_color );
+    gdk_color_parse( "#a33dac", &cpriv->magnet_color );
 }
 
 static void
@@ -387,10 +378,8 @@ pieces_cell_renderer_init( GTypeInstance * instance,
 
     priv = G_TYPE_INSTANCE_GET_PRIVATE(self, PIECES_CELL_RENDERER_TYPE,
                                        PiecesCellRendererPrivate );
-    priv->tor = NULL;
+    priv->gtor = NULL;
     priv->offscreen = NULL;
-    priv->tab = NULL;
-    priv->tabsize = 0;
 
     self->priv = priv;
 }

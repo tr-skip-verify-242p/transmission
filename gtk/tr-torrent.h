@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2008 Transmission authors and contributors
+ * Copyright (c) 2006-2011 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -62,6 +62,8 @@ tr_torrent *   tr_torrent_handle( TrTorrent *tor );
 const tr_stat *tr_torrent_stat( TrTorrent *tor );
 
 const tr_info *tr_torrent_info( TrTorrent *tor );
+
+const int8_t * tr_torrent_availability( TrTorrent *tor, int size );
 
 void           tr_torrent_open_folder( TrTorrent * tor );
 
