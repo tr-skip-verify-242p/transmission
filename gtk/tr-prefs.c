@@ -525,6 +525,17 @@ privacyPage( GObject * core )
     hig_workarea_add_section_divider( t, &row );
     hig_workarea_add_section_title ( t, &row, _( "Privacy" ) );
 
+    s = _( "Peer _ID Prefix:" );
+    w = new_entry( TR_PREFS_KEY_PEER_ID_PREFIX, core );
+    gtk_entry_set_max_length( GTK_ENTRY( w ), 8 );
+    hig_workarea_add_row( t, &row, s, w, NULL );
+    s = _( "Do not change this value, unless you know what you are doing. "
+           "Some clients or trackers may rely on this to find out what "
+           "capabilities this program supports (among other things), "
+           "and may disconnect you if your custom peer ID prefix "
+           "confuses them. If unsure, leave it blank." );
+    gtr_widget_set_tooltip_text( w, s );
+
     s = _( "_Encryption mode:" );
     w = new_encryption_combo( core, "encryption" );
     hig_workarea_add_row( t, &row, s, w, NULL );
