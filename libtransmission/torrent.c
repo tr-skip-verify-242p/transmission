@@ -1640,7 +1640,7 @@ torrentStart( tr_torrent * tor )
      * change the peerid. It would help sometimes if a stopped event
      * was missed to ensure that we didn't think someone was cheating. */
     tr_free( tor->peer_id );
-    tor->peer_id = tr_peerIdNew( );
+    tor->peer_id = tr_peerIdNew( tor->session );
     tor->isRunning = 1;
     tr_torrentSetDirty( tor );
     tr_runInEventThread( tor->session, torrentStartImpl, tor );

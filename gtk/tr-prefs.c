@@ -493,6 +493,20 @@ new_encryption_combo( GObject * core, const char * key )
     return w;
 }
 
+static void
+peer_id_prefix_changed_cb( GtkEntry * e, gpointer vcore )
+{
+    TrCore * core = vcore;
+    GtkLabel * label;
+    const tr_session * session;
+
+    label = GTK_LABEL( g_object_get_data( G_OBJECT( e ), "peer-id-label" ) );
+    g_assert( label != NULL );
+
+    session = tr_core_session( core );
+    gtk_label_set_text( label, tr_sessionGetCurrentPeerId( session ) );
+}
+
 static GtkWidget*
 privacyPage( GObject * core )
 {
@@ -540,6 +554,25 @@ privacyPage( GObject * core )
 
     hig_workarea_add_section_divider( t, &row );
     hig_workarea_add_section_title ( t, &row, _( "Privacy" ) );
+
+    s = _( "Peer _ID Prefix:" );
+    e = new_entry( TR_PREFS_KEY_PEER_ID_PREFIX, core );
+    gtk_entry_set_max_length( GTK_ENTRY( e ), 8 );
+    hig_workarea_add_row( t, &row, s, e, NULL );
+    s = _( "Do not change this value, unless you know what you are doing. "
+           "Some clients or trackers may rely on this to find out what "
+           "capabilities this program supports (among other things), and "
+           "may disconnect you if your custom peer ID prefix confuses "
+           "them. Note that you must restart torrents in order for the "
+           "new peer ID to take effect.\n\n"
+           "If unsure, leave it blank." );
+    gtr_widget_set_tooltip_text( e, s );
+    s = _( "Current Peer ID:" );
+    w = gtk_label_new( NULL );
+    hig_workarea_add_row( t, &row, s, w, NULL );
+    g_object_set_data( G_OBJECT( e ), "peer-id-label", w );
+    g_signal_connect( e, "changed", G_CALLBACK( peer_id_prefix_changed_cb ), core );
+    peer_id_prefix_changed_cb( GTK_ENTRY( e ), core );
 
     s = _( "_Encryption mode:" );
     w = new_encryption_combo( core, "encryption" );
