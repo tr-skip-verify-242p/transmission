@@ -76,7 +76,7 @@ getRandomPort( tr_session * s )
    minor version number, z is the maintenance number, and b
    designates beta (Azureus-style) */
 uint8_t*
-tr_peerIdNew( void )
+tr_peerIdNew( tr_session * session )
 {
     int          i;
     int          val;
@@ -85,7 +85,7 @@ tr_peerIdNew( void )
     const char * pool = "0123456789abcdefghijklmnopqrstuvwxyz";
     const int    base = 36;
 
-    memcpy( buf, PEERID_PREFIX, 8 );
+    memcpy( buf, session ? session->peer_id_prefix : PEERID_PREFIX, 8 );
 
     tr_cryptoRandBuf( buf+8, 11 );
     for( i=8; i<19; ++i ) {
@@ -102,13 +102,25 @@ tr_peerIdNew( void )
 }
 
 const uint8_t*
-tr_getPeerId( void )
+tr_getPeerId( tr_session * session )
 {
-    static uint8_t * id = NULL;
+    if( !session )
+    {
+        static uint8_t * id = NULL;
+        if( !id )
+            id = tr_peerIdNew( NULL );
+        return id;
+    }
 
-    if( id == NULL )
-        id = tr_peerIdNew( );
-    return id;
+    assert( tr_isSession( session ) );
+
+    if( session->peer_id[0] == '\0' )
+    {
+        uint8_t * peer_id = tr_peerIdNew( session );
+        memcpy( session->peer_id, peer_id, sizeof( session->peer_id ) );
+        tr_free( peer_id );
+    }
+    return session->peer_id;
 }
 
 /***
@@ -279,6 +291,7 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddBool( d, TR_PREFS_KEY_LAZY_BITFIELD,            TRUE );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_MSGLEVEL,                 TR_MSG_INF );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_OPEN_FILE_LIMIT,          atoi( TR_DEFAULT_OPEN_FILE_LIMIT_STR ) );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_ID_PREFIX,           PEERID_PREFIX );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_LIMIT_GLOBAL,        atoi( TR_DEFAULT_PEER_LIMIT_GLOBAL_STR ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_LIMIT_TORRENT,       atoi( TR_DEFAULT_PEER_LIMIT_TORRENT_STR ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PORT,                atoi( TR_DEFAULT_PEER_PORT_STR ) );
@@ -349,6 +362,7 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddBool( d, TR_PREFS_KEY_LAZY_BITFIELD,            s->useLazyBitfield );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_MSGLEVEL,                 tr_getMessageLevel( ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_OPEN_FILE_LIMIT,          tr_fdGetFileLimit( s ) );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_ID_PREFIX,           tr_sessionGetPeerIdPrefix( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_LIMIT_GLOBAL,        tr_sessionGetPeerLimit( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_LIMIT_TORRENT,       s->peerLimitPerTorrent );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PORT,                tr_sessionGetPeerPort( s ) );
@@ -1584,6 +1598,25 @@ tr_sessionClearAltSpeedFunc( tr_session * session )
 /***
 ****
 ***/
+
+void
+tr_sessionSetPeerIdPrefix ( tr_session * session, const char * id )
+{
+    assert( tr_isSession( session ) );
+    tr_sessionLock( session );
+
+    tr_strlcpy( session->peer_id_prefix, id,
+                sizeof( session->peer_id_prefix ) );
+    session->peer_id[0] = '\0';
+    tr_sessionUnlock( session );
+}
+
+const char *
+tr_sessionGetPeerIdPrefix ( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+    return session->peer_id_prefix;
+}
 
 void
 tr_sessionSetPeerLimit( tr_session * session, uint16_t maxGlobalPeers )

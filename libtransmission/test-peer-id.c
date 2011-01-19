@@ -40,7 +40,7 @@ main( void )
     {
         int       j;
         int       val = 0;
-        uint8_t * pch = tr_peerIdNew( );
+        uint8_t * pch = tr_peerIdNew( NULL );
 
         check( strlen( (char*)pch ) == 20 );
         check( !memcmp( pch, PEERID_PREFIX, 8 ) );
