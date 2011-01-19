@@ -50,11 +50,7 @@ AddData :: set( const QString& key )
         int len;
         char * raw = tr_base64_decode( key.toUtf8().constData(), key.toUtf8().size(), &len );
         if( raw ) {
-#if QT_VERSION >= 0x040500
             metainfo.append( raw, len );
-#else
-            metainfo.append( QByteArray::fromRawData( raw, len ) );
-#endif
             tr_free( raw );
             type = METAINFO;
         }

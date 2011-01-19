@@ -31,7 +31,6 @@
 #include "options.h"
 #include "prefs.h"
 #include "prefs-dialog.h"
-#include "qticonloader.h"
 #include "relocate.h"
 #include "session.h"
 #include "session-dialog.h"
@@ -49,7 +48,7 @@
 QIcon
 TrMainWindow :: getStockIcon( const QString& name, int fallback )
 {
-    QIcon icon = QtIconLoader::icon( name );
+    QIcon icon = QIcon::fromTheme( name );
 
     if( icon.isNull( ) && ( fallback >= 0 ) )
         icon = style()->standardIcon( QStyle::StandardPixmap( fallback ), 0, this );
@@ -122,14 +121,6 @@ TrMainWindow :: TrMainWindow( Session& session, Prefs& prefs, TorrentModel& mode
     ui.action_Preferences->setIcon( getStockIcon( "preferences-system" ) );
     ui.action_Contents->setIcon( getStockIcon( "help-contents", QStyle::SP_DialogHelpButton ) );
     ui.action_About->setIcon( getStockIcon( "help-about" ) );
-
-    // ui version compatibility
-#if QT_VERSION >= 0x040600
-    ui.action_Start->setPriority(QAction::LowPriority);
-    ui.action_Pause->setPriority(QAction::LowPriority);
-    ui.action_Remove->setPriority(QAction::LowPriority);
-    ui.toolBar->setToolButtonStyle(QT::ToolButtonFollowStyle);
-#endif
 
     // ui signals
     connect( ui.action_Toolbar, SIGNAL(toggled(bool)), this, SLOT(setToolbarVisible(bool)));
