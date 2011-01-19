@@ -302,7 +302,7 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddBool( d, TR_PREFS_KEY_LAZY_BITFIELD,            TRUE );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_MSGLEVEL,                 TR_MSG_INF );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_OPEN_FILE_LIMIT,          atoi( TR_DEFAULT_OPEN_FILE_LIMIT_STR ) );
-    tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_ID_PREFIX,           PEERID_PREFIX );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_ID_PREFIX,           "" );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_LIMIT_GLOBAL,        atoi( TR_DEFAULT_PEER_LIMIT_GLOBAL_STR ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_LIMIT_TORRENT,       atoi( TR_DEFAULT_PEER_LIMIT_TORRENT_STR ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PORT,                atoi( TR_DEFAULT_PEER_PORT_STR ) );
@@ -1614,7 +1614,6 @@ tr_sessionClearAltSpeedFunc( tr_session * session )
 void
 tr_sessionSetPeerIdPrefix ( tr_session * session, const char * id )
 {
-    const char * src;
     size_t len;
 
     assert( tr_isSession( session ) );
@@ -1622,16 +1621,13 @@ tr_sessionSetPeerIdPrefix ( tr_session * session, const char * id )
 
     memset( session->peer_id_prefix, '-', PEER_ID_PREFIX_LEN );
 
-    if( !id || id[0] == '\0' )
-        src = PEERID_PREFIX;
-    else
-        src = id;
-
-    len = strlen( src );
+    len = strlen( id );
     if( len > PEER_ID_PREFIX_LEN )
         len = PEER_ID_PREFIX_LEN;
-    memcpy( session->peer_id_prefix, src, len );
-    session->peer_id_prefix[PEER_ID_PREFIX_LEN] = '\0';
+    if( len == 0 )
+        session->peer_id_prefix[0] = '\0';
+    else
+        memcpy( session->peer_id_prefix, id, len );
 
     resetPeerID( session );
 
