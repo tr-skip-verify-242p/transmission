@@ -50,6 +50,7 @@ noinst_HEADERS = \
     msgwin.h \
     notify.h \
     pieces-cell-renderer.h \
+    pieces-viewer.h \
     relocate.h \
     stats.h \
     torrent-cell-renderer.h \
@@ -82,6 +83,7 @@ transmission_gtk_SOURCES = \
     msgwin.c \
     notify.c \
     pieces-cell-renderer.c \
+    pieces-viewer.c \
     relocate.c \
     stats.c \
     torrent-cell-renderer.c \

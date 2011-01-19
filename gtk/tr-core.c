@@ -1773,3 +1773,19 @@ tr_core_get_active_torrent_count( TrCore * core )
     return activeCount;
 }
 
+TrTorrent *
+tr_core_get_handle( TrCore * core, const tr_torrent * tor )
+{
+    GtkTreeIter iter;
+    TrTorrent * gtor = NULL;
+
+    if( !tor )
+        return NULL;
+
+    if( findTorrentInModel( core, tr_torrentId( tor ), &iter ) )
+    {
+        GtkTreeModel * model = tr_core_model( core );
+        gtk_tree_model_get( model, &iter, MC_TORRENT, &gtor, -1 );
+    }
+    return gtor;
+}

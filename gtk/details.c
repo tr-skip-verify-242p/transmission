@@ -26,6 +26,7 @@
 #include "favicon.h" /* gtr_get_favicon() */
 #include "file-list.h"
 #include "hig.h"
+#include "pieces-viewer.h"
 #include "tr-prefs.h"
 #include "util.h"
 
@@ -69,6 +70,7 @@ struct DetailsImpl
     GtkWidget * date_started_lb;
     GtkWidget * eta_lb;
     GtkWidget * last_activity_lb;
+    GtkWidget * pieces_viewer;
 
     GtkWidget * hash_lb;
     GtkWidget * privacy_lb;
@@ -930,6 +932,13 @@ refreshInfo( struct DetailsImpl * di, tr_torrent ** torrents, int n )
     }
     gtr_label_set_text( GTK_LABEL( di->last_activity_lb ), str );
 
+    /* pieces viewer */
+    if( n == 1 )
+        gtr_pieces_viewer_set_gtorrent( GTR_PIECES_VIEWER( di->pieces_viewer ),
+                                        tr_core_get_handle( di->core, torrents[0] ) );
+    else
+        gtr_pieces_viewer_set_gtorrent( GTR_PIECES_VIEWER( di->pieces_viewer ), NULL );
+
     g_free( stats );
     g_free( infos );
 }
@@ -939,8 +948,10 @@ info_page_new( struct DetailsImpl * di )
 {
     int row = 0;
     GtkTextBuffer * b;
-    GtkWidget *l, *w, *fr, *sw;
+    GtkWidget *l, *w, *fr, *sw, *hbox;
     GtkWidget *t = hig_workarea_create( );
+
+    gtk_container_set_border_width( GTK_CONTAINER( t ), 0 );
 
     hig_workarea_add_section_title( t, &row, _( "Activity" ) );
 
@@ -983,6 +994,17 @@ info_page_new( struct DetailsImpl * di )
         hig_workarea_add_row( t, &row, _( "Error:" ), l, NULL );
         di->error_lb = l;
 
+    hbox = gtk_hbox_new( FALSE, GUI_PAD_BIG );
+    gtk_box_pack_start( GTK_BOX( hbox ), t, TRUE, TRUE, 0 );
+
+    di->pieces_viewer = gtr_pieces_viewer_new( );
+    w = gtk_alignment_new( 1, 1, 0, 0 );
+    gtk_container_add( GTK_CONTAINER( w ), di->pieces_viewer );
+    gtk_box_pack_start( GTK_BOX( hbox ), w, FALSE, FALSE, 0 );
+
+    t = hig_workarea_create( );
+    gtk_table_attach( GTK_TABLE( t ), hbox, 0, 2, 0, 1, GTK_FILL, 0, 0, 0 );
+    row = 1;
 
     hig_workarea_add_section_divider( t, &row );
     hig_workarea_add_section_title( t, &row, _( "Details" ) );
