@@ -760,6 +760,7 @@ uint16_t   tr_sessionGetIdleLimit ( const tr_session * );
 
 void         tr_sessionSetPeerIdPrefix ( tr_session *, const char * );
 const char * tr_sessionGetPeerIdPrefix ( const tr_session * );
+const char * tr_sessionGetCurrentPeerId ( const tr_session * );
 
 void       tr_sessionSetPeerLimit( tr_session *, uint16_t maxGlobalPeers );
 uint16_t   tr_sessionGetPeerLimit( const tr_session * );

@@ -86,7 +86,7 @@ resetPeerID( tr_session * session )
    minor version number, z is the maintenance number, and b
    designates beta (Azureus-style) */
 uint8_t*
-tr_peerIdNew( tr_session * session )
+tr_peerIdNew( const tr_session * session )
 {
     int          i;
     int          val;
@@ -119,7 +119,7 @@ tr_peerIdNew( tr_session * session )
 }
 
 const uint8_t*
-tr_getPeerId( tr_session * session )
+tr_getPeerId( const tr_session * session )
 {
     if( !session )
     {
@@ -1639,6 +1639,11 @@ tr_sessionGetPeerIdPrefix ( const tr_session * session )
 {
     assert( tr_isSession( session ) );
     return session->peer_id_prefix;
+}
+
+const char * tr_sessionGetCurrentPeerId ( const tr_session * session )
+{
+    return (const char *) tr_getPeerId( session );
 }
 
 void

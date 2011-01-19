@@ -39,9 +39,9 @@ enum
     PEER_ID_PREFIX_LEN = 8,
 };
 
-uint8_t*       tr_peerIdNew( tr_session * session );
+uint8_t*       tr_peerIdNew( const tr_session * session );
 
-const uint8_t* tr_getPeerId( tr_session * session );
+const uint8_t* tr_getPeerId( const tr_session * session );
 
 struct event_base;
 struct tr_address;
