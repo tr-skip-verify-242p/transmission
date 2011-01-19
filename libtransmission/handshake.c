@@ -50,7 +50,6 @@ enum
     HANDSHAKE_NAME_LEN             = 20,
     HANDSHAKE_FLAGS_LEN            = 8,
     HANDSHAKE_SIZE                 = 68,
-    PEER_ID_LEN                    = 20,
     INCOMING_HANDSHAKE_LEN         = 48,
 
     /* Encryption Constants */

@@ -91,23 +91,29 @@ tr_peerIdNew( tr_session * session )
     int          i;
     int          val;
     int          total = 0;
-    uint8_t *    buf = tr_new( uint8_t, 21 );
+    uint8_t *    buf = tr_new( uint8_t, PEER_ID_LEN + 1 );
     const char * pool = "0123456789abcdefghijklmnopqrstuvwxyz";
     const int    base = 36;
+    const char * src;
 
-    memcpy( buf, session ? session->peer_id_prefix : PEERID_PREFIX,
-            PEERID_PREFIX_LEN );
+    if( !session || session->peer_id_prefix[0] == '\0' )
+        src = PEERID_PREFIX;
+    else
+        src = session->peer_id_prefix;
 
-    tr_cryptoRandBuf( buf + PEERID_PREFIX_LEN, 11 );
-    for( i = PEERID_PREFIX_LEN; i < 19; ++i ) {
+    memcpy( buf, src, PEER_ID_PREFIX_LEN );
+
+    tr_cryptoRandBuf( buf + PEER_ID_PREFIX_LEN,
+                      PEER_ID_LEN - PEER_ID_PREFIX_LEN - 1 );
+    for( i = PEER_ID_PREFIX_LEN; i < PEER_ID_LEN - 1; ++i ) {
         val = buf[i] % base;
         total += val;
         buf[i] = pool[val];
     }
 
     val = total % base ? base - ( total % base ) : 0;
-    buf[19] = pool[val];
-    buf[20] = '\0';
+    buf[PEER_ID_LEN - 1] = pool[val];
+    buf[PEER_ID_LEN] = '\0';
 
     return buf;
 }
@@ -124,13 +130,6 @@ tr_getPeerId( tr_session * session )
     }
 
     assert( tr_isSession( session ) );
-
-    if( session->peer_id[0] == '\0' )
-    {
-        tr_sessionLock( session );
-        resetPeerID( session );
-        tr_sessionUnlock( session );
-    }
 
     return session->peer_id;
 }
@@ -571,6 +570,7 @@ tr_sessionInit( const char  * tag,
     session->tag = tr_strdup( tag );
     session->magicNumber = SESSION_MAGIC_NUMBER;
     session->buffer = tr_valloc( SESSION_BUFFER_SIZE );
+    resetPeerID( session );
     tr_bencInitList( &session->removedTorrents, 0 );
 
     /* nice to start logging at the very beginning */
@@ -1620,7 +1620,7 @@ tr_sessionSetPeerIdPrefix ( tr_session * session, const char * id )
     assert( tr_isSession( session ) );
     tr_sessionLock( session );
 
-    memset( session->peer_id_prefix, '-', PEERID_PREFIX_LEN );
+    memset( session->peer_id_prefix, '-', PEER_ID_PREFIX_LEN );
 
     if( !id || id[0] == '\0' )
         src = PEERID_PREFIX;
@@ -1628,10 +1628,10 @@ tr_sessionSetPeerIdPrefix ( tr_session * session, const char * id )
         src = id;
 
     len = strlen( src );
-    if( len > PEERID_PREFIX_LEN )
-        len = PEERID_PREFIX_LEN;
+    if( len > PEER_ID_PREFIX_LEN )
+        len = PEER_ID_PREFIX_LEN;
     memcpy( session->peer_id_prefix, src, len );
-    session->peer_id_prefix[PEERID_PREFIX_LEN] = '\0';
+    session->peer_id_prefix[PEER_ID_PREFIX_LEN] = '\0';
 
     resetPeerID( session );
 

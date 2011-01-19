@@ -33,6 +33,12 @@
 
 typedef enum { TR_NET_OK, TR_NET_ERROR, TR_NET_WAIT } tr_tristate_t;
 
+enum
+{
+    PEER_ID_LEN        = 20,
+    PEER_ID_PREFIX_LEN = 8,
+};
+
 uint8_t*       tr_peerIdNew( tr_session * session );
 
 const uint8_t* tr_getPeerId( tr_session * session );
@@ -107,9 +113,8 @@ struct tr_session
 
     int                          umask;
 
-#define PEERID_PREFIX_LEN 8
-    char                         peer_id_prefix[PEERID_PREFIX_LEN + 1];
-    uint8_t                      peer_id[21];
+    char                         peer_id_prefix[PEER_ID_PREFIX_LEN + 1];
+    uint8_t                      peer_id[PEER_ID_LEN + 1];
 
     int                          speedLimit_Bps[2];
     tr_bool                      speedLimitEnabled[2];
