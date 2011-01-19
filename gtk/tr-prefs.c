@@ -531,9 +531,9 @@ privacyPage( GObject * core )
     hig_workarea_add_row( t, &row, s, w, NULL );
     s = _( "Do not change this value, unless you know what you are doing. "
            "Some clients or trackers may rely on this to find out what "
-           "capabilities this program supports (among other things), "
-           "and may disconnect you if your custom peer ID prefix "
-           "confuses them. If unsure, leave it blank." );
+           "capabilities this program supports (among other things), and "
+           "may disconnect you if your custom peer ID prefix confuses "
+           "them. If unsure, leave it blank to use the default value." );
     gtr_widget_set_tooltip_text( w, s );
 
     s = _( "_Encryption mode:" );
