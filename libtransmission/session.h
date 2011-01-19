@@ -107,7 +107,8 @@ struct tr_session
 
     int                          umask;
 
-    char                         peer_id_prefix[8];
+#define PEERID_PREFIX_LEN 8
+    char                         peer_id_prefix[PEERID_PREFIX_LEN + 1];
     uint8_t                      peer_id[21];
 
     int                          speedLimit_Bps[2];
