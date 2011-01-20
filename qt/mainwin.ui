@@ -157,6 +157,9 @@
      <height>24</height>
     </size>
    </property>
+   <property name="toolButtonStyle">
+    <enum>Qt::ToolButtonFollowStyle</enum>
+   </property>
    <property name="floatable">
     <bool>false</bool>
    </property>
@@ -230,6 +233,9 @@
    <property name="shortcut">
     <string>Ctrl+S</string>
    </property>
+   <property name="priority">
+    <enum>QAction::LowPriority</enum>
+   </property>
   </action>
   <action name="action_Announce">
    <property name="text">
@@ -249,6 +255,9 @@
    <property name="shortcut">
     <string>Ctrl+P</string>
    </property>
+   <property name="priority">
+    <enum>QAction::LowPriority</enum>
+   </property>
   </action>
   <action name="action_Verify">
    <property name="text">
@@ -267,6 +276,9 @@
    </property>
    <property name="shortcut">
     <string>Del</string>
+   </property>
+   <property name="priority">
+    <enum>QAction::LowPriority</enum>
    </property>
   </action>
   <action name="action_Delete">

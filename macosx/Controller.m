@@ -44,6 +44,7 @@
 #import "ToolbarSegmentedCell.h"
 #import "BlocklistDownloader.h"
 #import "StatusBarView.h"
+#import "FilterBarView.h"
 #import "FilterButton.h"
 #import "BonjourController.h"
 #import "Badger.h"
@@ -325,7 +326,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         
         //hidden pref
         if ([fDefaults objectForKey: @"PeerSocketTOS"])
-            tr_bencDictAddInt(&settings, TR_PREFS_KEY_PEER_SOCKET_TOS, [fDefaults integerForKey: @"PeerSocketTOS"]);
+            tr_bencDictAddStr(&settings, TR_PREFS_KEY_PEER_SOCKET_TOS, [[fDefaults stringForKey: @"PeerSocketTOS"] UTF8String]);
         
         tr_bencDictAddBool(&settings, TR_PREFS_KEY_PEX_ENABLED, [fDefaults boolForKey: @"PEXGlobal"]);
         tr_bencDictAddBool(&settings, TR_PREFS_KEY_PORT_FORWARDING, [fDefaults boolForKey: @"NatTraversal"]);
@@ -394,7 +395,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         [[UKKQueue sharedFileWatcher] setDelegate: self];
         
         [[SUUpdater sharedUpdater] setDelegate: self];
-        fUpdateInProgress = NO;
+        fQuitRequested = NO;
         
         fPauseOnLaunch = (GetCurrentKeyModifiers() & (optionKey | rightOptionKey)) != 0;
     }
@@ -681,7 +682,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 
 - (NSApplicationTerminateReply) applicationShouldTerminate: (NSApplication *) sender
 {
-    if (!fUpdateInProgress && [fDefaults boolForKey: @"CheckQuit"])
+    if (!fQuitRequested && [fDefaults boolForKey: @"CheckQuit"])
     {
         NSInteger active = 0, downloading = 0;
         for (Torrent * torrent  in fTorrents)
@@ -4362,7 +4363,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 
 - (void) updaterWillRelaunchApplication: (SUUpdater *) updater
 {
-    fUpdateInProgress = YES;
+    fQuitRequested = YES;
 }
 
 - (NSDictionary *) registrationDictionaryForGrowl
@@ -4442,6 +4443,11 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         
         case TR_RPC_SESSION_CHANGED:
             [fPrefsController performSelectorOnMainThread: @selector(rpcUpdatePrefs) withObject: nil waitUntilDone: NO];
+            break;
+        
+        case TR_RPC_SESSION_CLOSE:
+            fQuitRequested = YES;
+            [NSApp performSelectorOnMainThread: @selector(terminate:) withObject: self waitUntilDone: NO];
             break;
         
         default:

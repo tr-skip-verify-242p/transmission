@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -101,13 +101,6 @@ savePeers( tr_benc * dict, const tr_torrent * tor )
         tr_bencDictAddRaw( dict, KEY_PEERS6, pex, sizeof( tr_pex ) * count );
 
     tr_free( pex );
-}
-
-static tr_bool
-tr_isPex( const tr_pex * pex )
-{
-    return tr_isAddress( &pex->addr )
-        && ( pex->flags & 3 ) == pex->flags;
 }
 
 static int
