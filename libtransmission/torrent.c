@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2009-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -49,6 +49,16 @@
 #include "utils.h"
 #include "verify.h"
 #include "version.h"
+
+/***
+****
+***/
+
+#define tr_deeplog_tor( tor, ... ) \
+    do { \
+        if( tr_deepLoggingIsActive( ) ) \
+            tr_deepLog( __FILE__, __LINE__, tr_torrentName( tor ), __VA_ARGS__ ); \
+    } while( 0 )
 
 /***
 ****
@@ -765,7 +775,7 @@ setLocalErrorIfFilesDisappeared( tr_torrent * tor )
 
     if( disappeared )
     {
-        tr_tordbg( tor, "%s", "[LAZY] uh oh, the files disappeared" );
+        tr_deeplog_tor( tor, "%s", "[LAZY] uh oh, the files disappeared" );
         tr_torrentSetLocalError( tor, "%s", _( "No data found! Ensure your drives are connected or use \"Set Location\". To re-download, remove the torrent and re-add it." ) );
     }
 
@@ -1412,50 +1422,72 @@ tr_torrentFilesFree( tr_file_stat *            files,
 double*
 tr_torrentWebSpeeds_KBps( const tr_torrent * tor )
 {
-    return tr_isTorrent( tor ) ? tr_peerMgrWebSpeeds_KBps( tor ) : NULL;
+    double * ret = NULL;
+
+    if( tr_isTorrent( tor ) )
+    {
+        tr_torrentLock( tor );
+        ret = tr_peerMgrWebSpeeds_KBps( tor );
+        tr_torrentUnlock( tor );
+    }
+
+    return ret;
 }
 
 tr_peer_stat *
-tr_torrentPeers( const tr_torrent * tor,
-                 int *              peerCount )
+tr_torrentPeers( const tr_torrent * tor, int * peerCount )
 {
     tr_peer_stat * ret = NULL;
 
     if( tr_isTorrent( tor ) )
+    {
+        tr_torrentLock( tor );
         ret = tr_peerMgrPeerStats( tor, peerCount );
+        tr_torrentUnlock( tor );
+    }
 
     return ret;
 }
 
 void
-tr_torrentPeersFree( tr_peer_stat * peers,
-                     int peerCount  UNUSED )
+tr_torrentPeersFree( tr_peer_stat * peers, int peerCount UNUSED )
 {
     tr_free( peers );
 }
 
 tr_tracker_stat *
-tr_torrentTrackers( const tr_torrent * torrent,
-                    int              * setmeTrackerCount )
+tr_torrentTrackers( const tr_torrent * torrent, int * setmeTrackerCount )
 {
-    assert( tr_isTorrent( torrent ) );
+    tr_tracker_stat * ret = NULL;
 
-    return tr_announcerStats( torrent, setmeTrackerCount );
+    if( tr_isTorrent( torrent ) )
+    {
+        tr_torrentLock( torrent );
+        ret = tr_announcerStats( torrent, setmeTrackerCount );
+        tr_torrentUnlock( torrent );
+    }
+
+    return ret;
 }
 
 void
-tr_torrentTrackersFree( tr_tracker_stat * trackers,
-                        int trackerCount )
+tr_torrentTrackersFree( tr_tracker_stat * trackers, int trackerCount )
 {
     tr_announcerStatsFree( trackers, trackerCount );
 }
 
 void
-tr_torrentAvailability( const tr_torrent * tor,
-                        int8_t *           tab,
-                        int                size )
+tr_torrentAvailability( const tr_torrent * tor, int8_t * tab, int size )
 {
+    assert( tr_isTorrent( tor ) );
+    assert( tab != NULL );
+    assert( size > 0 );
+
+    tr_torrentLock( tor );
+
     tr_peerMgrTorrentAvailability( tor, tab, size );
+
+    tr_torrentUnlock( tor );
 }
 
 void
@@ -1790,6 +1822,8 @@ stopTorrent( void * vtor )
 
     assert( tr_isTorrent( tor ) );
 
+    tr_torrentLock( tor );
+
     tr_verifyRemove( tor );
     tr_peerMgrStopTorrent( tor );
     tr_announcerTorrentStopped( tor );
@@ -1799,6 +1833,8 @@ stopTorrent( void * vtor )
 
     if( !tor->isDeleting )
         tr_torrentSave( tor );
+
+    tr_torrentUnlock( tor );
 }
 
 void
@@ -2881,7 +2917,7 @@ tr_torrentCheckPiece( tr_torrent * tor, tr_piece_index_t pieceIndex )
 {
     const tr_bool pass = tr_ioTestPiece( tor, pieceIndex );
 
-    tr_tordbg( tor, "[LAZY] tr_torrentCheckPiece tested piece %zu, pass==%d", (size_t)pieceIndex, (int)pass );
+    tr_deeplog_tor( tor, "[LAZY] tr_torrentCheckPiece tested piece %zu, pass==%d", (size_t)pieceIndex, (int)pass );
     tr_torrentSetHasPiece( tor, pieceIndex, pass );
     tr_torrentSetPieceChecked( tor, pieceIndex );
     tor->anyDate = tr_time( );

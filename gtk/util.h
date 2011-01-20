@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -199,5 +199,8 @@ gboolean on_tree_view_button_released( GtkWidget      * view,
 
 /* move a file to the trashcan if GIO is available; otherwise, delete it */
 int gtr_file_trash_or_remove( const char * filename );
+
+void gtr_paste_clipboard_url_into_entry( GtkWidget * entry );
+
 
 #endif /* GTR_UTIL_H */
