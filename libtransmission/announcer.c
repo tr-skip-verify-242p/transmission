@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2009-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -977,7 +977,7 @@ tierAddAnnounce( tr_tier * tier, const char * announceEvent, time_t announceAt )
     tr_ptrArrayAppend( &tier->announceEvents, (void*)announceEvent );
     tier->announceAt = announceAt;
 
-    dbgmsg( tier, "appended event \"%s\"; announcing in %d seconds\n", announceEvent, (int)difftime(announceAt,time(NULL)) );
+    dbgmsg( tier, "appended event \"%s\"; announcing in %d seconds", announceEvent, (int)difftime(announceAt,time(NULL)) );
 }
 
 static void
@@ -1956,6 +1956,7 @@ tr_announcerStats( const tr_torrent * torrent,
     const time_t now = tr_time( );
 
     assert( tr_isTorrent( torrent ) );
+    assert( tr_torrentIsLocked( torrent ) );
 
     /* count the trackers... */
     for( i=n=0, tierCount=tr_ptrArraySize( &torrent->tiers->tiers ); i<tierCount; ++i ) {

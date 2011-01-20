@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -481,6 +481,10 @@ onRPCChanged( tr_session            * session,
 
     switch( type )
     {
+        case TR_RPC_SESSION_CLOSE:
+            gtr_action_activate( "quit" );
+            break;
+
         case TR_RPC_TORRENT_ADDED:
             tr_core_add_torrent( cbdata->core, tr_torrent_new_preexisting( tor ), TRUE );
             break;
