@@ -49,7 +49,6 @@
 #include <libtransmission/web.h>
 
 #include "actions.h"
-#include "add-dialog.h"
 #include "conf.h"
 #include "details.h"
 #include "dialogs.h"
@@ -57,6 +56,7 @@
 #include "makemeta-ui.h"
 #include "msgwin.h"
 #include "notify.h"
+#include "open-dialog.h"
 #include "relocate.h"
 #include "stats.h"
 #include "tr-core.h"
@@ -1785,15 +1785,15 @@ gtr_actions_handler( const char * action_name, gpointer user_data )
     struct cbdata * data = user_data;
     gboolean        changed = FALSE;
 
-    if( !strcmp( action_name, "add-torrent-from-url" ) )
+    if( !strcmp( action_name, "open-torrent-from-url" ) )
     {
-        GtkWidget * w = gtr_torrent_add_from_url_dialog_new( data->wind, data->core );
+        GtkWidget * w = gtr_torrent_open_from_url_dialog_new( data->wind, data->core );
         gtk_widget_show( w );
     }
-    else if(  !strcmp( action_name, "add-torrent-menu" )
-      || !strcmp( action_name, "add-torrent-toolbar" ) )
+    else if(  !strcmp( action_name, "open-torrent-menu" )
+      || !strcmp( action_name, "open-torrent-toolbar" ) )
     {
-        GtkWidget * w = gtr_torrent_add_from_file_dialog_new( data->wind, data->core );
+        GtkWidget * w = gtr_torrent_open_from_file_dialog_new( data->wind, data->core );
         gtk_widget_show( w );
     }
     else if( !strcmp( action_name, "show-stats" ) )
