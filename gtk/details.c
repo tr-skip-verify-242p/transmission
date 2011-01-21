@@ -73,6 +73,7 @@ struct DetailsImpl
     GtkWidget * pieces_viewer;
 
     GtkWidget * hash_lb;
+    GtkWidget * peerid_lb;
     GtkWidget * privacy_lb;
     GtkWidget * origin_lb;
     GtkWidget * destination_lb;
@@ -883,6 +884,19 @@ refreshInfo( struct DetailsImpl * di, tr_torrent ** torrents, int n )
         str = mixed;
     gtr_label_set_text( GTK_LABEL( di->hash_lb ), str );
 
+    /* peerid_ln */
+    if( n <= 0 )
+        str = no_torrent;
+    else if( n == 1 )
+    {
+        str = stats[0]->peerID;
+        if( str[0] == '\0' )
+            str = _( "None set" );
+    }
+    else
+        str = mixed;
+    gtr_label_set_text( GTK_LABEL( di->peerid_lb ), str );
+
     /* error */
     if( n <= 0 )
         str = no_torrent;
@@ -1023,6 +1037,13 @@ info_page_new( struct DetailsImpl * di )
                                            NULL );
         hig_workarea_add_row( t, &row, _( "Hash:" ), l, NULL );
         di->hash_lb = l;
+
+        /* peer id */
+        l = g_object_new( GTK_TYPE_LABEL, "selectable", TRUE,
+                                          "ellipsize", PANGO_ELLIPSIZE_END,
+                                           NULL );
+        hig_workarea_add_row( t, &row, _( "Our Peer ID:" ), l, NULL );
+        di->peerid_lb = l;
 
         /* privacy */
         l = gtk_label_new( NULL );

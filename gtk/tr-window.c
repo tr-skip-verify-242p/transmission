@@ -29,6 +29,7 @@
 
 #include <libtransmission/transmission.h>
 #include <libtransmission/utils.h> /* tr_formatter_speed_KBps() */
+#include <libtransmission/version.h>
 
 #include "actions.h"
 #include "conf.h"
@@ -750,6 +751,24 @@ gtr_window_new( GtkUIManager * ui_mgr, TrCore * core )
 }
 
 static void
+updateTitle( TrWindow * self )
+{
+    PrivateData * p;
+    tr_session * session;
+    gchar title[256];
+
+    if( !( p = get_private_data( self ) )
+        || !( session = tr_core_session( p->core ) ) )
+        return;
+
+    g_snprintf( title, sizeof( title ), "%s %s [ %s ]",
+                g_get_application_name( ),
+                LONG_VERSION_STRING,
+                tr_sessionGetCurrentPeerId( session ) );
+    gtk_window_set_title( GTK_WINDOW( self ), title );
+}
+
+static void
 updateTorrentCount( PrivateData * p )
 {
     if( p && p->core )
@@ -859,6 +878,7 @@ gtr_window_refresh( TrWindow * self )
 
     if( p && p->core && tr_core_session( p->core ) )
     {
+        updateTitle( self );
         updateSpeeds( p );
         updateTorrentCount( p );
         updateStats( p );

@@ -1151,6 +1151,10 @@ tr_torrentStat( tr_torrent * tor )
 
     s = &tor->stats;
     s->id = tor->uniqueId;
+    if( tor->peer_id )
+        tr_strlcpy( s->peerID, tor->peer_id, sizeof( s->peerID ) );
+    else
+        s->peerID[0] = '\0';
     s->activity = tr_torrentGetActivity( tor );
     s->error = tor->error;
     memcpy( s->errorString, tor->errorString, sizeof( s->errorString ) );
