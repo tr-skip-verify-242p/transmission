@@ -52,7 +52,6 @@
 #include "formatter.h"
 #include "hig.h"
 #include "prefs.h"
-#include "qticonloader.h"
 #include "session.h"
 #include "squeezelabel.h"
 #include "torrent.h"
@@ -133,7 +132,7 @@ class PeerItem: public QTreeWidgetItem
 QIcon
 Details :: getStockIcon( const QString& freedesktop_name, int fallback )
 {
-    QIcon icon = QtIconLoader::icon( freedesktop_name );
+    QIcon icon = QIcon::fromTheme( freedesktop_name );
 
     if( icon.isNull( ) )
         icon = style()->standardIcon( QStyle::StandardPixmap( fallback ), 0, this );
@@ -424,7 +423,7 @@ Details :: refresh( )
             }
             else
             {
-                string = tr( "%1 of %2% (%3%), %4 Unverified" )
+                string = tr( "%1 of %2 (%3%), %4 Unverified" )
                              .arg( Formatter::sizeToString( haveVerified + haveUnverified ) )
                              .arg( Formatter::sizeToString( sizeWhenDone ) )
                              .arg( pct )
@@ -1231,11 +1230,7 @@ Details :: createTrackerTab( )
     v2->addStretch( 1 );
 
     h->addLayout( v2, 1 );
-#if QT_VERSION >= 0x040500
     h->setStretch( 1, 0 );
-#else
-    h->setStretchFactor( myTrackerView, 0 );
-#endif
 
     v->addLayout( h, 1 );
 

@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -71,11 +71,6 @@ typedef struct tr_peerIo
     tr_bool               extendedProtocolSupported;
     tr_bool               fastExtensionSupported;
     tr_bool               dhtSupported;
-
-    /* we create the socket in a nonblocking way, so this flag is initially
-     * false and then set to true when libevent says that the socket is ready
-     * for reading or writing */
-    tr_bool               hasFinishedConnecting;
 
     tr_priority_t         priority;
 
@@ -340,8 +335,7 @@ tr_peerIoHasBandwidthLeft( const tr_peerIo * io, tr_direction dir )
 {
     assert( tr_isPeerIo( io ) );
 
-    return !io->hasFinishedConnecting
-        || ( tr_bandwidthClamp( &io->bandwidth, dir, 1024 ) > 0 );
+    return tr_bandwidthClamp( &io->bandwidth, dir, 1024 ) > 0;
 }
 
 static inline unsigned int

@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -912,4 +912,43 @@ gtr_unrecognized_url_dialog( GtkWidget * parent, const char * url )
     g_signal_connect_swapped( w, "response", G_CALLBACK( gtk_widget_destroy ), w );
     gtk_widget_show( w );
     g_string_free( gstr, TRUE );
+}
+
+/***
+****
+***/
+
+void
+gtr_paste_clipboard_url_into_entry( GtkWidget * e )
+{
+  size_t i;
+
+  char * text[] = {
+    gtk_clipboard_wait_for_text( gtk_clipboard_get( GDK_SELECTION_PRIMARY ) ),
+    gtk_clipboard_wait_for_text( gtk_clipboard_get( GDK_SELECTION_CLIPBOARD ) )
+  };
+
+  for( i=0; i<G_N_ELEMENTS(text); ++i ) {
+      char * s = text[i];
+      if( s && ( gtr_is_supported_url( s ) || gtr_is_magnet_link( s ) ) ) {
+          gtk_entry_set_text( GTK_ENTRY( e ), s );
+          break;
+      }
+  }
+
+  for( i=0; i<G_N_ELEMENTS(text); ++i )
+    g_free( text[i] );
+}
+
+/***
+****
+***/
+
+void
+gtr_label_set_text( GtkLabel * lb, const char * newstr )
+{
+    const char * oldstr = gtk_label_get_text( lb );
+
+    if( ( oldstr == NULL ) || strcmp( oldstr, newstr ) )
+        gtk_label_set_text( lb, newstr );
 }

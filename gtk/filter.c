@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -608,7 +608,7 @@ activity_is_it_a_separator( GtkTreeModel * m, GtkTreeIter * i, gpointer d UNUSED
 static gboolean
 test_torrent_activity( tr_torrent * tor, int type )
 {
-    const tr_stat * st = tr_torrentStat( tor );
+    const tr_stat * st = tr_torrentStatCached( tor );
 
     switch( type )
     {
@@ -621,6 +621,7 @@ test_torrent_activity( tr_torrent * tor, int type )
         case ACTIVITY_FILTER_ACTIVE:
             return ( st->peersSendingToUs > 0 )
                 || ( st->peersGettingFromUs > 0 )
+                || ( st->webseedsSendingToUs > 0 )
                 || ( st->activity == TR_STATUS_CHECK );
 
         case ACTIVITY_FILTER_PAUSED:

@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2009-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -307,6 +307,8 @@ typedef struct
     int leecherCount;
     int downloadCount;
     int downloaderCount;
+
+    int consecutiveAnnounceFailures;
 
     uint32_t id;
 
@@ -977,7 +979,7 @@ tierAddAnnounce( tr_tier * tier, const char * announceEvent, time_t announceAt )
     tr_ptrArrayAppend( &tier->announceEvents, (void*)announceEvent );
     tier->announceAt = announceAt;
 
-    dbgmsg( tier, "appended event \"%s\"; announcing in %d seconds\n", announceEvent, (int)difftime(announceAt,time(NULL)) );
+    dbgmsg( tier, "appended event \"%s\"; announcing in %d seconds", announceEvent, (int)difftime(announceAt,time(NULL)) );
 }
 
 static void
@@ -1094,17 +1096,22 @@ tierIsNotResponding( const tr_tier * tier, const time_t now )
 }
 
 static int
-getRetryInterval( const tr_host * host )
+getRetryInterval( const tr_tracker_item * t )
 {
-    int interval;
-    const int jitter = tr_cryptoWeakRandInt( 120 );
-    const time_t timeSinceLastSuccess = tr_time() - host->lastSuccessfulRequest;
-         if( timeSinceLastSuccess < 15*60 ) interval = 0;
-    else if( timeSinceLastSuccess < 30*60 ) interval = 60*4;
-    else if( timeSinceLastSuccess < 45*60 ) interval = 60*8;
-    else if( timeSinceLastSuccess < 60*60 ) interval = 60*16;
-    else                                    interval = 60*32;
-    return interval + jitter;
+    int minutes;
+    const int jitter_seconds = tr_cryptoWeakRandInt( 120 );
+
+    switch( t->consecutiveAnnounceFailures ) {
+        case 0:  minutes =  0; break;
+        case 1:  minutes =  1; break;
+        case 2:  minutes =  2; break;
+        case 3:  minutes =  4; break;
+        case 4:  minutes =  8; break;
+        case 5:  minutes = 16; break;
+        default: minutes = 32; break;
+    }
+
+    return ( minutes * 60 ) + jitter_seconds;
 }
 
 static int
@@ -1365,6 +1372,7 @@ onAnnounceDone( tr_session   * session,
 
         if( responseCode == HTTP_OK )
         {
+            tier->currentTracker->consecutiveAnnounceFailures = 0;
             success = parseAnnounceResponse( tier, response, responseLen, &gotScrape );
             dbgmsg( tier, "success is %d", success );
 
@@ -1389,6 +1397,8 @@ onAnnounceDone( tr_session   * session,
 
             tr_strlcpy( tier->lastAnnounceStr, buf,
                         sizeof( tier->lastAnnounceStr ) );
+
+            ++tier->currentTracker->consecutiveAnnounceFailures;
 
             /* if the response is serious, *and* if the response may require
              * human intervention, then notify the user... otherwise just log it */
@@ -1415,7 +1425,7 @@ onAnnounceDone( tr_session   * session,
 
         if( responseCode == 0 )
         {
-            const int interval = getRetryInterval( tier->currentTracker->host );
+            const int interval = getRetryInterval( tier->currentTracker );
             dbgmsg( tier, "No response from tracker... retrying in %d seconds.", interval );
             tier->manualAnnounceAllowedAt = ~(time_t)0;
             tierAddAnnounce( tier, announceEvent, now + interval );
@@ -1458,7 +1468,7 @@ onAnnounceDone( tr_session   * session,
              * has erred or is incapable of performing the request.
              * So we pause a bit and try again. */
 
-            const int interval = getRetryInterval( tier->currentTracker->host );
+            const int interval = getRetryInterval( tier->currentTracker );
             tier->manualAnnounceAllowedAt = ~(time_t)0;
             tierAddAnnounce( tier, announceEvent, now + interval );
         }
@@ -1711,7 +1721,7 @@ onScrapeDone( tr_session   * session,
                 tr_snprintf( tier->lastScrapeStr, sizeof( tier->lastScrapeStr ),
                              _( "tracker gave HTTP Response Code %1$ld (%2$s)" ),
                              responseCode, tr_webGetResponseStr( responseCode ) );
-            tr_tordbg( tier->tor, "%s", tier->lastScrapeStr );
+            dbgmsg( tier, "%s", tier->lastScrapeStr );
         }
         else if( 300 <= responseCode && responseCode <= 399 )
         {
@@ -1720,11 +1730,11 @@ onScrapeDone( tr_session   * session,
             tier->scrapeAt = now + interval;
             tr_snprintf( tier->lastScrapeStr, sizeof( tier->lastScrapeStr ),
                          "Got a redirect. Retrying in %d seconds", interval );
-            tr_tordbg( tier->tor, "%s", tier->lastScrapeStr );
+            dbgmsg( tier, "%s", tier->lastScrapeStr );
         }
         else
         {
-            const int interval = getRetryInterval( tier->currentTracker->host );
+            const int interval = getRetryInterval( tier->currentTracker );
 
             /* Don't retry on a 4xx.
              * Retry at growing intervals on a 5xx */
@@ -1956,6 +1966,7 @@ tr_announcerStats( const tr_torrent * torrent,
     const time_t now = tr_time( );
 
     assert( tr_isTorrent( torrent ) );
+    assert( tr_torrentIsLocked( torrent ) );
 
     /* count the trackers... */
     for( i=n=0, tierCount=tr_ptrArraySize( &torrent->tiers->tiers ); i<tierCount; ++i ) {
