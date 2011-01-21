@@ -1803,6 +1803,9 @@ typedef struct tr_stat
         @see error */
     char errorString[512];
 
+    /** Our current peer ID for this torrent, a NULL-terminated string. */
+    char peerID[21];
+
     /** When tr_stat.activity is TR_STATUS_CHECK or TR_STATUS_CHECK_WAIT,
         this is the percentage of how much of the files has been
         verified. When it gets to 1, the verify process is done.
