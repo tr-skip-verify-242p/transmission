@@ -3032,6 +3032,31 @@ OUT:
     return err;
 }
 
+char *
+tr_torrentGetTopName( const tr_torrent * tor )
+{
+    const char * p, * orig;
+    const tr_info * info;
+    char * ret = NULL;
+
+    assert( tr_isTorrent( tor ) );
+
+    tr_torrentLock( tor );
+
+    if( !tr_torrentHasMetadata( tor ) )
+        goto OUT;
+
+    info = &tor->info;
+    orig = info->files[0].name;
+    if( !( p = strchr( orig, TR_PATH_DELIMITER ) ) )
+        goto OUT;
+    ret = tr_strndup( orig, (int) ( p - orig ) );
+
+OUT:
+    tr_torrentUnlock( tor );
+    return ret;
+}
+
 /***
 ****
 ***/
