@@ -1161,7 +1161,7 @@ wannaquit( gpointer vdata, int response UNUSED )
     GtkWidget *r, *p, *b, *w, *c;
     struct cbdata *cbdata = vdata;
 
-    if( pref_flag_get( PREF_KEY_QUIT_FAST ) )
+    if( gtr_pref_flag_get( PREF_KEY_QUIT_FAST ) )
         exit( 0 );
 
     /* stop the update timer */
