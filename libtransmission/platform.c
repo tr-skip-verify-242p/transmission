@@ -779,7 +779,7 @@ getquota( char * device )
 }
 #endif
 
-int64_t
+static int64_t
 tr_getQuotaFreeSpace( const char * path )
 {
     int64_t ret=-1;
@@ -794,8 +794,8 @@ tr_getQuotaFreeSpace( const char * path )
     return ret;
 }
 
-int64_t
-tr_getFreeSpace( const char * path )
+static int64_t
+tr_getDiskFreeSpace( const char * path )
 {
 #ifdef WIN32
     uint64_t freeBytesAvailable = 0;
@@ -809,6 +809,15 @@ tr_getFreeSpace( const char * path )
     #warning FIXME: not implemented
     return -1;
 #endif
+}
+
+int64_t
+tr_getFreeSpace( const char * path )
+{
+    int64_t i = tr_getQuotaFreeSpace( path );
+    if( i < 0 )
+	i = tr_getDiskFreeSpace( path );
+    return i;
 }
 
 /***

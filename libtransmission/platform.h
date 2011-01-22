@@ -54,12 +54,9 @@ const char * tr_getTorrentDir( const tr_session * );
 /** @brief return the directory where the Web Client's web ui files are kept */
 const char * tr_getWebClientDir( const tr_session * );
 
-/** @brief return the number of bytes available for use in the specified path, or -1 on error */
+/** If the disk quota is enabled and readable, this returns how much is available in the quota.
+    Otherwise, it returns how much is available on the disk, or -1 on error. */
 int64_t tr_getFreeSpace( const char * path );
-
-/** @brief return the number of bytes available for use in the disk quota */
-/** @return zero or pisitive number on success,-1 if quota isn't enabled or on error. */
-int64_t tr_getQuotaFreeSpace( const char * path );
 
 /** @} */
 

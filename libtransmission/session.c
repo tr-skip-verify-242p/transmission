@@ -939,19 +939,6 @@ tr_sessionGetDownloadDirFreeSpace( const tr_session * session )
 {
     assert( tr_isSession( session ) );
 
-    /* Check user quota first */
-    {
-	int64_t freespace;
-
-	freespace = tr_getQuotaFreeSpace( session->downloadDir );
-	/* If quota isn't enabled or there is error on getting its info */
-	/* proceed to check available space by the usual way */
-	if (freespace >= 0)
-	{
-	    return freespace;
-	}
-    }
-
     return tr_getFreeSpace( session->downloadDir );
 }
 
