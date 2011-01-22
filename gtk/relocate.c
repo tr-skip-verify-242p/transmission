@@ -238,7 +238,7 @@ gtr_rename_top_dialog_new( GtkWindow  * parent,
 
     e = gtk_entry_new( );
     gtk_entry_set_width_chars( GTK_ENTRY( e ), 64 );
-    curdir = tr_torrentGetTopName( tor );
+    curdir = tr_torrentGetTopDir( tor );
     gtk_entry_set_text( GTK_ENTRY( e ), curdir );
     g_free( curdir );
     g_object_set_data( G_OBJECT( d ), "rename-entry", e );

@@ -1143,8 +1143,7 @@ void tr_torrentSetLocation( tr_torrent  * torrent,
  *       @a torrent->info.files[n].name have the same directory
  *       prefix for all @a n.
  */
-int tr_torrentSetTopName( tr_torrent * torrent,
-                          const char * new_name );
+int tr_torrentSetTopDir( tr_torrent * torrent, const char * new_name );
 
 /**
  * Get the toplevel directory name for this torrent.
@@ -1153,7 +1152,7 @@ int tr_torrentSetTopName( tr_torrent * torrent,
  *         it is no longer needed, or NULL if the torrent does
  *         not have a toplevel directory.
  */
-char * tr_torrentGetTopName( const tr_torrent * torrent );
+char * tr_torrentGetTopDir( const tr_torrent * torrent );
 
 uint64_t tr_torrentGetBytesLeftToAllocate( const tr_torrent * torrent );
 

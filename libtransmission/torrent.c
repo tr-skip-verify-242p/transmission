@@ -2966,7 +2966,7 @@ dirExists( const char * path )
 }
 
 int
-tr_torrentSetTopName( tr_torrent * tor, const char * newname )
+tr_torrentSetTopDir( tr_torrent * tor, const char * newname )
 {
     tr_file_index_t fi;
     tr_info * info;
@@ -3033,7 +3033,7 @@ OUT:
 }
 
 char *
-tr_torrentGetTopName( const tr_torrent * tor )
+tr_torrentGetTopDir( const tr_torrent * tor )
 {
     const char * p, * orig;
     const tr_info * info;
