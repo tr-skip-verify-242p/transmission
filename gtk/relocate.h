@@ -20,4 +20,9 @@ GtkWidget * gtr_relocate_dialog_new( GtkWindow * parent,
                                      TrCore    * core,
                                      GSList    * torrentIds );
 
+GtkWidget * gtr_rename_top_dialog_new( GtkWindow  * parent,
+                                       TrCore     * core,
+                                       tr_torrent * tor );
+const gchar * gtr_rename_top_dialog_get_new_name( GtkWidget * dialog );
+
 #endif
