@@ -11,9 +11,15 @@
  */
 
 #ifndef WIN32
-#include <sys/quota.h> /* quotactl */
-#include <mntent.h>
-#include <paths.h> /* _PATH_MOUNTED */
+ #include <sys/quota.h> /* quotactl */
+ #ifdef HAVE_GETMNTENT
+  #include <mntent.h>
+  #include <paths.h> /* _PATH_MOUNTED */
+ #else /* BSD derived systems */
+  #include <sys/param.h>
+  #include <sys/ucred.h>
+  #include <sys/mount.h>
+ #endif
 #endif
 
 
@@ -703,6 +709,7 @@ tr_getWebClientDir( const tr_session * session UNUSED )
 static char *
 getdev( const char * path )
 {
+#ifdef HAVE_GETMNTENT
 	FILE *fp;
 	struct mntent *mnt;
 
@@ -719,6 +726,23 @@ getdev( const char * path )
 	}
 	endmntent(fp);
 	return mnt ? mnt->mnt_fsname : NULL;
+#else /* BSD derived systems */
+	int n, i;
+	struct statfs *mnt;
+
+	if ((n = getmntinfo(&mnt, MNT_WAIT)) == 0)
+	{
+		return NULL;
+	}
+	for (i=0; i<n; i++)
+	{
+		if (strcmp(path, mnt[i].f_mntonname) == 0)
+		{
+			break;
+		}
+	}
+	return (i < n) ? mnt[i].f_mntfromname : NULL;
+#endif
 }
 
 static char *
