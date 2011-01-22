@@ -1,7 +1,7 @@
 /*
- * This file Copyright (C) 2009-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
- * This file is licensed by the GPL version 2.  Works owned by the
+ * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
  * so that the bulk of its code can remain under the MIT license.
  * This exemption does not extend to derived works not owned by
@@ -13,13 +13,15 @@
 #include <assert.h>
 #include <limits.h>
 
-#include <event.h>
-#include <evhttp.h> /* for HTTP_OK */
+#include <event2/buffer.h>
+#include <event2/event.h>
+#include <event2/http.h> /* for HTTP_OK */
 
 #include "transmission.h"
 #include "announcer.h"
 #include "crypto.h"
 #include "net.h"
+#include "peer-mgr.h" /* tr_peerMgrCompactToPex() */
 #include "ptrarray.h"
 #include "session.h"
 #include "tr-dht.h"
@@ -263,8 +265,7 @@ tr_announcerInit( tr_session * session )
     a->session = session;
     a->slotsAvailable = MAX_CONCURRENT_TASKS;
     a->lpdHouseKeepingAt = relaxUntil;
-    a->upkeepTimer = tr_new0( struct event, 1 );
-    evtimer_set( a->upkeepTimer, onUpkeepTimer, a );
+    a->upkeepTimer = evtimer_new( session->event_base, onUpkeepTimer, a );
     tr_timerAdd( a->upkeepTimer, UPKEEP_INTERVAL_SECS, 0 );
 
     session->announcer = a;
@@ -279,8 +280,7 @@ tr_announcerClose( tr_session * session )
 
     flushCloseMessages( announcer );
 
-    evtimer_del( announcer->upkeepTimer );
-    tr_free( announcer->upkeepTimer );
+    event_free( announcer->upkeepTimer );
     announcer->upkeepTimer = NULL;
 
     tr_ptrArrayDestruct( &announcer->stops, NULL );
@@ -308,6 +308,8 @@ typedef struct
     int leecherCount;
     int downloadCount;
     int downloaderCount;
+
+    int consecutiveAnnounceFailures;
 
     uint32_t id;
 
@@ -630,87 +632,82 @@ getSeedProbability( int seeds, int leechers )
     return -1; /* unknown */
 }
 
-static int
-publishNewPeers( tr_tier * tier, int seeds, int leechers,
-                 const void * compact, int compactLen )
+static void
+publishPeersPex( tr_tier * tier, int seeds, int leechers,
+                 const tr_pex * pex, int n )
 {
     tr_tracker_event e = emptyEvent;
 
     e.messageType = TR_TRACKER_PEERS;
     e.seedProbability = getSeedProbability( seeds, leechers );
-    e.compact = compact;
-    e.compactLen = compactLen;
+    e.pex = pex;
+    e.pexCount = n;
 
     if( tier->tor->tiers->callback != NULL )
         tier->tor->tiers->callback( tier->tor, &e, NULL );
-
-    return compactLen / 6;
 }
 
-static int
-publishNewPeersCompact( tr_tier * tier, int seeds, int leechers,
+static size_t
+publishPeersCompact( tr_tier * tier, int seeds, int leechers,
                         const void * compact, int compactLen )
 {
-    int i;
-    const uint8_t *compactWalk;
-    uint8_t *array, *walk;
-    const int peerCount = compactLen / 6;
-    const int arrayLen = peerCount * ( sizeof( tr_address ) + 2 );
-    tr_address addr;
-    tr_port port;
+    size_t n = 0;
+    tr_pex * pex = tr_peerMgrCompactToPex( compact, compactLen, NULL, 0, &n );
+    publishPeersPex( tier, seeds, leechers, pex, n );
+    dbgmsg( tier, "got IPv4 list of %zu peers", n );
+    tr_free( pex );
+    return n;
+}    
 
-    addr.type = TR_AF_INET;
-    memset( &addr.addr, 0, sizeof( addr.addr ) );
-    array = tr_new( uint8_t, arrayLen );
-    for ( i=0, walk=array, compactWalk=compact ; i<peerCount ; ++i )
-    {
-        memcpy( &addr.addr.addr4, compactWalk, 4 );
-        memcpy( &port, compactWalk + 4, 2 );
-
-        memcpy( walk, &addr, sizeof( addr ) );
-        memcpy( walk + sizeof( addr ), &port, 2 );
-
-        walk += sizeof( tr_address ) + 2;
-        compactWalk += 6;
-    }
-
-    publishNewPeers( tier, seeds, leechers, array, arrayLen );
-
-    tr_free( array );
-
-    return peerCount;
-}
-
-static int
-publishNewPeersCompact6( tr_tier * tier, int seeds, int leechers,
+static size_t
+publishPeersCompact6( tr_tier * tier, int seeds, int leechers,
                          const void * compact, int compactLen )
 {
-    int i;
-    const uint8_t *compactWalk;
-    uint8_t *array, *walk;
-    const int peerCount = compactLen / 18;
-    const int arrayLen = peerCount * ( sizeof( tr_address ) + 2 );
-    tr_address addr;
-    tr_port port;
+    size_t n = 0;
+    tr_pex * pex = tr_peerMgrCompact6ToPex( compact, compactLen, NULL, 0, &n );
+    dbgmsg( tier, "got IPv6 list of %zu peers", n );
+    publishPeersPex( tier, seeds, leechers, pex, n );
+    tr_free( pex );
+    return n;
+}
 
-    addr.type = TR_AF_INET6;
-    memset( &addr.addr, 0, sizeof( addr.addr ) );
-    array = tr_new( uint8_t, arrayLen );
-    for ( i = 0, walk = array, compactWalk = compact ; i < peerCount ; ++i )
+static size_t
+publishPeersDict( tr_tier * tier, int seeds, int leechers, tr_benc * peerList )
+{
+    size_t i;
+    size_t n;
+    const size_t len = tr_bencListSize( peerList );
+    tr_pex * pex = tr_new0( tr_pex, len );
+
+    for( i=n=0; i<len; ++i )
     {
-        memcpy( &addr.addr.addr6, compactWalk, 16 );
-        memcpy( &port, compactWalk + 16, 2 );
-        compactWalk += 18;
+        int64_t port;
+        const char * ip;
+        tr_address addr;
+        tr_benc * peer = tr_bencListChild( peerList, i );
 
-        memcpy( walk, &addr, sizeof( addr ) );
-        memcpy( walk + sizeof( addr ), &port, 2 );
-        walk += sizeof( tr_address ) + 2;
+        if( peer == NULL )
+            continue;
+        if( !tr_bencDictFindStr( peer, "ip", &ip ) )
+            continue;
+        if( tr_pton( ip, &addr ) == NULL )
+            continue;
+        if( !tr_bencDictFindInt( peer, "port", &port ) )
+            continue;
+        if( ( port < 0 ) || ( port > USHRT_MAX ) )
+            continue;
+        if( !tr_isValidPeerAddress( &addr, port ) )
+            continue;
+
+        pex[n].addr = addr;
+        pex[n].port = htons( (uint16_t)port );
+        ++n;
     }
 
-    publishNewPeers( tier, seeds, leechers, array, arrayLen );
-    tr_free( array );
-
-    return peerCount;
+    dbgmsg( tier, "got benc list of %zu peers", n );
+    publishPeersPex( tier, seeds, leechers, pex, n );
+    tr_free( pex );
+    return n;
 }
 
 static char*
@@ -724,7 +721,6 @@ createAnnounceURL( const tr_announcer     * announcer,
     const tr_tracker_item  * tracker = tier->currentTracker;
     const char * ann = tracker->announce;
     struct evbuffer * buf = evbuffer_new( );
-    char * ret;
     const char * str;
     const unsigned char * ipv6;
 
@@ -773,7 +769,7 @@ createAnnounceURL( const tr_announcer     * announcer,
        and once over IPv6.
 
        To be safe, we should do both: add the "ipv6=" parameter and
-       announce twice.  At any rate, we're already computing our IPv6
+       announce twice. At any rate, we're already computing our IPv6
        address (for the LTEP handshake), so this comes for free. */
 
     ipv6 = tr_globalIPv6( );
@@ -784,10 +780,7 @@ createAnnounceURL( const tr_announcer     * announcer,
         tr_http_escape( buf, ipv6_readable, -1, TRUE );
     }
 
-    ret = tr_strndup( EVBUFFER_DATA( buf ), EVBUFFER_LENGTH( buf ) );
-    dbgmsg( tier, "announce URL is \"%s\"", ret );
-    evbuffer_free( buf );
-    return ret;
+    return evbuffer_free_to_str( buf );
 }
 
 
@@ -982,7 +975,7 @@ tierAddAnnounce( tr_tier * tier, const char * announceEvent, time_t announceAt )
     tr_ptrArrayAppend( &tier->announceEvents, (void*)announceEvent );
     tier->announceAt = announceAt;
 
-    dbgmsg( tier, "appended event \"%s\"; announcing in %d seconds\n", announceEvent, (int)difftime(announceAt,time(NULL)) );
+    dbgmsg( tier, "appended event \"%s\"; announcing in %d seconds", announceEvent, (int)difftime(announceAt,time(NULL)) );
 }
 
 static void
@@ -1099,17 +1092,22 @@ tierIsNotResponding( const tr_tier * tier, const time_t now )
 }
 
 static int
-getRetryInterval( const tr_host * host )
+getRetryInterval( const tr_tracker_item * t )
 {
-    int interval;
-    const int jitter = tr_cryptoWeakRandInt( 120 );
-    const time_t timeSinceLastSuccess = tr_time() - host->lastSuccessfulRequest;
-         if( timeSinceLastSuccess < 15*60 ) interval = 0;
-    else if( timeSinceLastSuccess < 30*60 ) interval = 60*4;
-    else if( timeSinceLastSuccess < 45*60 ) interval = 60*8;
-    else if( timeSinceLastSuccess < 60*60 ) interval = 60*16;
-    else                                    interval = 60*32;
-    return interval + jitter;
+    int minutes;
+    const int jitter_seconds = tr_cryptoWeakRandInt( 120 );
+
+    switch( t->consecutiveAnnounceFailures ) {
+        case 0:  minutes =  0; break;
+        case 1:  minutes =  1; break;
+        case 2:  minutes =  2; break;
+        case 3:  minutes =  4; break;
+        case 4:  minutes =  8; break;
+        case 5:  minutes = 16; break;
+        default: minutes = 32; break;
+    }
+
+    return ( minutes * 60 ) + jitter_seconds;
 }
 
 static int
@@ -1161,43 +1159,6 @@ compareTiers( const void * va, const void * vb )
     return ret;
 }
 
-static uint8_t *
-parseOldPeers( tr_benc * bePeers, size_t * byteCount )
-{
-    int       i;
-    uint8_t * array, *walk;
-    const int peerCount = bePeers->val.l.count;
-
-    assert( tr_bencIsList( bePeers ) );
-
-    array = tr_new( uint8_t, peerCount * ( sizeof( tr_address ) + 2 ) );
-
-    for( i = 0, walk = array; i < peerCount; ++i )
-    {
-        const char * s;
-        int64_t      itmp;
-        tr_address   addr;
-        tr_port      port;
-        tr_benc    * peer = &bePeers->val.l.vals[i];
-
-        if( tr_bencDictFindStr( peer, "ip", &s ) )
-            if( tr_pton( s, &addr ) == NULL )
-                continue;
-
-        if( !tr_bencDictFindInt( peer, "port", &itmp )
-                || itmp < 0
-                || itmp > USHRT_MAX )
-            continue;
-
-        memcpy( walk, &addr, sizeof( tr_address ) );
-        port = htons( (uint16_t)itmp );
-        memcpy( walk + sizeof( tr_address ), &port, 2 );
-        walk += sizeof( tr_address ) + 2;
-    }
-
-    *byteCount = peerCount * sizeof( tr_address ) + 2;
-    return array;
-}
 
 static tr_bool
 parseAnnounceResponse( tr_tier     * tier,
@@ -1290,7 +1251,7 @@ parseAnnounceResponse( tr_tier     * tier,
             /* "compact" extension */
             const int seeders = tier->currentTracker->seederCount;
             const int leechers = tier->currentTracker->leecherCount;
-            peerCount += publishNewPeersCompact( tier, seeders, leechers, raw, rawlen );
+            peerCount += publishPeersCompact( tier, seeders, leechers, raw, rawlen );
             gotPeers = TRUE;
         }
         else if( tr_bencDictFindList( &benc, "peers", &tmp ) )
@@ -1298,11 +1259,8 @@ parseAnnounceResponse( tr_tier     * tier,
             /* original version of peers */
             const int seeders = tier->currentTracker->seederCount;
             const int leechers = tier->currentTracker->leecherCount;
-            size_t byteCount = 0;
-            uint8_t * array = parseOldPeers( tmp, &byteCount );
-            peerCount += publishNewPeers( tier, seeders, leechers, array, byteCount );
+            peerCount += publishPeersDict( tier, seeders, leechers, tmp );
             gotPeers = TRUE;
-            tr_free( array );
         }
 
         if( tr_bencDictFindRaw( &benc, "peers6", &raw, &rawlen ) )
@@ -1310,7 +1268,7 @@ parseAnnounceResponse( tr_tier     * tier,
             /* "compact" extension */
             const int seeders = tier->currentTracker->seederCount;
             const int leechers = tier->currentTracker->leecherCount;
-            peerCount += publishNewPeersCompact6( tier, seeders, leechers, raw, rawlen );
+            peerCount += publishPeersCompact6( tier, seeders, leechers, raw, rawlen );
             gotPeers = TRUE;
         }
 
@@ -1370,6 +1328,7 @@ onAnnounceDone( tr_session   * session,
 
         if( responseCode == HTTP_OK )
         {
+            tier->currentTracker->consecutiveAnnounceFailures = 0;
             success = parseAnnounceResponse( tier, response, responseLen, &gotScrape );
             dbgmsg( tier, "success is %d", success );
 
@@ -1394,6 +1353,8 @@ onAnnounceDone( tr_session   * session,
 
             tr_strlcpy( tier->lastAnnounceStr, buf,
                         sizeof( tier->lastAnnounceStr ) );
+
+            ++tier->currentTracker->consecutiveAnnounceFailures;
 
             /* if the response is serious, *and* if the response may require
              * human intervention, then notify the user... otherwise just log it */
@@ -1420,7 +1381,7 @@ onAnnounceDone( tr_session   * session,
 
         if( responseCode == 0 )
         {
-            const int interval = getRetryInterval( tier->currentTracker->host );
+            const int interval = getRetryInterval( tier->currentTracker );
             dbgmsg( tier, "No response from tracker... retrying in %d seconds.", interval );
             tier->manualAnnounceAllowedAt = ~(time_t)0;
             tierAddAnnounce( tier, announceEvent, now + interval );
@@ -1456,14 +1417,14 @@ onAnnounceDone( tr_session   * session,
         else if( ( responseCode == 404 ) || ( 500 <= responseCode && responseCode <= 599 ) )
         {
             /* 404: The requested resource could not be found but may be
-             * available again in the future.  Subsequent requests by
+             * available again in the future. Subsequent requests by
              * the client are permissible. */
 
             /* 5xx: indicate cases in which the server is aware that it
              * has erred or is incapable of performing the request.
              * So we pause a bit and try again. */
 
-            const int interval = getRetryInterval( tier->currentTracker->host );
+            const int interval = getRetryInterval( tier->currentTracker );
             tier->manualAnnounceAllowedAt = ~(time_t)0;
             tierAddAnnounce( tier, announceEvent, now + interval );
         }
@@ -1716,7 +1677,7 @@ onScrapeDone( tr_session   * session,
                 tr_snprintf( tier->lastScrapeStr, sizeof( tier->lastScrapeStr ),
                              _( "tracker gave HTTP Response Code %1$ld (%2$s)" ),
                              responseCode, tr_webGetResponseStr( responseCode ) );
-            tr_tordbg( tier->tor, "%s", tier->lastScrapeStr );
+            dbgmsg( tier, "%s", tier->lastScrapeStr );
         }
         else if( 300 <= responseCode && responseCode <= 399 )
         {
@@ -1725,11 +1686,11 @@ onScrapeDone( tr_session   * session,
             tier->scrapeAt = now + interval;
             tr_snprintf( tier->lastScrapeStr, sizeof( tier->lastScrapeStr ),
                          "Got a redirect. Retrying in %d seconds", interval );
-            tr_tordbg( tier->tor, "%s", tier->lastScrapeStr );
+            dbgmsg( tier, "%s", tier->lastScrapeStr );
         }
         else
         {
-            const int interval = getRetryInterval( tier->currentTracker->host );
+            const int interval = getRetryInterval( tier->currentTracker );
 
             /* Don't retry on a 4xx.
              * Retry at growing intervals on a 5xx */
@@ -1894,7 +1855,7 @@ fprintf( stderr, "[%s] announce.c has %d requests ready to send (announce: %d, s
                 int rc;
                 rc = tr_dhtAnnounce(tor, AF_INET, 1);
                 if(rc == 0)
-                    /* The DHT is not ready yet.  Try again soon. */
+                    /* The DHT is not ready yet. Try again soon. */
                     tor->dhtAnnounceAt = now + 5 + tr_cryptoWeakRandInt( 5 );
                 else
                     /* We should announce at least once every 30 minutes. */
@@ -1961,6 +1922,7 @@ tr_announcerStats( const tr_torrent * torrent,
     const time_t now = tr_time( );
 
     assert( tr_isTorrent( torrent ) );
+    assert( tr_torrentIsLocked( torrent ) );
 
     /* count the trackers... */
     for( i=n=0, tierCount=tr_ptrArraySize( &torrent->tiers->tiers ); i<tierCount; ++i ) {
