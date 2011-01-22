@@ -81,12 +81,9 @@ transmission_gtk_SOURCES = \
     makemeta-ui.c \
     msgwin.c \
     notify.c \
-<<<<<<< HEAD
+    open-dialog.c \
     pieces-cell-renderer.c \
     pieces-viewer.c \
-=======
-    open-dialog.c \
->>>>>>> master
     relocate.c \
     stats.c \
     torrent-cell-renderer.c \
