@@ -1576,6 +1576,8 @@ torrentStartImpl( void * vtor )
     tor->finishedSeedingByIdle = FALSE;
 
     tr_torrentResetTransferStats( tor );
+    tr_torrentSave( tor );
+
     tr_announcerTorrentStarted( tor );
     tor->dhtAnnounceAt = now + tr_cryptoWeakRandInt( 20 );
     tor->dhtAnnounce6At = now + tr_cryptoWeakRandInt( 20 );
@@ -1662,6 +1664,7 @@ torrentRecheckDoneImpl( void * vtor )
 {
     tr_torrent * tor = vtor;
     assert( tr_isTorrent( tor ) );
+    tr_torrentLock( tor );
 
     tr_torrentRecheckCompleteness( tor );
 
@@ -1669,6 +1672,12 @@ torrentRecheckDoneImpl( void * vtor )
         tor->startAfterVerify = FALSE;
         torrentStart( tor );
     }
+    else
+    {
+        tr_torrentSave( tor );
+    }
+
+    tr_torrentUnlock( tor );
 }
 
 static void
