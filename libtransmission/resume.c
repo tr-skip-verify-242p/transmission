@@ -38,6 +38,7 @@
 #define KEY_PEERS               "peers2"
 #define KEY_PEERS6              "peers2-6"
 #define KEY_FILE_PRIORITIES     "priority"
+#define KEY_FILE_NAMES          "name"
 #define KEY_BANDWIDTH_PRIORITY  "bandwidth-priority"
 #define KEY_PROGRESS            "progress"
 #define KEY_SPEEDLIMIT_OLD      "speed-limit"
@@ -255,6 +256,45 @@ loadFilePriorities( tr_benc * dict, tr_torrent * tor )
             if( tr_bencGetInt( tr_bencListChild( list, i ), &priority ) )
                 tr_torrentInitFilePriority( tor, i, priority );
         ret = TR_FR_FILE_PRIORITIES;
+    }
+
+    return ret;
+}
+
+/***
+****
+***/
+
+static void
+saveFileNames( tr_benc * dict, const tr_torrent * tor )
+{
+    const tr_info * inf = tr_torrentInfo( tor );
+    const tr_file_index_t n = inf->fileCount;
+    tr_file_index_t i;
+    tr_benc * list;
+
+    list = tr_bencDictAddList( dict, KEY_FILE_NAMES, n );
+    for( i = 0; i < n; ++i )
+        tr_bencListAddStr( list, inf->files[i].name );
+}
+
+static uint64_t
+loadFileNames( tr_benc * dict, tr_torrent * tor )
+{
+    uint64_t ret = 0;
+    tr_info * inf = &tor->info;
+    const tr_file_index_t n = inf->fileCount;
+    tr_benc * list;
+
+    if( tr_bencDictFindList( dict, KEY_FILE_NAMES, &list )
+        && tr_bencListSize( list ) == n )
+    {
+        const char * name;
+        tr_file_index_t i;
+        for( i = 0; i < n; ++i )
+            if( tr_bencGetStr( tr_bencListChild( list, i ), &name ) )
+                tr_torrentInitFileName( tor, i, name );
+        ret = TR_FR_FILE_NAMES;
     }
 
     return ret;
@@ -517,6 +557,7 @@ tr_torrentSaveResume( tr_torrent * tor )
     savePeers( &top, tor );
     if( tr_torrentHasMetadata( tor ) )
     {
+        saveFileNames( &top, tor );
         saveFilePriorities( &top, tor );
         saveDND( &top, tor );
         saveProgress( &top, tor );
@@ -660,6 +701,9 @@ loadFromFile( tr_torrent * tor,
 
     if( fieldsToLoad & TR_FR_FILE_PRIORITIES )
         fieldsLoaded |= loadFilePriorities( &top, tor );
+
+    if( fieldsToLoad & TR_FR_FILE_NAMES )
+        fieldsLoaded |= loadFileNames( &top, tor );
 
     if( fieldsToLoad & TR_FR_PROGRESS )
         fieldsLoaded |= loadProgress( &top, tor );
