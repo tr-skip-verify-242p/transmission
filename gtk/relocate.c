@@ -195,3 +195,67 @@ gtr_relocate_dialog_new( GtkWindow * parent,
 
     return d;
 }
+
+static void
+onRenameEntryActivate( GtkEntry * e, gpointer vdialog )
+{
+    GtkDialog * d = GTK_DIALOG( vdialog );
+    gtk_dialog_response( d, GTK_RESPONSE_APPLY );
+}
+
+GtkWidget *
+gtr_rename_top_dialog_new( GtkWindow  * parent,
+                           TrCore     * core,
+                           tr_torrent * tor )
+{
+    const tr_info * info = tr_torrentInfo( tor );
+    GtkWidget * d, * e, * t, * l;
+    char * curdir;
+    int row;
+
+    d = gtk_dialog_new_with_buttons( _( "Rename Torrent Directory" ), parent,
+                                     GTK_DIALOG_DESTROY_WITH_PARENT |
+                                     GTK_DIALOG_MODAL,
+                                     GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
+                                     GTK_STOCK_APPLY, GTK_RESPONSE_APPLY,
+                                     NULL );
+    gtk_dialog_set_default_response( GTK_DIALOG( d ),
+                                     GTK_RESPONSE_CANCEL );
+    gtk_dialog_set_alternative_button_order( GTK_DIALOG( d ),
+                                             GTK_RESPONSE_APPLY,
+                                             GTK_RESPONSE_CANCEL,
+                                             -1 );
+    row = 0;
+    t = hig_workarea_create( );
+    hig_workarea_add_section_title( t, &row, _( "Rename Directory" ) );
+
+    l = g_object_new( GTK_TYPE_LABEL,
+                      "selectable", TRUE,
+                      "ellipsize", PANGO_ELLIPSIZE_END,
+                      NULL );
+    gtk_label_set_text( GTK_LABEL( l ), info->name );
+    hig_workarea_add_row( t, &row, _( "Original name:" ), l, NULL );
+
+    e = gtk_entry_new( );
+    gtk_entry_set_width_chars( GTK_ENTRY( e ), 64 );
+    curdir = tr_torrentGetTopDir( tor );
+    gtk_entry_set_text( GTK_ENTRY( e ), curdir );
+    g_free( curdir );
+    g_object_set_data( G_OBJECT( d ), "rename-entry", e );
+    g_signal_connect( e, "activate",
+                      G_CALLBACK( onRenameEntryActivate ), d );
+    hig_workarea_add_wide_control( t, &row, e );
+
+    hig_workarea_finish( t, &row );
+    gtr_dialog_set_content( GTK_DIALOG( d ), t );
+
+    return d;
+}
+
+const gchar *
+gtr_rename_top_dialog_get_new_name( GtkWidget * dialog )
+{
+    GtkWidget * entry;
+    entry = g_object_get_data( G_OBJECT( dialog ), "rename-entry" );
+    return entry ? gtk_entry_get_text( GTK_ENTRY( entry ) ) : NULL;
+}

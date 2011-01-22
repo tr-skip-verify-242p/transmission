@@ -1017,6 +1017,13 @@ removeTrackers( tr_torrent * tor, tr_benc * ids )
     return errmsg;
 }
 
+static const char *
+setTopDir( tr_torrent * tor, const char * str )
+{
+    int err = tr_torrentSetTopDir( tor, str );
+    return err == 0 ? NULL : tr_strerror( err );
+}
+
 static const char*
 torrentSet( tr_session               * session,
             tr_benc                  * args_in,
@@ -1033,6 +1040,7 @@ torrentSet( tr_session               * session,
     {
         int64_t      tmp;
         double       d;
+        const char * str;
         tr_benc *    files;
         tr_benc *    trackers;
         tr_bool      boolVal;
@@ -1073,6 +1081,8 @@ torrentSet( tr_session               * session,
             tr_torrentSetRatioLimit( tor, d );
         if( tr_bencDictFindInt( args_in, "seedRatioMode", &tmp ) )
             tr_torrentSetRatioMode( tor, tmp );
+        if( !errmsg && tr_bencDictFindStr( args_in, "top-dir", &str ) )
+            errmsg = setTopDir( tor, str );
         if( !errmsg && tr_bencDictFindList( args_in, "trackerAdd", &trackers ) )
             errmsg = addTrackerUrls( tor, trackers );
         if( !errmsg && tr_bencDictFindList( args_in, "trackerRemove", &trackers ) )

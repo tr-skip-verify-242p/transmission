@@ -1183,6 +1183,37 @@ void tr_torrentSetLocation( tr_torrent  * torrent,
                             double      * setme_progress,
                             int         * setme_state );
 
+/**
+ * Rename the toplevel directory in a torrent. If the current toplevel
+ * directory already exists, it will be moved along with any files to
+ * the new location. Running torrents will be stopped as a side-effect
+ * of this function and restarted if no error occurs.
+ *
+ * If the torrent does not have a toplevel directory (e.g. it only
+ * contains a single file), this function does nothing.
+ *
+ * @param new_name The new directory name to use. It may not contain
+ *                 path delimiters or be equal to "." or "..".
+ *
+ * @return 0 on success, otherwise an errno value. The torrent is
+ *         not restarted if an error occurs.
+ *
+ * @note This function assumes that if the torrent has a toplevel
+ *       directory, all of its files will be in it, i.e.
+ *       @a torrent->info.files[n].name have the same directory
+ *       prefix for all @a n.
+ */
+int tr_torrentSetTopDir( tr_torrent * torrent, const char * new_name );
+
+/**
+ * Get the toplevel directory name for this torrent.
+ *
+ * @return A newly-allocated string which you must free when
+ *         it is no longer needed, or NULL if the torrent does
+ *         not have a toplevel directory.
+ */
+char * tr_torrentGetTopDir( const tr_torrent * torrent );
+
 uint64_t tr_torrentGetBytesLeftToAllocate( const tr_torrent * torrent );
 
 /**

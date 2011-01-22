@@ -96,6 +96,7 @@
    "honorsSessionLimits" | boolean    true if session upload limits are honored
    "ids"                 | array      torrent list, as described in 3.1
    "location"            | string     new location of the torrent's content
+   "top-dir"             | string     new name for torrent's toplevel directory
    "peer-limit"          | number     maximum number of peers
    "priority-high"       | array      indices of high-priority file(s)
    "priority-low"        | array      indices of low-priority file(s)
