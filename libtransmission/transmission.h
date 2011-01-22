@@ -1139,6 +1139,11 @@ void tr_torrentSetLocation( tr_torrent  * torrent,
  *
  * @return 0 on success, otherwise an errno value. The torrent is
  *         not restarted if an error occurs.
+ *
+ * @note This function assumes that if the torrent has a toplevel
+ *       directory, all of its files will be in it, i.e.
+ *       @a torrent->info.files[n] have the same directory prefix
+ *       for all @a n.
  */
 int tr_torrentSetTopName( tr_torrent * torrent,
                           const char * new_name );

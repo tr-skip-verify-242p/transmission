@@ -2971,8 +2971,9 @@ tr_torrentSetTopName( tr_torrent * tor, const char * newname )
     tr_file_index_t fi;
     tr_info * info;
     tr_bool restart = FALSE;
-    const char * root, * p;
-    char * oldpath = NULL, * newpath = NULL, * mid = NULL, * rmid = NULL;
+    const char * root, * p, * orig;
+    char * oldpath = NULL, * newpath = NULL, * mid = NULL;
+    char * rmid = NULL, * oldname = NULL;
     int err = 0;
 
     assert( tr_isTorrent( tor ) );
@@ -2983,20 +2984,21 @@ tr_torrentSetTopName( tr_torrent * tor, const char * newname )
     tr_torrentLock( tor );
 
     info = &tor->info;
-    if( !strcmp( info->name, newname )
-        || !strchr( info->files[0].name, TR_PATH_DELIMITER ) )
+    orig = info->files[0].name;
+    if( !( p = strchr( orig, TR_PATH_DELIMITER ) ) )
         goto OUT;
+    oldname = tr_strndup( orig, (int) ( p - orig ) );
 
     restart = tor->isRunning;
     tr_torrentStop( tor );
 
     root = tr_torrentGetCurrentDir( tor );
-    oldpath = tr_buildPath( root, info->name, NULL );
-    newpath = tr_buildPath( root, newname, NULL );
+    oldpath = tr_buildPath( root, oldname, NULL );
 
     if( dirExists( oldpath ) )
     {
-        if( (p = strrchr( newname, TR_PATH_DELIMITER ) ) )
+        newpath = tr_buildPath( root, newname, NULL );
+        if( ( p = strrchr( newname, TR_PATH_DELIMITER ) ) )
         {
             mid = tr_strndup( newname, (int) ( p - newname ) );
             rmid = tr_buildPath( root, mid, NULL );
@@ -3022,7 +3024,7 @@ tr_torrentSetTopName( tr_torrent * tor, const char * newname )
         tr_file * file = &info->files[fi];
         char * newfnam;
 
-        if( !(p = strchr( file->name, TR_PATH_DELIMITER ) ) )
+        if( !( p = strchr( file->name, TR_PATH_DELIMITER ) ) )
             continue;
         newfnam = tr_buildPath( newname, p + 1, NULL );
         tr_free( file->name );
@@ -3030,6 +3032,7 @@ tr_torrentSetTopName( tr_torrent * tor, const char * newname )
     }
 
 OUT:
+    tr_free( oldname );
     tr_free( oldpath );
     tr_free( newpath );
     tr_free( mid );
