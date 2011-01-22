@@ -209,7 +209,8 @@ gtr_rename_top_dialog_new( GtkWindow  * parent,
                            tr_torrent * tor )
 {
     const tr_info * info = tr_torrentInfo( tor );
-    GtkWidget * d, * e, * t;
+    GtkWidget * d, * e, * t, * l;
+    char * curdir;
     int row;
 
     d = gtk_dialog_new_with_buttons( _( "Rename Torrent Directory" ), parent,
@@ -224,20 +225,28 @@ gtr_rename_top_dialog_new( GtkWindow  * parent,
                                              GTK_RESPONSE_APPLY,
                                              GTK_RESPONSE_CANCEL,
                                              -1 );
-
-    e = gtk_entry_new( );
-    gtk_entry_set_width_chars( GTK_ENTRY( e ), 64 );
-    gtk_entry_set_text( GTK_ENTRY( e ), info->name );
-    g_object_set_data( G_OBJECT( d ), "rename-entry", e );
-    g_signal_connect( e, "activate",
-                      G_CALLBACK( onRenameEntryActivate ), d );
-
     row = 0;
     t = hig_workarea_create( );
     hig_workarea_add_section_title( t, &row, _( "Rename Directory" ) );
-    hig_workarea_add_wide_control( t, &row, e );
-    hig_workarea_finish( t, &row );
 
+    l = g_object_new( GTK_TYPE_LABEL,
+                      "selectable", TRUE,
+                      "ellipsize", PANGO_ELLIPSIZE_END,
+                      NULL );
+    gtk_label_set_text( GTK_LABEL( l ), info->name );
+    hig_workarea_add_row( t, &row, _( "Original name:" ), l, NULL );
+
+    e = gtk_entry_new( );
+    gtk_entry_set_width_chars( GTK_ENTRY( e ), 64 );
+    curdir = tr_torrentGetTopName( tor );
+    gtk_entry_set_text( GTK_ENTRY( e ), curdir );
+    g_free( curdir );
+    g_object_set_data( G_OBJECT( d ), "rename-entry", e );
+    g_signal_connect( e, "activate",
+                      G_CALLBACK( onRenameEntryActivate ), d );
+    hig_workarea_add_wide_control( t, &row, e );
+
+    hig_workarea_finish( t, &row );
     gtr_dialog_set_content( GTK_DIALOG( d ), t );
 
     return d;
