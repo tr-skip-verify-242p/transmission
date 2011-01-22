@@ -48,12 +48,9 @@ noinst_HEADERS = \
     makemeta-ui.h \
     msgwin.h \
     notify.h \
-<<<<<<< HEAD
+    open-dialog.h \
     pieces-cell-renderer.h \
     pieces-viewer.h \
-=======
-    open-dialog.h \
->>>>>>> master
     relocate.h \
     stats.h \
     torrent-cell-renderer.h \
