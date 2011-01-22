@@ -2972,14 +2972,17 @@ tr_torrentSetTopName( tr_torrent * tor, const char * newname )
     tr_info * info;
     tr_bool restart = FALSE;
     const char * root, * p, * orig;
-    char * oldpath = NULL, * newpath = NULL, * mid = NULL;
-    char * rmid = NULL, * oldname = NULL;
+    char * oldpath = NULL, * newpath = NULL, * oldname = NULL;
     int err = 0;
 
     assert( tr_isTorrent( tor ) );
 
     if( !newname || !newname[0] || !tr_torrentHasMetadata( tor ) )
         return 0;
+
+    if( strchr( newname, TR_PATH_DELIMITER )
+        || !strcmp( newname, "." ) || !strcmp( newname,  ".." ) )
+        return EINVAL;
 
     tr_torrentLock( tor );
 
@@ -2998,18 +3001,6 @@ tr_torrentSetTopName( tr_torrent * tor, const char * newname )
     if( dirExists( oldpath ) )
     {
         newpath = tr_buildPath( root, newname, NULL );
-        if( ( p = strrchr( newname, TR_PATH_DELIMITER ) ) )
-        {
-            mid = tr_strndup( newname, (int) ( p - newname ) );
-            rmid = tr_buildPath( root, mid, NULL );
-            if( tr_mkdirp( rmid, 0777 ) == -1 )
-            {
-                err = errno;
-                tr_torerr( tor, _( "Error creating directory \"%s\": %s" ),
-                           rmid, tr_strerror( err ) );
-                goto OUT;
-            }
-        }
         if( rename( oldpath, newpath ) == -1 )
         {
             err = errno;
@@ -3035,8 +3026,6 @@ OUT:
     tr_free( oldname );
     tr_free( oldpath );
     tr_free( newpath );
-    tr_free( mid );
-    tr_free( rmid );
     if( restart && !err )
         tr_torrentStart( tor );
     tr_torrentUnlock( tor );

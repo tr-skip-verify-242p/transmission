@@ -1133,9 +1133,8 @@ void tr_torrentSetLocation( tr_torrent  * torrent,
  * If the torrent does not have a toplevel directory (e.g. it only
  * contains a single file), this function does nothing.
  *
- * @param new_name The new directory name to use. It may contain
- *                 path delimiters; sub-directories that do not
- *                 exist will be created.
+ * @param new_name The new directory name to use. It may not contain
+ *                 path delimiters.
  *
  * @return 0 on success, otherwise an errno value. The torrent is
  *         not restarted if an error occurs.
