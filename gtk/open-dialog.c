@@ -106,6 +106,7 @@ removeOldTorrent( struct OpenData * data )
     {
         gtr_file_list_clear( data->file_list );
         tr_torrent_set_remove_flag( data->gtor, TRUE );
+        gtr_warn_if_fail( G_OBJECT( data->gtor )->ref_count == 1 );
         g_object_unref( G_OBJECT( data->gtor ) );
         data->gtor = NULL;
     }

@@ -361,7 +361,7 @@ static void appsetup( TrWindow       * wind,
 
 static void winsetup( struct cbdata * cbdata, TrWindow * wind );
 
-static void wannaquit( gpointer vdata );
+static void wannaquit( gpointer vdata, int response );
 
 static void on_core_error( TrCore *, guint, const char *, struct cbdata * );
 
@@ -1009,7 +1009,7 @@ static void
 maybeaskquit( struct cbdata * cbdata )
 {
     if( !shouldConfirmBeforeExiting( cbdata ) )
-        wannaquit( cbdata );
+        wannaquit( cbdata, 0 );
     else {
         if( cbdata->quit_dialog == NULL ) {
             cbdata->quit_dialog = gtr_confirm_quit( cbdata->wind, cbdata->core, wannaquit, cbdata );
@@ -1164,7 +1164,7 @@ exit_now_cb( GtkWidget *w UNUSED, gpointer data UNUSED )
 }
 
 static void
-wannaquit( gpointer vdata )
+wannaquit( gpointer vdata, int response UNUSED )
 {
     GtkWidget *r, *p, *b, *w, *c;
     struct cbdata *cbdata = vdata;
