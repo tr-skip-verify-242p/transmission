@@ -2937,6 +2937,88 @@ tr_torrentSetLocation( tr_torrent  * tor,
     tr_runInEventThread( tor->session, setLocation, data );
 }
 
+static tr_bool
+dirExists( const char * path )
+{
+    struct stat sb;
+    return stat( path, &sb ) == 0 && S_ISDIR( sb.st_mode );
+}
+
+int
+tr_torrentSetTopName( tr_torrent * tor, const char * newname )
+{
+    tr_file_index_t fi;
+    tr_info * info;
+    tr_bool restart = FALSE;
+    const char * root, * p;
+    char * oldpath = NULL, * newpath = NULL, * mid = NULL, * rmid = NULL;
+    int err = 0;
+
+    assert( tr_isTorrent( tor ) );
+
+    if( !newname || !newname[0] || !tr_torrentHasMetadata( tor ) )
+        return 0;
+
+    tr_torrentLock( tor );
+
+    info = &tor->info;
+    if( !strcmp( info->name, newname )
+        || !strchr( info->files[0].name, TR_PATH_DELIMITER ) )
+        goto OUT;
+
+    restart = tor->isRunning;
+    tr_torrentStop( tor );
+
+    root = tr_torrentGetCurrentDir( tor );
+    oldpath = tr_buildPath( root, info->name, NULL );
+    newpath = tr_buildPath( root, newname, NULL );
+
+    if( dirExists( oldpath ) )
+    {
+        if( (p = strrchr( newname, TR_PATH_DELIMITER ) ) )
+        {
+            mid = tr_strndup( newname, (int) ( p - newname ) );
+            rmid = tr_buildPath( root, mid, NULL );
+            if( tr_mkdirp( rmid, 0777 ) == -1 )
+            {
+                err = errno;
+                tr_torerr( tor, _( "Error creating directory \"%s\": %s" ),
+                           rmid, tr_strerror( err ) );
+                goto OUT;
+            }
+        }
+        if( rename( oldpath, newpath ) == -1 )
+        {
+            err = errno;
+            tr_torerr( tor, _( "Error renaming \"%s\" to \"%s\": %s" ),
+                       oldpath, newpath, tr_strerror( err ) );
+            goto OUT;
+        }
+    }
+
+    for( fi = 0; fi < info->fileCount; ++fi )
+    {
+        tr_file * file = &info->files[fi];
+        char * newfnam;
+
+        if( !(p = strchr( file->name, TR_PATH_DELIMITER ) ) )
+            continue;
+        newfnam = tr_buildPath( newname, p + 1, NULL );
+        tr_free( file->name );
+        file->name = newfnam;
+    }
+
+OUT:
+    tr_free( oldpath );
+    tr_free( newpath );
+    tr_free( mid );
+    tr_free( rmid );
+    if( restart && !err )
+        tr_torrentStart( tor );
+    tr_torrentUnlock( tor );
+    return err;
+}
+
 /***
 ****
 ***/
