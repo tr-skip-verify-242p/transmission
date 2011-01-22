@@ -930,7 +930,8 @@ gtr_paste_clipboard_url_into_entry( GtkWidget * e )
 
   for( i=0; i<G_N_ELEMENTS(text); ++i ) {
       char * s = text[i];
-      if( s && ( gtr_is_supported_url( s ) || gtr_is_magnet_link( s ) ) ) {
+      if( s && ( gtr_is_supported_url( s ) || gtr_is_magnet_link( s )
+                                           || gtr_is_hex_hashcode( s ) ) ) {
           gtk_entry_set_text( GTK_ENTRY( e ), s );
           break;
       }
@@ -940,3 +941,15 @@ gtr_paste_clipboard_url_into_entry( GtkWidget * e )
     g_free( text[i] );
 }
 
+/***
+****
+***/
+
+void
+gtr_label_set_text( GtkLabel * lb, const char * newstr )
+{
+    const char * oldstr = gtk_label_get_text( lb );
+
+    if( ( oldstr == NULL ) || strcmp( oldstr, newstr ) )
+        gtk_label_set_text( lb, newstr );
+}

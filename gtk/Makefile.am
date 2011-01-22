@@ -31,7 +31,6 @@ AM_LDFLAGS = \
 
 noinst_HEADERS = \
     actions.h \
-    add-dialog.h \
     conf.h \
     details.h \
     dialogs.h \
@@ -49,8 +48,12 @@ noinst_HEADERS = \
     makemeta-ui.h \
     msgwin.h \
     notify.h \
+<<<<<<< HEAD
     pieces-cell-renderer.h \
     pieces-viewer.h \
+=======
+    open-dialog.h \
+>>>>>>> master
     relocate.h \
     stats.h \
     torrent-cell-renderer.h \
@@ -69,7 +72,6 @@ dbus_generated_sources = tr-core-dbus.h
 
 transmission_gtk_SOURCES = \
     actions.c \
-    add-dialog.c \
     conf.c \
     details.c \
     dialogs.c \
@@ -82,6 +84,7 @@ transmission_gtk_SOURCES = \
     makemeta-ui.c \
     msgwin.c \
     notify.c \
+    open-dialog.c \
     pieces-cell-renderer.c \
     pieces-viewer.c \
     relocate.c \
