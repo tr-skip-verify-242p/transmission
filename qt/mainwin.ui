@@ -267,7 +267,7 @@
     <string>Verify local data</string>
    </property>
    <property name="shortcut">
-    <string>Ctrl+V</string>
+    <string>Ctrl+Alt+V</string>
    </property>
   </action>
   <action name="action_Remove">
@@ -332,6 +332,9 @@
   <action name="action_Preferences">
    <property name="text">
     <string>&amp;Preferences</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Alt+P</string>
    </property>
   </action>
   <action name="action_CompactView">
@@ -568,10 +571,16 @@
    <property name="text">
     <string>Set &amp;Location...</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+L</string>
+   </property>
   </action>
   <action name="action_CopyMagnetToClipboard">
    <property name="text">
     <string>&amp;Copy Magnet Link to Clipboard</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+M</string>
    </property>
   </action>
   <action name="action_AddURL">
