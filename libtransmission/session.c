@@ -829,6 +829,8 @@ sessionSetImpl( void * vdata )
         tr_sessionSetCacheLimit_MB( session, i );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_LAZY_BITFIELD, &boolVal ) )
         tr_sessionSetLazyBitfieldEnabled( session, boolVal );
+    if( tr_bencDictFindStr( settings, TR_PREFS_KEY_PEER_ID_PREFIX, &str ) )
+        tr_sessionSetPeerIdPrefix( session, str );
     if( tr_bencDictFindInt( settings, TR_PREFS_KEY_PEER_LIMIT_TORRENT, &i ) )
         tr_sessionSetPeerLimitPerTorrent( session, i );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_PEX_ENABLED, &boolVal ) )
