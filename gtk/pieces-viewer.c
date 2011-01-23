@@ -31,12 +31,17 @@
 #define SQUARE_SIZE   4
 #define GRID_WIDTH    1
 
+/*
+ * Defines:
+ *   static gpointer gtr_pieces_viewer_parent_class;
+ *   GType gtr_pieces_viewer_get_type( void );
+ */
 G_DEFINE_TYPE( GtrPiecesViewer, gtr_pieces_viewer, GTK_TYPE_DRAWING_AREA );
 
 typedef struct _GtrPiecesViewerPrivate GtrPiecesViewerPrivate;
 struct _GtrPiecesViewerPrivate
 {
-    TrTorrent * gtor;
+    TrTorrent * gtor; /* shared */
 };
 #define GTR_PIECES_VIEWER_GET_PRIVATE( obj ) \
     ( G_TYPE_INSTANCE_GET_PRIVATE( ( obj ), GTR_TYPE_PIECES_VIEWER, \
@@ -111,14 +116,30 @@ gtr_pieces_viewer_size_request( GtkWidget * w, GtkRequisition * req )
 }
 
 static void
+gtr_pieces_viewer_dispose( GObject * object )
+{
+    GtrPiecesViewer * self = GTR_PIECES_VIEWER( object );
+    GtrPiecesViewerPrivate * priv = GTR_PIECES_VIEWER_GET_PRIVATE( self );
+
+    if( priv->gtor )
+    {
+        g_object_unref( priv->gtor );
+        priv->gtor = NULL;
+    }
+    G_OBJECT_CLASS( gtr_pieces_viewer_parent_class )->dispose( object );
+}
+
+static void
 gtr_pieces_viewer_class_init( GtrPiecesViewerClass * klass )
 {
     GtkWidgetClass * widget_class = GTK_WIDGET_CLASS( klass );
+    GObjectClass * gobject_class = G_OBJECT_CLASS( klass );
 
     g_type_class_add_private( klass, sizeof( GtrPiecesViewerPrivate ) );
 
     widget_class->expose_event = gtr_pieces_viewer_expose;
     widget_class->size_request = gtr_pieces_viewer_size_request;
+    gobject_class->dispose = gtr_pieces_viewer_dispose;
 }
 
 static void
@@ -139,5 +160,10 @@ void
 gtr_pieces_viewer_set_gtorrent( GtrPiecesViewer * self, TrTorrent * gtor )
 {
     GtrPiecesViewerPrivate * priv = GTR_PIECES_VIEWER_GET_PRIVATE( self );
+    if( priv->gtor == gtor )
+        return;
+    if( priv->gtor )
+        g_object_unref( priv->gtor );
     priv->gtor = gtor;
+    g_object_ref( priv->gtor );
 }

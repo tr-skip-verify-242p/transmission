@@ -175,6 +175,7 @@ tr_torrent_availability( TrTorrent * gtor, int size )
 
     if( !priv->avtab || priv->avtabsz < size )
     {
+        tr_free( priv->avtab );
         priv->avtab = tr_malloc0( size );
         priv->avtabsz = size;
         refresh = TRUE;
