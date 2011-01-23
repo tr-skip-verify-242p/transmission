@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -1684,19 +1684,20 @@ tr_bencToFile( const tr_benc * top, tr_fmt_mode mode, const char * filename )
 
         /* save the benc to a temporary file */
         {
-            struct evbuffer * buffer = evbuffer_new( );
-            tr_bencToBuf( top, mode, buffer );
-            nleft = evbuffer_get_length( buffer );
+            char * buf = tr_bencToStr( top, mode, &nleft );
+            const char * walk = buf;
             while( nleft > 0 ) {
-                const int n = evbuffer_write( buffer, fd );
-                if( n >= 0 )
+                const int n = write( fd, walk, nleft );
+                if( n >= 0 ) {
                     nleft -= n;
+                    walk += n;
+                }
                 else if( errno != EAGAIN ) {
                     err = errno;
                     break;
                 }
             }
-            evbuffer_free( buffer );
+            tr_free( buf );
         }
 
         if( nleft > 0 )

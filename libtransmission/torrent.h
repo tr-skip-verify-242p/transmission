@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2009-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -295,6 +295,11 @@ tr_torBlockCountBytes( const tr_torrent * tor, const tr_block_index_t block )
 static inline void tr_torrentLock( const tr_torrent * tor )
 {
     tr_sessionLock( tor->session );
+}
+
+static inline tr_bool tr_torrentIsLocked( const tr_torrent * tor )
+{
+    return tr_sessionIsLocked( tor->session );
 }
 
 static inline void tr_torrentUnlock( const tr_torrent * tor )
