@@ -44,7 +44,8 @@ struct TrTorrentPrivate
     gboolean     delete_local_data;
     int8_t     * avtab;
     int          avtabsz;
-    time_t       avtabts;
+    time_t       avlastts;
+    int          avlastsz;
 };
 
 
@@ -60,6 +61,8 @@ tr_torrent_init( GTypeInstance * instance, gpointer g_class UNUSED )
     p->delete_local_data = FALSE;
     p->avtab = NULL;
     p->avtabsz = 0;
+    p->avlastts = 0;
+    p->avlastsz = 0;
 
     self->priv = p;
 }
@@ -182,13 +185,14 @@ tr_torrent_availability( TrTorrent * gtor, int size )
     }
     else
     {
-        refresh = ( now != priv->avtabts || size != priv->avtabsz );
+        refresh = ( now != priv->avlastts || size != priv->avlastsz );
     }
 
     if( refresh )
     {
         tr_torrentAvailability( tor, priv->avtab, size );
-        priv->avtabts = now;
+        priv->avlastts = now;
+        priv->avlastsz = size;
     }
 
     return priv->avtab;
