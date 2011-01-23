@@ -129,7 +129,14 @@ TESTS = \
     test-peer-id \
     utils-test
 
-noinst_PROGRAMS = $(TESTS)
+EXTRA_PROGRAMS = $(TESTS)
+
+test: $(TESTS)
+	for i in $(TESTS) ; do \
+		./$$i || break ; \
+	done
+
+.PHONY: test
 
 apps_ldflags = \
     @ZLIB_LDFLAGS@
