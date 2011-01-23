@@ -43,6 +43,7 @@ struct _GtrPiecesViewerPrivate
 {
     TrTorrent * gtor; /* shared */
 };
+
 #define GTR_PIECES_VIEWER_GET_PRIVATE( obj ) \
     ( G_TYPE_INSTANCE_GET_PRIVATE( ( obj ), GTR_TYPE_PIECES_VIEWER, \
                                    GtrPiecesViewerPrivate ) )

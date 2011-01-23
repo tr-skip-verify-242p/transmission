@@ -913,7 +913,7 @@ torrent_cell_renderer_init( GTypeInstance *  instance,
     p->gtor = NULL;
     p->text_renderer = gtk_cell_renderer_text_new( );
     g_object_set( p->text_renderer, "xpad", 0, "ypad", 0, NULL );
-    p->pbar_renderer = pieces_cell_renderer_new( );
+    p->pbar_renderer = gtr_pieces_cell_renderer_new( );
     p->prog_renderer = gtk_cell_renderer_progress_new( );
     p->icon_renderer = gtk_cell_renderer_pixbuf_new(  );
     gtr_object_ref_sink( p->text_renderer );

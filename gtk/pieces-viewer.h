@@ -29,10 +29,11 @@
 #include "tr-torrent.h"
 
 #define GTR_TYPE_PIECES_VIEWER ( gtr_pieces_viewer_get_type( ) )
+GType gtr_pieces_viewer_get_type( void );
 #define GTR_PIECES_VIEWER( obj ) \
     ( G_TYPE_CHECK_INSTANCE_CAST( ( obj ), GTR_TYPE_PIECES_VIEWER, GtrPiecesViewer ) )
 #define GTR_PIECES_VIEWER_CLASS( obj ) \
-    ( G_TYPE_CHECK_CLASS_CAST( ( obj ), GTR_PIECES_VIEWER,  GtrPiecesViewerClass ) )
+    ( G_TYPE_CHECK_CLASS_CAST( ( obj ), GTR_PIECES_VIEWER, GtrPiecesViewerClass ) )
 #define GTR_IS_PIECES_VIEWER( obj ) \
     ( G_TYPE_CHECK_INSTANCE_TYPE( ( obj ), GTR_TYPE_PIECES_VIEWER ) )
 #define GTR_IS_PIECES_VIEWER_CLASS( obj ) \
@@ -53,7 +54,6 @@ struct _GtrPiecesViewerClass
     GtkDrawingAreaClass parent_class;
 };
 
-GType gtr_pieces_viewer_get_type( void );
 GtkWidget * gtr_pieces_viewer_new( void );
 
 /** @note Increases the reference count of @a gtor. */
