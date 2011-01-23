@@ -493,23 +493,21 @@ onTrackerResponse( tr_torrent * tor, const tr_tracker_event * event, void * unus
     {
         case TR_TRACKER_PEERS:
         {
-            size_t i, n;
+            size_t i;
             const int8_t seedProbability = event->seedProbability;
             const tr_bool allAreSeeds = seedProbability == 100;
-            tr_pex * pex = tr_peerMgrArrayToPex( event->compact,
-                                                 event->compactLen, &n );
-             if( allAreSeeds )
-                tr_tordbg( tor, "Got %d seeds from tracker", (int)n );
-            else
-                tr_tordbg( tor, "Got %d peers from tracker", (int)n );
 
-            for( i = 0; i < n; ++i )
-                tr_peerMgrAddPex( tor, TR_PEER_FROM_TRACKER, pex+i, seedProbability );
+             if( allAreSeeds )
+                tr_tordbg( tor, "Got %zu seeds from tracker", event->pexCount );
+            else
+                tr_tordbg( tor, "Got %zu peers from tracker", event->pexCount );
+
+            for( i = 0; i < event->pexCount; ++i )
+                tr_peerMgrAddPex( tor, TR_PEER_FROM_TRACKER, &event->pex[i], seedProbability );
 
             if( allAreSeeds && tr_torrentIsPrivate( tor ) )
                 tr_peerMgrMarkAllAsSeeds( tor );
 
-            tr_free( pex );
             break;
         }
 
@@ -1459,15 +1457,12 @@ tr_torrentTrackersFree( tr_tracker_stat * trackers, int trackerCount )
 void
 tr_torrentAvailability( const tr_torrent * tor, int8_t * tab, int size )
 {
-    assert( tr_isTorrent( tor ) );
-    assert( tab != NULL );
-    assert( size > 0 );
-
-    tr_torrentLock( tor );
-
-    tr_peerMgrTorrentAvailability( tor, tab, size );
-
-    tr_torrentUnlock( tor );
+    if( tr_isTorrent( tor ) && ( tab != NULL ) && ( size > 0 ) )
+    {
+        tr_torrentLock( tor );
+        tr_peerMgrTorrentAvailability( tor, tab, size );
+        tr_torrentUnlock( tor );
+    }
 }
 
 void
