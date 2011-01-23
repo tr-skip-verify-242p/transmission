@@ -47,13 +47,13 @@ typedef struct _PiecesCellRendererClassPrivate
     GdkColor piece_have_color;
     GdkColor piece_missing_color;
     GdkColor piece_seeding_color;
-    GdkColor piece_inactive_color;
+    GdkColor piece_stopped_color;
     GdkColor progress_bg_color;
     GdkColor progress_bar_color;
     GdkColor ratio_bg_color;
     GdkColor ratio_bar_color;
     GdkColor border_color;
-    GdkColor paused_bar_color;
+    GdkColor progress_stopped_color;
     GdkColor magnet_color;
 } PiecesCellRendererClassPrivate;
 
@@ -148,7 +148,7 @@ render_progress( PiecesCellRendererPrivate * priv,
     if( st->activity == TR_STATUS_STOPPED )
     {
         bg_color = &cpriv->progress_bg_color;
-        bar_color = &cpriv->paused_bar_color;
+        bar_color = &cpriv->progress_stopped_color;
     }
 
     if( progress < 1.0 )
@@ -186,7 +186,7 @@ render_pieces( PiecesCellRendererPrivate * priv,
     {
         const tr_torrent * tor = tr_torrent_handle( priv->gtor );
         const tr_bool magnet = !tr_torrentHasMetadata( tor );
-        const tr_bool inactive = ( st->activity == TR_STATUS_STOPPED );
+        const tr_bool stopped = ( st->activity == TR_STATUS_STOPPED );
         const tr_bool connected = ( st->peersConnected > 0 );
         const tr_bool seeding = ( st->percentDone >= 1.0 );
         GdkColor * piece_have_color;
@@ -194,8 +194,8 @@ render_pieces( PiecesCellRendererPrivate * priv,
         int i, j;
         int8_t avail;
 
-        if( inactive )
-            piece_have_color = &cpriv->piece_inactive_color;
+        if( stopped )
+            piece_have_color = &cpriv->piece_stopped_color;
         else if( seeding )
             piece_have_color = &cpriv->piece_seeding_color;
         else
@@ -364,13 +364,13 @@ pieces_cell_renderer_class_init( PiecesCellRendererClass * klass )
     gdk_color_parse( "#2975d6", &cpriv->piece_have_color );
     gdk_color_parse( "#d90000", &cpriv->piece_missing_color );
     gdk_color_parse( "#30b027", &cpriv->piece_seeding_color );
-    gdk_color_parse( "#aaaaaa", &cpriv->piece_inactive_color );
+    gdk_color_parse( "#aaaaaa", &cpriv->piece_stopped_color );
     gdk_color_parse( "#dadada", &cpriv->progress_bg_color );
     gdk_color_parse( "#314e6c", &cpriv->progress_bar_color );
+    gdk_color_parse( "#777777", &cpriv->progress_stopped_color );
     gdk_color_parse( "#a6e3b4", &cpriv->ratio_bg_color );
     gdk_color_parse( "#448632", &cpriv->ratio_bar_color );
     gdk_color_parse( "#888888", &cpriv->border_color );
-    gdk_color_parse( "#777777", &cpriv->paused_bar_color );
     gdk_color_parse( "#a33dac", &cpriv->magnet_color );
 }
 
