@@ -150,7 +150,12 @@ void     tr_core_torrents_added( TrCore * self );
 void  tr_core_remove_torrent( TrCore * self, TrTorrent * gtor, gboolean deleteFiles );
 void  tr_core_remove_torrent_from_id( TrCore * self, int id, gboolean deleteFiles );
 
-/* find a TrTorrent handle given a tr_torrent */
+/**
+ * Find the TrTorrent handle associated with the tr_torrent @tor.
+ *
+ * @note The reference count of the returned gobject will be incremented
+ *       by this function.
+ */
 TrTorrent * tr_core_get_handle( TrCore * self, const tr_torrent * tor );
 
 /* update the model with current torrent status */

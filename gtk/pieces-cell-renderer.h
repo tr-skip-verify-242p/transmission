@@ -22,35 +22,40 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-#ifndef PIECES_CELL_RENDERER_H
-#define PIECES_CELL_RENDERER_H
+#ifndef GTR_PIECES_CELL_RENDERER_H
+#define GTR_PIECES_CELL_RENDERER_H
 
 #include <gtk/gtkcellrenderer.h>
 
-#define PIECES_CELL_RENDERER_TYPE ( pieces_cell_renderer_get_type( ) )
+#define GTR_TYPE_PIECES_CELL_RENDERER ( gtr_pieces_cell_renderer_get_type( ) )
+GType gtr_pieces_cell_renderer_get_type( void );
+#define GTR_PIECES_CELL_RENDERER( obj ) \
+    ( G_TYPE_CHECK_INSTANCE_CAST( ( obj ), GTR_TYPE_PIECES_CELL_RENDERER, \
+                                  GtrPiecesCellRenderer ) )
+#define GTR_PIECES_CELL_RENDERER_CLASS( obj ) \
+    ( G_TYPE_CHECK_CLASS_CAST( ( obj ), GTR_PIECES_CELL_RENDERER, \
+                               GtrPiecesCellRendererClass ) )
+#define GTR_IS_PIECES_CELL_RENDERER( obj ) \
+    ( G_TYPE_CHECK_INSTANCE_TYPE( ( obj ), GTR_TYPE_PIECES_CELL_RENDERER ) )
+#define GTR_IS_PIECES_CELL_RENDERER_CLASS( obj ) \
+    ( G_TYPE_CHECK_CLASS_TYPE( ( obj ), GTR_TYPE_PIECES_CELL_RENDERER ) )
+#define GTR_PIECES_CELL_RENDERER_GET_CLASS \
+    ( G_TYPE_INSTANCE_GET_CLASS( ( obj ), GTR_TYPE_PIECES_CELL_RENDERER, \
+                                 GtrPiecesCellRendererClass ) )
 
-#define PIECES_CELL_RENDERER( o ) \
-    ( G_TYPE_CHECK_INSTANCE_CAST( ( o ), \
-                                 PIECES_CELL_RENDERER_TYPE, \
-                                 PiecesCellRenderer ) )
+typedef struct _GtrPiecesCellRenderer      GtrPiecesCellRenderer;
+typedef struct _GtrPiecesCellRendererClass GtrPiecesCellRendererClass;
 
-typedef struct _PiecesCellRenderer        PiecesCellRenderer;
-typedef struct _PiecesCellRendererClass   PiecesCellRendererClass;
-typedef struct _PiecesCellRendererPrivate PiecesCellRendererPrivate;
-
-struct _PiecesCellRenderer
+struct _GtrPiecesCellRenderer
 {
     GtkCellRenderer             parent;
-    PiecesCellRendererPrivate * priv;
 };
 
-struct _PiecesCellRendererClass
+struct _GtrPiecesCellRendererClass
 {
     GtkCellRendererClass parent_class;
 };
 
-GType             pieces_cell_renderer_get_type( void );
+GtkCellRenderer * gtr_pieces_cell_renderer_new( void );
 
-GtkCellRenderer * pieces_cell_renderer_new( void );
-
-#endif /* PIECES_CELL_RENDERER_H */
+#endif /* GTR_PIECES_CELL_RENDERER_H */

@@ -941,10 +941,17 @@ refreshInfo( struct DetailsImpl * di, tr_torrent ** torrents, int n )
 
     /* pieces viewer */
     if( n == 1 )
-        gtr_pieces_viewer_set_gtorrent( GTR_PIECES_VIEWER( di->pieces_viewer ),
-                                        tr_core_get_handle( di->core, torrents[0] ) );
+    {
+        TrTorrent * gtor = tr_core_get_handle( di->core, torrents[0] );
+        GtrPiecesViewer * pv = GTR_PIECES_VIEWER( di->pieces_viewer );
+        gtr_pieces_viewer_set_gtorrent( pv, gtor );
+        g_object_unref( gtor );
+    }
     else
-        gtr_pieces_viewer_set_gtorrent( GTR_PIECES_VIEWER( di->pieces_viewer ), NULL );
+    {
+        GtrPiecesViewer * pv = GTR_PIECES_VIEWER( di->pieces_viewer );
+        gtr_pieces_viewer_set_gtorrent( pv, NULL );
+    }
 
     g_free( stats );
     g_free( infos );

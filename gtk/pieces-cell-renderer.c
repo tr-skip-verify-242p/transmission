@@ -28,38 +28,41 @@
 #include "tr-torrent.h"
 #include "util.h"
 
-enum
-{
-    PROP_0,
-    PROP_TORRENT
-};
 
 static const gint MIN_BAR_WIDTH   = 100;
 static const gint MIN_BAR_HEIGHT  = 20;
 static const gint PROGRESS_HEIGHT = 4;
 static const gint BORDER_WIDTH    = 1;
 
-/* See pieces_cell_renderer_class_init() for color values. */
+/*
+ * Defines:
+ *   static gpointer gtr_pieces_cell_renderer_parent_class;
+ *   GType gtr_pieces_cell_renderer_get_type( void );
+ */
+G_DEFINE_TYPE( GtrPiecesCellRenderer, gtr_pieces_cell_renderer,
+               GTK_TYPE_CELL_RENDERER );
 
-typedef struct _PiecesCellRendererClassPrivate
+typedef struct _GtrPiecesCellRendererClassPrivate
 {
+    /* See gtr_pieces_cell_renderer_class_init() for color values. */
     GdkColor piece_bg_color;
     GdkColor piece_have_color;
     GdkColor piece_missing_color;
     GdkColor piece_seeding_color;
+    GdkColor piece_stopped_color;
     GdkColor progress_bg_color;
     GdkColor progress_bar_color;
     GdkColor ratio_bg_color;
     GdkColor ratio_bar_color;
     GdkColor border_color;
-    GdkColor paused_bar_color;
+    GdkColor progress_stopped_color;
     GdkColor magnet_color;
-} PiecesCellRendererClassPrivate;
+} GtrPiecesCellRendererClassPrivate;
 
-static PiecesCellRendererClassPrivate cpriv_data;
-static PiecesCellRendererClassPrivate * cpriv = &cpriv_data;
+static GtrPiecesCellRendererClassPrivate cpriv_data;
+static GtrPiecesCellRendererClassPrivate * cpriv = &cpriv_data;
 
-struct _PiecesCellRendererPrivate
+struct _GtrPiecesCellRendererPrivate
 {
     TrTorrent       * gtor;
     cairo_surface_t * offscreen;
@@ -67,14 +70,26 @@ struct _PiecesCellRendererPrivate
     int               offscreen_h;
 };
 
+typedef struct _GtrPiecesCellRendererPrivate GtrPiecesCellRendererPrivate;
+
+#define GTR_PIECES_CELL_RENDERER_GET_PRIVATE( obj ) \
+    ( G_TYPE_INSTANCE_GET_PRIVATE( ( obj ), GTR_TYPE_PIECES_CELL_RENDERER, \
+                                   GtrPiecesCellRendererPrivate ) )
+
+enum
+{
+    PROP_0,
+    PROP_TORRENT
+};
+
 static void
-pieces_cell_renderer_get_size( GtkCellRenderer * cell,
-                               GtkWidget       * widget UNUSED,
-                               GdkRectangle    * cell_area,
-                               gint            * x_offset,
-                               gint            * y_offset,
-                               gint            * width,
-                               gint            * height )
+gtr_pieces_cell_renderer_get_size( GtkCellRenderer * cell,
+                                   GtkWidget       * widget UNUSED,
+                                   GdkRectangle    * cell_area,
+                                   gint            * x_offset,
+                                   gint            * y_offset,
+                                   gint            * width,
+                                   gint            * height )
 {
     if( width )
         *width = MIN_BAR_WIDTH + cell->xpad * 2;
@@ -96,7 +111,7 @@ pieces_cell_renderer_get_size( GtkCellRenderer * cell,
 }
 
 static cairo_t *
-get_offscreen_context( PiecesCellRendererPrivate * priv,
+get_offscreen_context( GtrPiecesCellRendererPrivate * priv,
                        cairo_t * cr, int w, int h )
 {
     if( !priv->offscreen || priv->offscreen_w != w
@@ -116,7 +131,7 @@ get_offscreen_context( PiecesCellRendererPrivate * priv,
 }
 
 static void
-render_progress( PiecesCellRendererPrivate * priv,
+render_progress( GtrPiecesCellRendererPrivate * priv,
                  cairo_t * cr, int x, int y, int w, int h )
 {
     const tr_stat * st = tr_torrent_stat( priv->gtor );
@@ -147,7 +162,7 @@ render_progress( PiecesCellRendererPrivate * priv,
     if( st->activity == TR_STATUS_STOPPED )
     {
         bg_color = &cpriv->progress_bg_color;
-        bar_color = &cpriv->paused_bar_color;
+        bar_color = &cpriv->progress_stopped_color;
     }
 
     if( progress < 1.0 )
@@ -166,7 +181,7 @@ render_progress( PiecesCellRendererPrivate * priv,
 }
 
 static void
-render_pieces( PiecesCellRendererPrivate * priv,
+render_pieces( GtrPiecesCellRendererPrivate * priv,
                cairo_t * cr, int x, int y, int w, int h )
 {
     const tr_stat * st;
@@ -185,6 +200,7 @@ render_pieces( PiecesCellRendererPrivate * priv,
     {
         const tr_torrent * tor = tr_torrent_handle( priv->gtor );
         const tr_bool magnet = !tr_torrentHasMetadata( tor );
+        const tr_bool stopped = ( st->activity == TR_STATUS_STOPPED );
         const tr_bool connected = ( st->peersConnected > 0 );
         const tr_bool seeding = ( st->percentDone >= 1.0 );
         GdkColor * piece_have_color;
@@ -192,7 +208,9 @@ render_pieces( PiecesCellRendererPrivate * priv,
         int i, j;
         int8_t avail;
 
-        if( seeding )
+        if( stopped )
+            piece_have_color = &cpriv->piece_stopped_color;
+        else if( seeding )
             piece_have_color = &cpriv->piece_seeding_color;
         else
             piece_have_color = &cpriv->piece_have_color;
@@ -232,18 +250,21 @@ render_pieces( PiecesCellRendererPrivate * priv,
 }
 
 static void
-pieces_cell_renderer_render( GtkCellRenderer      * cell,
-                             GdkDrawable          * window,
-                             GtkWidget            * widget UNUSED,
-                             GdkRectangle         * background_area UNUSED,
-                             GdkRectangle         * cell_area,
-                             GdkRectangle         * expose_area,
-                             GtkCellRendererState   flags UNUSED )
+gtr_pieces_cell_renderer_render( GtkCellRenderer      * cell,
+                                 GdkDrawable          * window,
+                                 GtkWidget            * widget UNUSED,
+                                 GdkRectangle         * background_area UNUSED,
+                                 GdkRectangle         * cell_area,
+                                 GdkRectangle         * expose_area,
+                                 GtkCellRendererState   flags UNUSED )
 {
-    PiecesCellRenderer * self = PIECES_CELL_RENDERER( cell );
-    PiecesCellRendererPrivate * priv = self->priv;
+    GtrPiecesCellRenderer * self;
+    GtrPiecesCellRendererPrivate * priv;
     gint x, y, w, h, xo, yo, wo, ho, hp;
     cairo_t * cr, * cro;
+
+    self = GTR_PIECES_CELL_RENDERER( cell );
+    priv = GTR_PIECES_CELL_RENDERER_GET_PRIVATE( self );
 
     x = cell_area->x + cell->xpad;
     y = cell_area->y + cell->ypad;
@@ -280,13 +301,16 @@ pieces_cell_renderer_render( GtkCellRenderer      * cell,
 }
 
 static void
-pieces_cell_renderer_set_property( GObject      * object,
-                                   guint          property_id,
-                                   const GValue * v,
-                                   GParamSpec   * pspec )
+gtr_pieces_cell_renderer_set_property( GObject      * object,
+                                       guint          property_id,
+                                       const GValue * v,
+                                       GParamSpec   * pspec )
 {
-    PiecesCellRenderer * self = PIECES_CELL_RENDERER( object );
-    PiecesCellRendererPrivate * priv = self->priv;
+    GtrPiecesCellRenderer * self;
+    GtrPiecesCellRendererPrivate * priv;
+
+    self = GTR_PIECES_CELL_RENDERER( object );
+    priv = GTR_PIECES_CELL_RENDERER_GET_PRIVATE( self );
 
     switch( property_id )
     {
@@ -300,13 +324,16 @@ pieces_cell_renderer_set_property( GObject      * object,
 }
 
 static void
-pieces_cell_renderer_get_property( GObject    * object,
-                                   guint        property_id,
-                                   GValue     * v,
-                                   GParamSpec * pspec )
+gtr_pieces_cell_renderer_get_property( GObject    * object,
+                                       guint        property_id,
+                                       GValue     * v,
+                                       GParamSpec * pspec )
 {
-    const PiecesCellRenderer * self = PIECES_CELL_RENDERER( object );
-    PiecesCellRendererPrivate * priv = self->priv;
+    const GtrPiecesCellRenderer * self;
+    GtrPiecesCellRendererPrivate * priv;
+
+    self = GTR_PIECES_CELL_RENDERER( object );
+    priv = GTR_PIECES_CELL_RENDERER_GET_PRIVATE( self );
 
     switch( property_id )
     {
@@ -320,11 +347,12 @@ pieces_cell_renderer_get_property( GObject    * object,
 }
 
 static void
-pieces_cell_renderer_finalize( GObject * object )
+gtr_pieces_cell_renderer_finalize( GObject * object )
 {
-    PiecesCellRenderer * self = PIECES_CELL_RENDERER( object );
-    PiecesCellRendererPrivate * priv = self->priv;
-    GObjectClass * parent;
+    GtrPiecesCellRenderer * self = GTR_PIECES_CELL_RENDERER( object );
+    GtrPiecesCellRendererPrivate * priv;
+
+    priv =  GTR_PIECES_CELL_RENDERER_GET_PRIVATE( self );
 
     if( priv->offscreen )
     {
@@ -332,23 +360,22 @@ pieces_cell_renderer_finalize( GObject * object )
         priv->offscreen = NULL;
     }
 
-    parent = g_type_class_peek( g_type_parent( PIECES_CELL_RENDERER_TYPE ) ) ;
-    parent->finalize( object );
+    G_OBJECT_CLASS( gtr_pieces_cell_renderer_parent_class )->finalize( object );
 }
 
 static void
-pieces_cell_renderer_class_init( PiecesCellRendererClass * klass )
+gtr_pieces_cell_renderer_class_init( GtrPiecesCellRendererClass * klass )
 {
-    GObjectClass * gobject_class = G_OBJECT_CLASS( klass );
     GtkCellRendererClass * cell_class = GTK_CELL_RENDERER_CLASS( klass );
+    GObjectClass * gobject_class = G_OBJECT_CLASS( klass );
 
-    g_type_class_add_private( klass, sizeof( PiecesCellRendererPrivate ) );
+    g_type_class_add_private( klass, sizeof( GtrPiecesCellRendererPrivate ) );
 
-    cell_class->render          = pieces_cell_renderer_render;
-    cell_class->get_size        = pieces_cell_renderer_get_size;
-    gobject_class->set_property = pieces_cell_renderer_set_property;
-    gobject_class->get_property = pieces_cell_renderer_get_property;
-    gobject_class->finalize     = pieces_cell_renderer_finalize;
+    cell_class->render          = gtr_pieces_cell_renderer_render;
+    cell_class->get_size        = gtr_pieces_cell_renderer_get_size;
+    gobject_class->set_property = gtr_pieces_cell_renderer_set_property;
+    gobject_class->get_property = gtr_pieces_cell_renderer_get_property;
+    gobject_class->finalize     = gtr_pieces_cell_renderer_finalize;
 
     g_object_class_install_property( gobject_class, PROP_TORRENT,
                                      g_param_spec_object( "torrent", NULL,
@@ -360,61 +387,28 @@ pieces_cell_renderer_class_init( PiecesCellRendererClass * klass )
     gdk_color_parse( "#2975d6", &cpriv->piece_have_color );
     gdk_color_parse( "#d90000", &cpriv->piece_missing_color );
     gdk_color_parse( "#30b027", &cpriv->piece_seeding_color );
+    gdk_color_parse( "#aaaaaa", &cpriv->piece_stopped_color );
     gdk_color_parse( "#dadada", &cpriv->progress_bg_color );
     gdk_color_parse( "#314e6c", &cpriv->progress_bar_color );
+    gdk_color_parse( "#777777", &cpriv->progress_stopped_color );
     gdk_color_parse( "#a6e3b4", &cpriv->ratio_bg_color );
     gdk_color_parse( "#448632", &cpriv->ratio_bar_color );
     gdk_color_parse( "#888888", &cpriv->border_color );
-    gdk_color_parse( "#aaaaaa", &cpriv->paused_bar_color );
     gdk_color_parse( "#a33dac", &cpriv->magnet_color );
 }
 
 static void
-pieces_cell_renderer_init( GTypeInstance * instance,
-                           gpointer g_class UNUSED )
+gtr_pieces_cell_renderer_init( GtrPiecesCellRenderer * self )
 {
-    PiecesCellRenderer * self = PIECES_CELL_RENDERER( instance );
-    PiecesCellRendererPrivate * priv;
+    GtrPiecesCellRendererPrivate * priv;
 
-    priv = G_TYPE_INSTANCE_GET_PRIVATE(self, PIECES_CELL_RENDERER_TYPE,
-                                       PiecesCellRendererPrivate );
+    priv = GTR_PIECES_CELL_RENDERER_GET_PRIVATE( self );
     priv->gtor = NULL;
     priv->offscreen = NULL;
-
-    self->priv = priv;
-}
-
-GType
-pieces_cell_renderer_get_type( void )
-{
-    static GType type = 0;
-
-    if( !type )
-    {
-        static const GTypeInfo info =
-        {
-            sizeof( PiecesCellRendererClass ),
-            NULL, /* base_init */
-            NULL, /* base_finalize */
-            (GClassInitFunc) pieces_cell_renderer_class_init,
-            NULL, /* class_finalize */
-            NULL, /* class_data */
-            sizeof( PiecesCellRenderer ),
-            0, /* n_preallocs */
-            (GInstanceInitFunc) pieces_cell_renderer_init,
-            NULL
-        };
-
-        type = g_type_register_static( GTK_TYPE_CELL_RENDERER,
-                                       "PiecesCellRenderer",
-                                       &info, (GTypeFlags) 0 );
-    }
-
-    return type;
 }
 
 GtkCellRenderer *
-pieces_cell_renderer_new( void )
+gtr_pieces_cell_renderer_new( void )
 {
-    return g_object_new( PIECES_CELL_RENDERER_TYPE, NULL );
+    return g_object_new( GTR_TYPE_PIECES_CELL_RENDERER, NULL );
 }
