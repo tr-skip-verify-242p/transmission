@@ -1,7 +1,7 @@
 /*
- * This file Copyright (C) 2009-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
- * This file is licensed by the GPL version 2.  Works owned by the
+ * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
  * so that the bulk of its code can remain under the MIT license.
  * This exemption does not extend to derived works not owned by
@@ -185,7 +185,7 @@ struct tr_torrent
     time_t                     dhtAnnounce6At;
     tr_bool                    dhtAnnounceInProgress;
     tr_bool                    dhtAnnounce6InProgress;
-    
+
     time_t                     lpdAnnounceAt;
 
     uint64_t                   downloadedCur;
@@ -205,6 +205,9 @@ struct tr_torrent
     time_t                     doneDate;
     time_t                     startDate;
     time_t                     anyDate;
+
+    time_t                     secondsDownloading;
+    time_t                     secondsSeeding;
 
     tr_torrent_metadata_func  * metadata_func;
     void                      * metadata_func_user_data;
@@ -292,6 +295,11 @@ tr_torBlockCountBytes( const tr_torrent * tor, const tr_block_index_t block )
 static inline void tr_torrentLock( const tr_torrent * tor )
 {
     tr_sessionLock( tor->session );
+}
+
+static inline tr_bool tr_torrentIsLocked( const tr_torrent * tor )
+{
+    return tr_sessionIsLocked( tor->session );
 }
 
 static inline void tr_torrentUnlock( const tr_torrent * tor )
@@ -417,7 +425,7 @@ tr_bool tr_torrentPieceNeedsCheck( const tr_torrent * tor, tr_piece_index_t piec
 /**
  * @brief Test a piece against its info dict checksum
  * @return true if the piece's passes the checksum test
- */ 
+ */
 tr_bool tr_torrentCheckPiece( tr_torrent * tor, tr_piece_index_t pieceIndex );
 
 uint64_t tr_torrentGetCurrentSizeOnDisk( const tr_torrent * tor );
