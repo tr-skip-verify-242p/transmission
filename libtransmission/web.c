@@ -141,10 +141,21 @@ getTimeoutFromURL( const struct tr_web_task * task )
     long timeout;
     const tr_session * session = task->session;
 
-    if( !session || session->isClosed ) timeout = 20L;
-    else if( strstr( task->url, "scrape" ) != NULL ) timeout = 30L;
-    else if( strstr( task->url, "announce" ) != NULL ) timeout = 90L;
-    else timeout = 240L;
+    if( !session || session->isClosed )
+    {
+        timeout = 20L;
+    }
+    else
+    {
+        if( tr_sessionIsProxyEnabled( session ) )
+            timeout = 300L;
+        else if( strstr( task->url, "scrape" ) != NULL )
+            timeout = 30L;
+        else if( strstr( task->url, "announce" ) != NULL )
+            timeout = 90L;
+        else
+            timeout = 240L;
+    }
 
     return timeout;
 }
