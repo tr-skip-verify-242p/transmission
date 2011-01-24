@@ -153,8 +153,7 @@ void  tr_core_remove_torrent_from_id( TrCore * self, int id, gboolean deleteFile
 /**
  * Find the TrTorrent handle associated with the tr_torrent @tor.
  *
- * @note The reference count of the returned gobject will be incremented
- *       by this function.
+ * @note The reference count of the returned gobject is not incremented.
  */
 TrTorrent * tr_core_get_handle( TrCore * self, const tr_torrent * tor );
 

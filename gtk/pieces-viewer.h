@@ -56,7 +56,7 @@ struct _GtrPiecesViewerClass
 
 GtkWidget * gtr_pieces_viewer_new( void );
 
-/** @note Increases the reference count of @a gtor. */
+/** @note Does not increase the reference count of @a gtor. */
 void gtr_pieces_viewer_set_gtorrent( GtrPiecesViewer * pv, TrTorrent * gtor );
 
 #endif /* GTR_PIECES_VIEWER_H */
