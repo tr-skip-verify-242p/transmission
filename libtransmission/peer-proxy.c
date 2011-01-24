@@ -273,7 +273,7 @@ writeProxyRequestHTTP( tr_peerIo * io )
                        peerHost, peerPort, http_minor_version,
                        hostHdr, authHdr );
 
-    tr_peerIoWrite( io, buf, len, FALSE );
+    tr_peerIoWriteBytes( io, buf, len, FALSE );
     tr_peerProxySetState( proxy, PEER_PROXY_CONNECT );
 }
 
@@ -292,18 +292,18 @@ writeProxyRequestSOCKS4( tr_peerIo * io )
 
     assert( addr->type == TR_AF_INET );
 
-    tr_peerIoWrite( io, &version, 1, FALSE );
-    tr_peerIoWrite( io, &command, 1, FALSE );
-    tr_peerIoWrite( io, &port, 2, FALSE );
-    tr_peerIoWrite( io, &addr->addr.addr4.s_addr, 4, FALSE );
+    tr_peerIoWriteBytes( io, &version, 1, FALSE );
+    tr_peerIoWriteBytes( io, &command, 1, FALSE );
+    tr_peerIoWriteBytes( io, &port, 2, FALSE );
+    tr_peerIoWriteBytes( io, &addr->addr.addr4.s_addr, 4, FALSE );
 
     if( tr_peerProxyIsAuthEnabled( proxy ) )
     {
         const char * username = tr_peerProxyGetUsername( proxy );
         size_t len = strlen( username );
-        tr_peerIoWrite( io, username, len, FALSE );
+        tr_peerIoWriteBytes( io, username, len, FALSE );
     }
-    tr_peerIoWrite( io, &null, 1, FALSE );
+    tr_peerIoWriteBytes( io, &null, 1, FALSE );
     tr_peerProxySetState( proxy, PEER_PROXY_CONNECT );
 }
 
@@ -315,12 +315,12 @@ writeProxyRequestSOCKS5( tr_peerIo * io )
     if( tr_peerProxyIsAuthEnabled( proxy ) )
     {
         uint8_t packet[4] = { SOCKS5_VERSION, 2, SOCKS5_AUTH_NONE, SOCKS5_AUTH_USERPASS };
-        tr_peerIoWrite( io, packet, sizeof( packet ), FALSE );
+        tr_peerIoWriteBytes( io, packet, sizeof( packet ), FALSE );
     }
     else
     {
         uint8_t packet[3] = { SOCKS5_VERSION, 1, SOCKS5_AUTH_NONE };
-        tr_peerIoWrite( io, packet, sizeof( packet ), FALSE );
+        tr_peerIoWriteBytes( io, packet, sizeof( packet ), FALSE );
     }
 
     tr_peerProxySetState( proxy, PEER_PROXY_INIT );
@@ -412,24 +412,24 @@ writeSOCKS5ConnectCommand( tr_peerIo * io )
     version = SOCKS5_VERSION;
     command = SOCKS5_CMD_CONNECT;
     reserved = 0;
-    tr_peerIoWrite( io, &version, 1, FALSE );
-    tr_peerIoWrite( io, &command, 1, FALSE );
-    tr_peerIoWrite( io, &reserved, 1, FALSE );
+    tr_peerIoWriteBytes( io, &version, 1, FALSE );
+    tr_peerIoWriteBytes( io, &command, 1, FALSE );
+    tr_peerIoWriteBytes( io, &reserved, 1, FALSE );
 
     if( addr->type == TR_AF_INET6 )
     {
         address_type = SOCKS5_ADDR_IPV6;
-        tr_peerIoWrite( io, &address_type, 1, FALSE );
-        tr_peerIoWrite( io, &addr->addr.addr6, 16, FALSE );
+        tr_peerIoWriteBytes( io, &address_type, 1, FALSE );
+        tr_peerIoWriteBytes( io, &addr->addr.addr6, 16, FALSE );
     }
     else
     {
         assert( addr->type == TR_AF_INET );
         address_type = SOCKS5_ADDR_IPV4;
-        tr_peerIoWrite( io, &address_type, 1, FALSE );
-        tr_peerIoWrite( io, &addr->addr.addr4.s_addr, 4, FALSE );
+        tr_peerIoWriteBytes( io, &address_type, 1, FALSE );
+        tr_peerIoWriteBytes( io, &addr->addr.addr4.s_addr, 4, FALSE );
     }
-    tr_peerIoWrite( io, &port, 2, FALSE );
+    tr_peerIoWriteBytes( io, &port, 2, FALSE );
 
     tr_peerProxySetState( io->proxy, PEER_PROXY_CONNECT );
 }
@@ -463,13 +463,13 @@ processSOCKS5Greeting( tr_peerIo * io, struct evbuffer * inbuf )
         const char *username = tr_peerProxyGetUsername( proxy );
         const char *password = tr_peerProxyGetPassword( proxy );
         version = SOCKS5_VERSION;
-        tr_peerIoWrite( io, &version, 1, FALSE );
+        tr_peerIoWriteBytes( io, &version, 1, FALSE );
         length = MAX( strlen( username ), 255 );
-        tr_peerIoWrite( io, &length, 1, FALSE );
-        tr_peerIoWrite( io, username, length, FALSE );
+        tr_peerIoWriteBytes( io, &length, 1, FALSE );
+        tr_peerIoWriteBytes( io, username, length, FALSE );
         length = MAX( strlen( password ), 255 );
-        tr_peerIoWrite( io, &length, 1, FALSE );
-        tr_peerIoWrite( io, password, length, FALSE );
+        tr_peerIoWriteBytes( io, &length, 1, FALSE );
+        tr_peerIoWriteBytes( io, password, length, FALSE );
 
         tr_peerProxySetState( proxy, PEER_PROXY_AUTH );
         return READ_LATER;

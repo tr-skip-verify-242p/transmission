@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2
@@ -10,6 +10,7 @@
  * $Id$
  */
 
+#include <errno.h>
 #include <stdio.h>
 #include <unistd.h> /* getcwd() */
 
@@ -82,7 +83,11 @@ tr_getcwd( void )
 #ifdef WIN32
     _getcwd( buf, sizeof( buf ) );
 #else
-    getcwd( buf, sizeof( buf ) );
+    if( !getcwd( buf, sizeof( buf ) ) )
+    {
+        fprintf( stderr, "getcwd: %s", strerror( errno ) );
+        buf[0] = '\0';
+    }
 #endif
     return tr_strdup( buf );
 }

@@ -1,7 +1,7 @@
 /*
- * This file Copyright (C) 2009-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
- * This file is licensed by the GPL version 2.  Works owned by the
+ * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
  * so that the bulk of its code can remain under the MIT license.
  * This exemption does not extend to derived works not owned by
@@ -12,6 +12,7 @@
 
 #include <sys/types.h> /* stat */
 #include <sys/stat.h> /* stat */
+#include <sys/wait.h> /* wait() */
 #include <unistd.h> /* stat */
 #include <dirent.h>
 
@@ -22,8 +23,7 @@
 #include <string.h> /* memcmp */
 #include <stdlib.h> /* qsort */
 
-#include <stdarg.h> /* some 1.4.x versions of evutil.h need this */
-#include <evutil.h> /* evutil_vsnprintf() */
+#include <event2/util.h> /* evutil_vsnprintf() */
 
 #include "transmission.h"
 #include "announcer.h"
@@ -48,6 +48,16 @@
 #include "utils.h"
 #include "verify.h"
 #include "version.h"
+
+/***
+****
+***/
+
+#define tr_deeplog_tor( tor, ... ) \
+    do { \
+        if( tr_deepLoggingIsActive( ) ) \
+            tr_deepLog( __FILE__, __LINE__, tr_torrentName( tor ), __VA_ARGS__ ); \
+    } while( 0 )
 
 /***
 ****
@@ -483,23 +493,21 @@ onTrackerResponse( tr_torrent * tor, const tr_tracker_event * event, void * unus
     {
         case TR_TRACKER_PEERS:
         {
-            size_t i, n;
+            size_t i;
             const int8_t seedProbability = event->seedProbability;
             const tr_bool allAreSeeds = seedProbability == 100;
-            tr_pex * pex = tr_peerMgrArrayToPex( event->compact,
-                                                 event->compactLen, &n );
-             if( allAreSeeds )
-                tr_tordbg( tor, "Got %d seeds from tracker", (int)n );
-            else
-                tr_tordbg( tor, "Got %d peers from tracker", (int)n );
 
-            for( i = 0; i < n; ++i )
-                tr_peerMgrAddPex( tor, TR_PEER_FROM_TRACKER, pex+i, seedProbability );
+             if( allAreSeeds )
+                tr_tordbg( tor, "Got %zu seeds from tracker", event->pexCount );
+            else
+                tr_tordbg( tor, "Got %zu peers from tracker", event->pexCount );
+
+            for( i = 0; i < event->pexCount; ++i )
+                tr_peerMgrAddPex( tor, TR_PEER_FROM_TRACKER, &event->pex[i], seedProbability );
 
             if( allAreSeeds && tr_torrentIsPrivate( tor ) )
                 tr_peerMgrMarkAllAsSeeds( tor );
 
-            tr_free( pex );
             break;
         }
 
@@ -652,7 +660,7 @@ tr_torrentInitFilePieces( tr_torrent * tor )
 static void torrentStart( tr_torrent * tor );
 
 /**
- * Decide on a block size.  constraints:
+ * Decide on a block size. Constraints:
  * (1) most clients decline requests over 16 KiB
  * (2) pieceSize must be a multiple of block size
  */
@@ -737,14 +745,35 @@ tr_torrentGotNewInfoDict( tr_torrent * tor )
 }
 
 static tr_bool
+hasAnyLocalData( const tr_torrent * tor )
+{
+    tr_file_index_t i;
+    tr_bool has_local_data = FALSE;
+    const tr_file_index_t n = tor->info.fileCount;
+
+    for( i=0; i<n && !has_local_data; ++i )
+    {
+        struct stat sb;
+        char * filename = tr_torrentFindFile( tor, i );
+
+        if( filename && !stat( filename, &sb ) )
+            has_local_data = TRUE;
+
+        tr_free( filename );
+    }
+
+    return has_local_data;
+}
+
+static tr_bool
 setLocalErrorIfFilesDisappeared( tr_torrent * tor )
 {
-    const tr_bool disappeared = ( tr_cpHaveTotal( &tor->completion ) > 0 ) && ( tr_torrentGetCurrentSizeOnDisk( tor ) == 0 );
+    const tr_bool disappeared = ( tr_cpHaveTotal( &tor->completion ) > 0 ) && !hasAnyLocalData( tor );
 
     if( disappeared )
     {
-        tr_tordbg( tor, "%s", "[LAZY] uh oh, the files disappeared" );
-        tr_torrentSetLocalError( tor, "%s", _( "No data found!  Ensure your drives are connected or use \"Set Location\".  To re-download, remove the torrent and re-add it." ) );
+        tr_deeplog_tor( tor, "%s", "[LAZY] uh oh, the files disappeared" );
+        tr_torrentSetLocalError( tor, "%s", _( "No data found! Ensure your drives are connected or use \"Set Location\". To re-download, remove the torrent and re-add it." ) );
     }
 
     return disappeared;
@@ -1138,14 +1167,16 @@ tr_torrentStat( tr_torrent * tor )
     s->percentComplete = tr_cpPercentComplete ( &tor->completion );
     s->metadataPercentComplete = tr_torrentGetMetadataPercent( tor );
 
-    s->percentDone      = tr_cpPercentDone  ( &tor->completion );
-    s->leftUntilDone    = tr_cpLeftUntilDone( &tor->completion );
-    s->sizeWhenDone     = tr_cpSizeWhenDone ( &tor->completion );
-    s->recheckProgress  = s->activity == TR_STATUS_CHECK ? getVerifyProgress( tor ) : 0;
-    s->activityDate     = tor->activityDate;
-    s->addedDate        = tor->addedDate;
-    s->doneDate         = tor->doneDate;
-    s->startDate        = tor->startDate;
+    s->percentDone         = tr_cpPercentDone  ( &tor->completion );
+    s->leftUntilDone       = tr_cpLeftUntilDone( &tor->completion );
+    s->sizeWhenDone        = tr_cpSizeWhenDone ( &tor->completion );
+    s->recheckProgress     = s->activity == TR_STATUS_CHECK ? getVerifyProgress( tor ) : 0;
+    s->activityDate        = tor->activityDate;
+    s->addedDate           = tor->addedDate;
+    s->doneDate            = tor->doneDate;
+    s->startDate           = tor->startDate;
+    s->secondsSeeding      = tor->secondsSeeding;
+    s->secondsDownloading  = tor->secondsDownloading;
 
     if ((s->activity == TR_STATUS_DOWNLOAD || s->activity == TR_STATUS_SEED) && s->startDate != 0)
         s->idleSecs = difftime(tr_time(), MAX(s->startDate, s->activityDate));
@@ -1365,50 +1396,69 @@ tr_torrentFilesFree( tr_file_stat *            files,
 double*
 tr_torrentWebSpeeds_KBps( const tr_torrent * tor )
 {
-    return tr_isTorrent( tor ) ? tr_peerMgrWebSpeeds_KBps( tor ) : NULL;
+    double * ret = NULL;
+
+    if( tr_isTorrent( tor ) )
+    {
+        tr_torrentLock( tor );
+        ret = tr_peerMgrWebSpeeds_KBps( tor );
+        tr_torrentUnlock( tor );
+    }
+
+    return ret;
 }
 
 tr_peer_stat *
-tr_torrentPeers( const tr_torrent * tor,
-                 int *              peerCount )
+tr_torrentPeers( const tr_torrent * tor, int * peerCount )
 {
     tr_peer_stat * ret = NULL;
 
     if( tr_isTorrent( tor ) )
+    {
+        tr_torrentLock( tor );
         ret = tr_peerMgrPeerStats( tor, peerCount );
+        tr_torrentUnlock( tor );
+    }
 
     return ret;
 }
 
 void
-tr_torrentPeersFree( tr_peer_stat * peers,
-                     int peerCount  UNUSED )
+tr_torrentPeersFree( tr_peer_stat * peers, int peerCount UNUSED )
 {
     tr_free( peers );
 }
 
 tr_tracker_stat *
-tr_torrentTrackers( const tr_torrent * torrent,
-                    int              * setmeTrackerCount )
+tr_torrentTrackers( const tr_torrent * torrent, int * setmeTrackerCount )
 {
-    assert( tr_isTorrent( torrent ) );
+    tr_tracker_stat * ret = NULL;
 
-    return tr_announcerStats( torrent, setmeTrackerCount );
+    if( tr_isTorrent( torrent ) )
+    {
+        tr_torrentLock( torrent );
+        ret = tr_announcerStats( torrent, setmeTrackerCount );
+        tr_torrentUnlock( torrent );
+    }
+
+    return ret;
 }
 
 void
-tr_torrentTrackersFree( tr_tracker_stat * trackers,
-                        int trackerCount )
+tr_torrentTrackersFree( tr_tracker_stat * trackers, int trackerCount )
 {
     tr_announcerStatsFree( trackers, trackerCount );
 }
 
 void
-tr_torrentAvailability( const tr_torrent * tor,
-                        int8_t *           tab,
-                        int                size )
+tr_torrentAvailability( const tr_torrent * tor, int8_t * tab, int size )
 {
-    tr_peerMgrTorrentAvailability( tor, tab, size );
+    if( tr_isTorrent( tor ) && ( tab != NULL ) && ( size > 0 ) )
+    {
+        tr_torrentLock( tor );
+        tr_peerMgrTorrentAvailability( tor, tab, size );
+        tr_torrentUnlock( tor );
+    }
 }
 
 void
@@ -1570,6 +1620,13 @@ torrentStart( tr_torrent * tor )
     if( setLocalErrorIfFilesDisappeared( tor ) )
         return;
 
+    /* verifying right now... wait until that's done so
+     * we'll know what completeness to use/announce */
+    if( tor->verifyState != TR_VERIFY_NONE ) {
+        tor->startAfterVerify = TRUE;
+        return;
+    }
+
     /* otherwise, start it now... */
     tr_sessionLock( tor->session );
 
@@ -1578,8 +1635,6 @@ torrentStart( tr_torrent * tor )
         tr_torinf( tor, _( "Restarted manually -- disabling its seed ratio" ) );
         tr_torrentSetRatioMode( tor, TR_RATIOLIMIT_UNLIMITED );
     }
-
-    tr_verifyRemove( tor );
 
     /* corresponds to the peer_id sent as a tracker request parameter.
      * one tracker admin says: "When the same torrent is opened and
@@ -1678,6 +1733,8 @@ stopTorrent( void * vtor )
 
     assert( tr_isTorrent( tor ) );
 
+    tr_torrentLock( tor );
+
     tr_verifyRemove( tor );
     tr_peerMgrStopTorrent( tor );
     tr_announcerTorrentStopped( tor );
@@ -1687,6 +1744,8 @@ stopTorrent( void * vtor )
 
     if( !tor->isDeleting )
         tr_torrentSave( tor );
+
+    tr_torrentUnlock( tor );
 }
 
 void
@@ -1749,13 +1808,43 @@ tr_torrentFree( tr_torrent * tor )
     }
 }
 
-void
-tr_torrentRemove( tr_torrent * tor )
+struct remove_data
 {
-    assert( tr_isTorrent( tor ) );
+    tr_torrent   * tor;
+    tr_bool        deleteFlag;
+    tr_fileFunc  * deleteFunc;
+};
 
+static void tr_torrentDeleteLocalData( tr_torrent *, tr_fileFunc );
+
+static void
+removeTorrent( void * vdata )
+{
+    struct remove_data * data = vdata;
+
+    if( data->deleteFlag )
+        tr_torrentDeleteLocalData( data->tor, data->deleteFunc );
+
+    tr_torrentClearCompletenessCallback( data->tor );
+    closeTorrent( data->tor );
+    tr_free( data );
+}
+
+void
+tr_torrentRemove( tr_torrent   * tor,
+                  tr_bool        deleteFlag, 
+                  tr_fileFunc    deleteFunc )
+{
+    struct remove_data * data;
+
+    assert( tr_isTorrent( tor ) );
     tor->isDeleting = 1;
-    tr_torrentFree( tor );
+
+    data = tr_new0( struct remove_data, 1 );
+    data->tor = tor;
+    data->deleteFlag = deleteFlag;
+    data->deleteFunc = deleteFunc;
+    tr_runInEventThread( tor->session, removeTorrent, data );
 }
 
 /**
@@ -1850,37 +1939,46 @@ tr_torrentClearIdleLimitHitCallback( tr_torrent * torrent )
 }
 
 static void
-tr_setenv( const char * name, const char * value, tr_bool override )
+onSigCHLD( int i UNUSED )
 {
-#ifdef WIN32
-    putenv( tr_strdup_printf( "%s=%s", name, value ) ); /* leaks memory... */
-#else
-    setenv( name, value, override );
-#endif
+    waitpid( -1, 0, WNOHANG );
 }
 
 static void
-torrentCallScript( tr_torrent * tor, const char * script )
+torrentCallScript( const tr_torrent * tor, const char * script )
 {
+    char timeStr[128];
+    const time_t now = tr_time( );
+
     assert( tr_isTorrent( tor ) );
+
+    tr_strlcpy( timeStr, ctime( &now ), sizeof( timeStr ) );
+    *strchr( timeStr,'\n' ) = '\0';
 
     if( script && *script )
     {
-        char buf[128];
-        const time_t now = tr_time( );
+        int i;
+        char * cmd[] = { tr_strdup( script ), NULL };
+        char * env[] = {
+            tr_strdup_printf( "TR_APP_VERSION=%s", SHORT_VERSION_STRING ),
+            tr_strdup_printf( "TR_TIME_LOCALTIME=%s", timeStr ),
+            tr_strdup_printf( "TR_TORRENT_DIR=%s", tor->currentDir ),
+            tr_strdup_printf( "TR_TORRENT_ID=%d", tr_torrentId( tor ) ),
+            tr_strdup_printf( "TR_TORRENT_HASH=%s", tor->info.hashString ),
+            tr_strdup_printf( "TR_TORRENT_NAME=%s", tr_torrentName( tor ) ),
+            NULL };
 
-        tr_setenv( "TR_APP_VERSION", SHORT_VERSION_STRING, 1 );
+        tr_torinf( tor, "Calling script \"%s\"", script ); 
+        signal( SIGCHLD, onSigCHLD );
 
-        tr_snprintf( buf, sizeof( buf ), "%d", tr_torrentId( tor ) );
-        tr_setenv( "TR_TORRENT_ID", buf, 1 );
-        tr_setenv( "TR_TORRENT_NAME", tr_torrentName( tor ), 1 );
-        tr_setenv( "TR_TORRENT_DIR", tor->currentDir, 1 );
-        tr_setenv( "TR_TORRENT_HASH", tor->info.hashString, 1 );
-        tr_strlcpy( buf, ctime( &now ), sizeof( buf ) );
-        *strchr( buf,'\n' ) = '\0';
-        tr_setenv( "TR_TIME_LOCALTIME", buf, 1 );
-        tr_torinf( tor, "Calling script \"%s\"", script );
-        system( script );
+        if( !fork( ) )
+        {
+            execve( script, cmd, env );
+            _exit( 0 );
+        }
+
+        for( i=0; cmd[i]; ++i ) tr_free( cmd[i] );
+        for( i=0; env[i]; ++i ) tr_free( env[i] );
     }
 }
 
@@ -2252,7 +2350,6 @@ tr_torrentSetPieceChecked( tr_torrent * tor, tr_piece_index_t pieceIndex )
     assert( tr_isTorrent( tor ) );
     assert( pieceIndex < tor->info.pieceCount );
 
-    tr_tordbg( tor, "[LAZY] setting piece %zu timeChecked to now", (size_t)pieceIndex );
     tor->info.pieces[pieceIndex].timeChecked = tr_time( );
 }
 
@@ -2272,7 +2369,7 @@ tr_torrentCheckPiece( tr_torrent * tor, tr_piece_index_t pieceIndex )
 {
     const tr_bool pass = tr_ioTestPiece( tor, pieceIndex );
 
-    tr_tordbg( tor, "[LAZY] tr_torrentCheckPiece tested piece %zu, pass==%d", (size_t)pieceIndex, (int)pass );
+    tr_deeplog_tor( tor, "[LAZY] tr_torrentCheckPiece tested piece %zu, pass==%d", (size_t)pieceIndex, (int)pass );
     tr_torrentSetHasPiece( tor, pieceIndex, pass );
     tr_torrentSetPieceChecked( tor, pieceIndex );
     tor->anyDate = tr_time( );
@@ -2307,27 +2404,20 @@ tr_torrentPieceNeedsCheck( const tr_torrent * tor, tr_piece_index_t p )
     uint64_t unused;
     tr_file_index_t f;
     const tr_info * inf = tr_torrentInfo( tor );
-  
-    /* if we've never checked this piece, then it needs to be checked */ 
-    if( !inf->pieces[p].timeChecked ) {
-        tr_tordbg( tor, "[LAZY] piece %zu needs to be tested because it's never been tested", (size_t)p );
+
+    /* if we've never checked this piece, then it needs to be checked */
+    if( !inf->pieces[p].timeChecked )
         return TRUE;
-    }
 
     /* If we think we've completed one of the files in this piece,
      * but it's been modified since we last checked it,
      * then it needs to be rechecked */
     tr_ioFindFileLocation( tor, p, 0, &f, &unused );
-    for( ; f < inf->fileCount && pieceHasFile( p, &inf->files[f] ); ++f ) {
-        if( tr_cpFileIsComplete( &tor->completion, f ) ) {
-            if( getFileMTime( tor, f ) > inf->pieces[p].timeChecked ) {
-                tr_tordbg( tor, "[LAZY] piece %zu needs to be tested because file %zu mtime is newer than check time %zu", (size_t)p, (size_t)f, (size_t)inf->pieces[p].timeChecked );
+    for( ; f < inf->fileCount && pieceHasFile( p, &inf->files[f] ); ++f )
+        if( tr_cpFileIsComplete( &tor->completion, f ) )
+            if( getFileMTime( tor, f ) > inf->pieces[p].timeChecked )
                 return TRUE;
-            }
-        }
-    }
 
-    tr_tordbg( tor, "[LAZY] piece %zu does not need to be tested", (size_t)p );
     return FALSE;
 }
 
@@ -2680,7 +2770,7 @@ deleteLocalData( tr_torrent * tor, tr_fileFunc fileFunc )
     tr_free( tmp );
 }
 
-void
+static void
 tr_torrentDeleteLocalData( tr_torrent * tor, tr_fileFunc fileFunc )
 {
     assert( tr_isTorrent( tor ) );
@@ -2689,6 +2779,7 @@ tr_torrentDeleteLocalData( tr_torrent * tor, tr_fileFunc fileFunc )
         fileFunc = remove;
 
     /* close all the files because we're about to delete them */
+    tr_cacheFlushTorrent( tor->session->cache, tor );
     tr_fdTorrentClose( tor->session, tor->uniqueId );
 
     if( tor->info.fileCount > 1 )
@@ -2725,33 +2816,10 @@ struct LocationData
     tr_torrent * tor;
 };
 
-static tr_bool
-isSameLocation( const char * path1, const char * path2 )
-{
-    struct stat s1, s2;
-    const int err1 = stat( path1, &s1 );
-    const int err2 = stat( path2, &s2 );
-
-    if( !err1 && !err2 ) {
-        tr_dbg( "path1 dev:inode is %"PRIu64":%"PRIu64"; "
-                "path2 dev:inode is %"PRIu64":%"PRIu64,
-                (uint64_t)s1.st_dev, (uint64_t)s1.st_ino,
-                (uint64_t)s2.st_dev, (uint64_t)s2.st_ino );
-        return ( s1.st_dev == s2.st_dev )
-            && ( s1.st_ino == s2.st_ino );
-    }
-
-    /* either one, or the other, or both don't exist... */
-    tr_dbg( "stat(%s) returned %d\n", path1, err1 );
-    tr_dbg( "stat(%s) returned %d\n", path2, err2 );
-    return FALSE;
-}
-
 static void
 setLocation( void * vdata )
 {
     tr_bool err = FALSE;
-    tr_bool verify_needed = FALSE;
     struct LocationData * data = vdata;
     tr_torrent * tor = data->tor;
     const tr_bool do_move = data->move_from_old_location;
@@ -2765,7 +2833,7 @@ setLocation( void * vdata )
 
     tr_mkdirp( location, 0777 );
 
-    if( !isSameLocation( location, tor->currentDir ) )
+    if( !tr_is_same_file( location, tor->currentDir ) )
     {
         tr_file_index_t i;
 
@@ -2798,10 +2866,6 @@ setLocation( void * vdata )
                         tr_torerr( tor, "error moving \"%s\" to \"%s\": %s",
                                         oldpath, newpath, tr_strerror( errno ) );
                     }
-                    else if( !renamed )
-                    {
-                        verify_needed = TRUE;
-                    }
                 }
 
                 tr_free( newpath );
@@ -2824,8 +2888,6 @@ setLocation( void * vdata )
 
             /* set the new location and reverify */
             tr_torrentSetDownloadDir( tor, location );
-            if( verify_needed )
-                tr_torrentVerify( tor );
         }
     }
 
