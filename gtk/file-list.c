@@ -1079,7 +1079,7 @@ gtr_file_list_new( TrCore * core, int torrentId )
 }
 
 void
-gtr_file_list_set_allow_delete ( GtkWidget * w, gboolean enable )
+gtr_file_list_set_allow_delete( GtkWidget * w, gboolean enable )
 {
     FileData * filedata;
 
