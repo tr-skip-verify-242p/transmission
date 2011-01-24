@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -278,7 +278,7 @@ myDebug( const char * file, int line,
         evbuffer_add_vprintf( buf, fmt, args );
         va_end( args );
         evbuffer_add_printf( buf, " (%s:%d)\n", base, line );
-        evbuffer_write( buf, fileno( fp ) );
+        fputs( (const char*)evbuffer_pullup( buf, -1 ), fp );
 
         tr_free( base );
         evbuffer_free( buf );

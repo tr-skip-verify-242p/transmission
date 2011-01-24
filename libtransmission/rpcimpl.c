@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -1666,6 +1666,20 @@ sessionGet( tr_session               * s,
 ****
 ***/
 
+static const char*
+sessionClose( tr_session               * session,
+              tr_benc                  * args_in UNUSED,
+              tr_benc                  * args_out UNUSED,
+              struct tr_rpc_idle_data  * idle_data UNUSED )
+{
+    notify( session, TR_RPC_SESSION_CLOSE, NULL );
+    return NULL;
+}
+
+/***
+****
+***/
+
 typedef const char* ( *handler )( tr_session*, tr_benc*, tr_benc*, struct tr_rpc_idle_data * );
 
 static struct method
@@ -1678,6 +1692,7 @@ methods[] =
 {
     { "port-test",             FALSE, portTest            },
     { "blocklist-update",      FALSE, blocklistUpdate     },
+    { "session-close",         TRUE,  sessionClose        },
     { "session-get",           TRUE,  sessionGet          },
     { "session-set",           TRUE,  sessionSet          },
     { "session-stats",         TRUE,  sessionStats        },

@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2
@@ -172,7 +172,9 @@ strlmem( char * buf, int64_t bytes, size_t buflen )
 static char*
 strlsize( char * buf, int64_t bytes, size_t buflen )
 {
-    if( !bytes )
+    if( bytes < 1 )
+        tr_strlcpy( buf, "Unknown", buflen );
+    else if( !bytes )
         tr_strlcpy( buf, "None", buflen );
     else
         tr_formatter_size_B( buf, bytes, buflen );
@@ -241,7 +243,8 @@ static tr_option opts[] =
     { 'e', "cache",                  "Set the maximum size of the session's memory cache (in " MEM_M_STR ")", "e", 1, "<size>" },
     { 910, "encryption-required",    "Encrypt all peer connections", "er", 0, NULL },
     { 911, "encryption-preferred",   "Prefer encrypted peer connections", "ep", 0, NULL },
-    { 912, "encryption-tolerated",   "Prefer unencrypted peer connections", "et", 0, NULL },
+    { 912, "encryption-tolerated",   "Prefer unencrypted peer connections", "et", 0, NULL }, 
+    { 850, "exit",                   "Tell the transmission session to shut down", NULL, 0, NULL },
     { 940, "files",                  "List the current torrent(s)' files", "f",  0, NULL },
     { 'g', "get",                    "Mark files for download", "g",  1, "<files>" },
     { 'G', "no-get",                 "Mark files for not downloading", "G",  1, "<files>" },
@@ -342,8 +345,9 @@ enum
     MODE_SESSION_SET           = (1<<9),
     MODE_SESSION_GET           = (1<<10),
     MODE_SESSION_STATS         = (1<<11),
-    MODE_BLOCKLIST_UPDATE      = (1<<12),
-    MODE_PORT_TEST             = (1<<13)
+    MODE_SESSION_CLOSE         = (1<<12),
+    MODE_BLOCKLIST_UPDATE      = (1<<13),
+    MODE_PORT_TEST             = (1<<14)
 };
 
 static int
@@ -446,6 +450,9 @@ getOptMode( int val )
 
         case 'w': /* download-dir */
             return MODE_SESSION_SET | MODE_TORRENT_ADD;
+
+        case 850: /* session-close */
+            return MODE_SESSION_CLOSE;
 
         case 963: /* blocklist-update */
             return MODE_BLOCKLIST_UPDATE;
@@ -2187,6 +2194,14 @@ processArgs( const char * rpcurl, int argc, const char ** argv )
                     tr_bencDictAddStr( args, "download-dir", path );
                 }
                 tr_free( path );
+                break;
+            }
+            case 850:
+            {
+                tr_benc * top = tr_new0( tr_benc, 1 );
+                tr_bencInitDict( top, 1 );
+                tr_bencDictAddStr( top, "method", "session-close" );
+                status |= flush( rpcurl, &top );
                 break;
             }
             case 963:

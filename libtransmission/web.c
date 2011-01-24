@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -342,7 +342,7 @@ tr_webThreadFunc( void * vsession )
         tr_lockLock( web->taskLock );
         while(( task = tr_list_pop_front( &web->tasks )))
         {
-            dbgmsg( "adding task to curl: [%s]\n", task->url );
+            dbgmsg( "adding task to curl: [%s]", task->url );
             curl_multi_add_handle( multi, createEasy( session, task ));
             /*fprintf( stderr, "adding a task.. taskCount is now %d\n", taskCount );*/
             ++taskCount;

@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -49,7 +49,6 @@
 #include <libtransmission/web.h>
 
 #include "actions.h"
-#include "add-dialog.h"
 #include "conf.h"
 #include "details.h"
 #include "dialogs.h"
@@ -57,6 +56,7 @@
 #include "makemeta-ui.h"
 #include "msgwin.h"
 #include "notify.h"
+#include "open-dialog.h"
 #include "relocate.h"
 #include "stats.h"
 #include "tr-core.h"
@@ -481,6 +481,10 @@ onRPCChanged( tr_session            * session,
 
     switch( type )
     {
+        case TR_RPC_SESSION_CLOSE:
+            gtr_action_activate( "quit" );
+            break;
+
         case TR_RPC_TORRENT_ADDED:
             tr_core_add_torrent( cbdata->core, tr_torrent_new_preexisting( tor ), TRUE );
             break;
@@ -1726,15 +1730,15 @@ gtr_actions_handler( const char * action_name, gpointer user_data )
     struct cbdata * data = user_data;
     gboolean        changed = FALSE;
 
-    if( !strcmp( action_name, "add-torrent-from-url" ) )
+    if( !strcmp( action_name, "open-torrent-from-url" ) )
     {
-        GtkWidget * w = gtr_torrent_add_from_url_dialog_new( data->wind, data->core );
+        GtkWidget * w = gtr_torrent_open_from_url_dialog_new( data->wind, data->core );
         gtk_widget_show( w );
     }
-    else if(  !strcmp( action_name, "add-torrent-menu" )
-      || !strcmp( action_name, "add-torrent-toolbar" ) )
+    else if(  !strcmp( action_name, "open-torrent-menu" )
+      || !strcmp( action_name, "open-torrent-toolbar" ) )
     {
-        GtkWidget * w = gtr_torrent_add_from_file_dialog_new( data->wind, data->core );
+        GtkWidget * w = gtr_torrent_open_from_file_dialog_new( data->wind, data->core );
         gtk_widget_show( w );
     }
     else if( !strcmp( action_name, "show-stats" ) )
