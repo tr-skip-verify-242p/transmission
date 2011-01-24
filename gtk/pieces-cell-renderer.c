@@ -338,7 +338,7 @@ gtr_pieces_cell_renderer_get_property( GObject    * object,
     switch( property_id )
     {
         case PROP_TORRENT:
-            g_value_set_object( v, priv->gtor );
+            g_value_take_object( v, priv->gtor );
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID( object, property_id, pspec );

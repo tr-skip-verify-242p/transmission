@@ -812,7 +812,7 @@ torrent_cell_renderer_get_property( GObject     * object,
 
     switch( property_id )
     {
-        case P_TORRENT:        g_value_set_object( v, p->gtor ); break;
+        case P_TORRENT:        g_value_take_object( v, p->gtor ); break;
         case P_UPLOAD_SPEED:   g_value_set_double( v, p->upload_speed_KBps ); break;
         case P_DOWNLOAD_SPEED: g_value_set_double( v, p->download_speed_KBps ); break;
         case P_BAR_HEIGHT:     g_value_set_int( v, p->bar_height ); break;

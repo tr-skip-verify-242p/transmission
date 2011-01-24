@@ -931,7 +931,6 @@ refreshInfo( struct DetailsImpl * di, tr_torrent ** torrents, int n )
         TrTorrent * gtor = tr_core_get_handle( di->core, torrents[0] );
         GtrPiecesViewer * pv = GTR_PIECES_VIEWER( di->pieces_viewer );
         gtr_pieces_viewer_set_gtorrent( pv, gtor );
-        g_object_unref( gtor );
     }
     else
     {

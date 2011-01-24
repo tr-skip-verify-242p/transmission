@@ -123,10 +123,7 @@ gtr_pieces_viewer_dispose( GObject * object )
     GtrPiecesViewerPrivate * priv = GTR_PIECES_VIEWER_GET_PRIVATE( self );
 
     if( priv->gtor )
-    {
-        g_object_unref( priv->gtor );
         priv->gtor = NULL;
-    }
     G_OBJECT_CLASS( gtr_pieces_viewer_parent_class )->dispose( object );
 }
 
@@ -161,10 +158,5 @@ void
 gtr_pieces_viewer_set_gtorrent( GtrPiecesViewer * self, TrTorrent * gtor )
 {
     GtrPiecesViewerPrivate * priv = GTR_PIECES_VIEWER_GET_PRIVATE( self );
-    if( priv->gtor == gtor )
-        return;
-    if( priv->gtor )
-        g_object_unref( priv->gtor );
     priv->gtor = gtor;
-    g_object_ref( priv->gtor );
 }
