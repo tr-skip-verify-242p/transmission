@@ -1008,19 +1008,17 @@ proxyPage( GObject * core )
     GtkWidget *        t;
     GtkWidget *        w;
     struct ProxyPage * page = tr_new0( struct ProxyPage, 1 );
-    char buf[128];
 
     t = hig_workarea_create( );
-    hig_workarea_add_section_title ( t, &row, _( "Tracker" ) );
+    hig_workarea_add_section_title ( t, &row, _( "Web (HTTP and HTTPS)" ) );
 
-    s = _( "Connect to tracker via a pro_xy" );
+    s = _( "Enable _web proxy" );
     w = new_check_button( s, TR_PREFS_KEY_PROXY_ENABLED, core );
+    s = _( "This proxy will be used for all HTTP and HTTPS tracker "
+           "communication (announces and scrapes) as well as for "
+           "downloading torrent files from URLs." );
+    gtr_widget_set_tooltip_text( w, s );
     g_signal_connect( w, "toggled", G_CALLBACK( onProxyToggled ), page );
-    hig_workarea_add_wide_control( t, &row, w );
-
-    s = _( "Note: This proxy will also be used for downloading URLs." );
-    g_snprintf( buf, sizeof( buf ), "<i>%s</i>", s );
-    w = gtk_label_new( buf );
     hig_workarea_add_wide_control( t, &row, w );
 
     s = _( "Proxy _server:" );
