@@ -35,7 +35,7 @@ if test "$GETTEXTIZE"; then
   intltoolize --copy --force --automake
 fi
 
-autoreconf -fi || exit 1;
+autoreconf --force --install --verbose || exit 1;
 
 
 cd "$ORIGDIR" || exit $?
