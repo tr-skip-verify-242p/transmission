@@ -245,6 +245,24 @@ gtr_tree_model_foreach_postorder( GtkTreeModel            * model,
 }
 
 static void
+refresh_status_label( FileData * data, const tr_torrent * tor )
+{
+    const tr_info * info;
+    gchar statstr[256];
+
+    if( !tor )
+    {
+        gtk_label_set_text( GTK_LABEL( data->status_label ), NULL );
+        return;
+    }
+
+    info = tr_torrentInfo( tor );
+    g_snprintf( statstr, sizeof( statstr ),
+                "Files: %u", info->fileCount );
+    gtk_label_set_text( GTK_LABEL( data->status_label ), statstr );
+}
+
+static void
 refresh( FileData * data )
 {
     tr_torrent * tor = NULL;
@@ -256,7 +274,6 @@ refresh( FileData * data )
     if( tor == NULL )
     {
         gtr_file_list_clear( data->top );
-        gtk_label_set_text( GTK_LABEL( data->status_label ), NULL );
     }
     else
     {
@@ -265,7 +282,6 @@ refresh( FileData * data )
         tr_file_index_t fileCount;
         struct RefreshData refresh_data;
         GtkTreeSortable * sortable = GTK_TREE_SORTABLE( data->model );
-        gchar statstr[256];
 
         gtk_tree_sortable_get_sort_column_id( sortable, &sort_column_id, &order );
 
@@ -281,11 +297,8 @@ refresh( FileData * data )
             gtk_tree_sortable_set_sort_column_id( sortable, sort_column_id, order );
 
         tr_torrentFilesFree( refresh_data.refresh_file_stat, fileCount );
-
-        g_snprintf( statstr, sizeof( statstr ),
-                    "Files: %d", fileCount );
-        gtk_label_set_text( GTK_LABEL( data->status_label ), statstr );
     }
+    refresh_status_label( data, tor );
 }
 
 static gboolean
