@@ -640,7 +640,7 @@ applyDesktopProxySettings( CURL * easy, GConfClient * client, const char * host_
 #endif
 
 static void
-curlConfigFunc( tr_session * session UNUSED, void * vcurl UNUSED, const char * destination )
+curlConfigFunc( tr_session * session UNUSED, void * vcurl UNUSED, const char * destination UNUSED )
 {
 #ifdef HAVE_GCONF2
     const char * str;
