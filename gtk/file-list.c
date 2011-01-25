@@ -272,7 +272,7 @@ refresh( FileData * data )
         refresh_data.sort_column_id = sort_column_id;
         refresh_data.resort_needed = FALSE;
         refresh_data.refresh_file_stat = tr_torrentFiles( tor, &fileCount );
-        refresh_data.tor = tr_torrentFindFromId( session, data->torrentId );
+        refresh_data.tor = tor;
         refresh_data.file_data = data;
 
         gtr_tree_model_foreach_postorder( data->model, refreshFilesForeach, &refresh_data );
