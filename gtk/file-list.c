@@ -935,6 +935,7 @@ filter_entry_changed( GtkEditable * entry, gpointer user_data )
 {
     FileData * data = user_data;
     gtk_tree_model_filter_refilter( GTK_TREE_MODEL_FILTER( data->filter ) );
+    gtk_tree_view_expand_all( GTK_TREE_VIEW( data->view ) );
     return FALSE;
 }
 
@@ -969,9 +970,9 @@ gtr_file_list_new( TrCore * core, int torrentId )
     entry = gtk_entry_new( );
     gtk_widget_set_size_request( entry, 64, -1 );
     gtk_label_set_mnemonic_widget( GTK_LABEL( label ), entry );
-    tooltip = _( "Type in a pattern to control which files are displayed. "
-                 "Only files that contain the string (without regard to "
-                 "letter case) will be shown." );
+    tooltip = _( "Type in some text to control which files are displayed. "
+                 "Only files whose name contains the string (without regard "
+                 "to letter case) will be shown." );
     gtr_widget_set_tooltip_text( entry, tooltip );
     data->filter_entry = entry;
     g_signal_connect( G_OBJECT( entry ), "changed",
