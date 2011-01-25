@@ -969,7 +969,7 @@ gtr_file_list_new( TrCore * core, int torrentId )
 
     data->core = core;
 
-    vbox = gtk_vbox_new( FALSE, GUI_PAD_SMALL );
+    vbox = gtk_vbox_new( FALSE, GUI_PAD );
     hbox = gtk_hbox_new( FALSE, 0 );
 
     label = gtk_label_new( NULL );
