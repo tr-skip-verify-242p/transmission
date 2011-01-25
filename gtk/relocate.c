@@ -197,7 +197,7 @@ gtr_relocate_dialog_new( GtkWindow * parent,
 }
 
 static void
-onRenameEntryActivate( GtkEntry * e, gpointer vdialog )
+onRenameEntryActivate( GtkEntry * e UNUSED, gpointer vdialog )
 {
     GtkDialog * d = GTK_DIALOG( vdialog );
     gtk_dialog_response( d, GTK_RESPONSE_APPLY );
@@ -205,7 +205,7 @@ onRenameEntryActivate( GtkEntry * e, gpointer vdialog )
 
 GtkWidget *
 gtr_rename_top_dialog_new( GtkWindow  * parent,
-                           TrCore     * core,
+                           TrCore     * core UNUSED,
                            tr_torrent * tor )
 {
     const tr_info * info = tr_torrentInfo( tor );

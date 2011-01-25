@@ -1032,7 +1032,9 @@ onViewPopupMenu( GtkWidget * w, gpointer gdata )
 }
 
 static gboolean
-onViewKeyPressed( GtkWidget * w, GdkEventKey * event, gpointer user_data )
+onViewKeyPressed( GtkWidget   * w UNUSED,
+                  GdkEventKey * event,
+                  gpointer      user_data UNUSED )
 {
     /* Do not propagate modifier key presses because the expander
      * focus shortcut conflicts with treeview multiselection. */
