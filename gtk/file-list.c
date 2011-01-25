@@ -996,14 +996,13 @@ onViewPopupMenu( GtkWidget * w, gpointer gdata )
     return TRUE;
 }
 
-static gboolean
+static void
 filter_entry_activated( GtkEditable * entry, gpointer user_data )
 {
     FileData * data = user_data;
     gtk_tree_model_filter_refilter( GTK_TREE_MODEL_FILTER( data->filter ) );
     gtk_tree_view_expand_all( GTK_TREE_VIEW( data->view ) );
     refresh_status_label( data );
-    return FALSE;
 }
 
 static void
