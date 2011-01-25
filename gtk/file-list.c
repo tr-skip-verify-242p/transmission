@@ -610,6 +610,7 @@ gtr_file_list_set_torrent( GtkWidget * w, int torrentId )
     data->store = store;
     data->model = GTK_TREE_MODEL( store );
     data->torrentId = torrentId;
+    data->display_count = 0;
 
     /* populate the model */
     if( torrentId > 0 )
