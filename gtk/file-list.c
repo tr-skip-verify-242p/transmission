@@ -946,17 +946,13 @@ gtr_file_list_new( TrCore * core, int torrentId )
     GtkWidget * ret;
     GtkWidget * view;
     GtkWidget * scroll;
-    GtkWidget * vbox;
-    GtkWidget * hbox, * hbox2;
-    GtkWidget * align;
-    GtkWidget * label;
-    GtkWidget * entry;
+    GtkWidget * vbox, * hbox, * hbox2, * align;
+    GtkWidget * label, * entry;
     GtkCellRenderer * rend;
     GtkTreeSelection * sel;
     GtkTreeViewColumn * col;
     GtkTreeView * tree_view;
-    const char * title;
-    const char * s;
+    const char * title, * tooltip;
     PangoLayout * pango_layout;
     PangoContext * pango_context;
     PangoFontDescription * pango_font_description;
@@ -966,15 +962,17 @@ gtr_file_list_new( TrCore * core, int torrentId )
 
     vbox = gtk_vbox_new( FALSE, GUI_PAD_SMALL );
     hbox = gtk_hbox_new( FALSE, 0 );
+
     hbox2 = gtk_hbox_new( FALSE, GUI_PAD_SMALL );
     label = gtk_label_new_with_mnemonic( _( "_File display filter:" ) );
     gtk_box_pack_start( GTK_BOX( hbox2 ), label, FALSE, FALSE, 0 );
     entry = gtk_entry_new( );
+    gtk_widget_set_size_request( entry, 64, -1 );
     gtk_label_set_mnemonic_widget( GTK_LABEL( label ), entry );
-    s = _( "Type in a pattern to control which files are displayed. "
-           "Only files that contain the string (without regard to "
-           "letter case) will be shown." );
-    gtr_widget_set_tooltip_text( entry, s );
+    tooltip = _( "Type in a pattern to control which files are displayed. "
+                 "Only files that contain the string (without regard to "
+                 "letter case) will be shown." );
+    gtr_widget_set_tooltip_text( entry, tooltip );
     data->filter_entry = entry;
     g_signal_connect( G_OBJECT( entry ), "changed",
                       G_CALLBACK( filter_entry_changed ), data );
@@ -982,6 +980,7 @@ gtr_file_list_new( TrCore * core, int torrentId )
     align = gtk_alignment_new( 1, 0.5, 0, 0 );
     gtk_container_add( GTK_CONTAINER( align ), hbox2 );
     gtk_box_pack_start( GTK_BOX( hbox ), align, TRUE, TRUE, 0 );
+
     gtk_box_pack_start( GTK_BOX( vbox ), hbox, FALSE, FALSE, 0 );
 
     /* create the view */
