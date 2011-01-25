@@ -59,6 +59,7 @@ typedef struct
     GtkWidget     * filter_entry;
     GtkWidget     * status_label;
     GtkTreeModel  * filter;
+    int             display_count;
     GtkTreeModel  * model; /* same object as store, but recast */
     GtkTreeStore  * store; /* same object as model, but recast */
     int             torrentId;
@@ -265,9 +266,10 @@ refresh_status_label( FileData * data )
     sel = gtk_tree_view_get_selection( GTK_TREE_VIEW( data->view ) );
 
     g_snprintf( statstr, sizeof( statstr ),
-                "Files: %u   Selected: %d",
+                "Files: %u   Selected: %d   Displayed: %d",
                 info->fileCount,
-                gtk_tree_selection_count_selected_rows( sel ) );
+                gtk_tree_selection_count_selected_rows( sel ),
+                data->display_count );
     gtk_label_set_text( GTK_LABEL( data->status_label ), statstr );
 }
 
@@ -536,21 +538,49 @@ static gboolean
 filter_func( GtkTreeModel * model, GtkTreeIter * iter, gpointer user_data )
 {
     FileData * data = user_data;
-    gchar * name;
     const gchar * pattern;
-    gboolean rv;
+    gboolean show;
 
     if( gtk_tree_model_iter_has_child( model, iter ) )
         return TRUE;
 
     pattern = gtk_entry_get_text( GTK_ENTRY( data->filter_entry ) );
     if( !pattern || pattern[0] == '\0' )
-        return TRUE;
+    {
+        show = TRUE;
+    }
+    else
+    {
+        gchar * name;
+        gtk_tree_model_get( model, iter, FC_LABEL, &name, -1 );
+        show = ( tr_strcasestr( name, pattern ) != NULL );
+        g_free( name );
+    }
 
-    gtk_tree_model_get( model, iter, FC_LABEL, &name, -1 );
-    rv = ( tr_strcasestr( name, pattern ) != NULL );
-    g_free( name );
-    return rv;
+    return show;
+}
+
+static void
+filter_row_inserted( GtkTreeModel * model,
+                     GtkTreePath  * path,
+                     GtkTreeIter  * iter,
+                     gpointer       user_data )
+{
+    FileData * data = user_data;
+    g_assert( data != NULL );
+    g_assert( data->filter == model );
+    data->display_count++;
+}
+
+static void
+filter_row_deleted( GtkTreeModel * model,
+                    GtkTreePath  * path,
+                    gpointer       user_data )
+{
+    FileData * data = user_data;
+    g_assert( data != NULL );
+    g_assert( data->filter == model );
+    data->display_count--;
 }
 
 void
@@ -628,6 +658,7 @@ gtr_file_list_set_torrent( GtkWidget * w, int torrentId )
             build.store = data->store;
             build.iter = NULL;
             g_node_children_foreach( root, G_TRAVERSE_ALL, buildTree, &build );
+            data->display_count = inf->fileCount;
 
             /* cleanup */
             g_node_destroy( root );
@@ -642,6 +673,10 @@ gtr_file_list_set_torrent( GtkWidget * w, int torrentId )
     data->filter = gtk_tree_model_filter_new( data->model, NULL );
     filter = GTK_TREE_MODEL_FILTER( data->filter );
     gtk_tree_model_filter_set_visible_func( filter, filter_func, data, NULL );
+    g_signal_connect( G_OBJECT( filter ), "row-inserted",
+                      G_CALLBACK( filter_row_inserted ), data );
+    g_signal_connect( G_OBJECT( filter ), "row-deleted",
+                      G_CALLBACK( filter_row_deleted ), data );
 
     gtk_tree_view_set_model( GTK_TREE_VIEW( data->view ), data->filter );
     gtk_tree_view_expand_all( GTK_TREE_VIEW( data->view ) );
@@ -966,6 +1001,7 @@ filter_entry_changed( GtkEditable * entry, gpointer user_data )
     FileData * data = user_data;
     gtk_tree_model_filter_refilter( GTK_TREE_MODEL_FILTER( data->filter ) );
     gtk_tree_view_expand_all( GTK_TREE_VIEW( data->view ) );
+    refresh_status_label( data );
     return FALSE;
 }
 
