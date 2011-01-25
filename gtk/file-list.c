@@ -57,6 +57,7 @@ typedef struct
     GtkWidget     * top;
     GtkWidget     * view;
     GtkWidget     * filter_entry;
+    GtkWidget     * status_label;
     GtkTreeModel  * filter;
     GtkTreeModel  * model; /* same object as store, but recast */
     GtkTreeStore  * store; /* same object as model, but recast */
@@ -255,6 +256,7 @@ refresh( FileData * data )
     if( tor == NULL )
     {
         gtr_file_list_clear( data->top );
+        gtk_label_set_text( GTK_LABEL( data->status_label ), NULL );
     }
     else
     {
@@ -263,6 +265,8 @@ refresh( FileData * data )
         tr_file_index_t fileCount;
         struct RefreshData refresh_data;
         GtkTreeSortable * sortable = GTK_TREE_SORTABLE( data->model );
+        gchar statstr[256];
+
         gtk_tree_sortable_get_sort_column_id( sortable, &sort_column_id, &order );
 
         refresh_data.sort_column_id = sort_column_id;
@@ -277,6 +281,10 @@ refresh( FileData * data )
             gtk_tree_sortable_set_sort_column_id( sortable, sort_column_id, order );
 
         tr_torrentFilesFree( refresh_data.refresh_file_stat, fileCount );
+
+        g_snprintf( statstr, sizeof( statstr ),
+                    "Files: %d", fileCount );
+        gtk_label_set_text( GTK_LABEL( data->status_label ), statstr );
     }
 }
 
@@ -963,6 +971,10 @@ gtr_file_list_new( TrCore * core, int torrentId )
 
     vbox = gtk_vbox_new( FALSE, GUI_PAD_SMALL );
     hbox = gtk_hbox_new( FALSE, 0 );
+
+    label = gtk_label_new( NULL );
+    data->status_label = label;
+    gtk_box_pack_start( GTK_BOX( hbox ), label, FALSE, FALSE, 0 );
 
     hbox2 = gtk_hbox_new( FALSE, GUI_PAD_SMALL );
     label = gtk_label_new_with_mnemonic( _( "_File display filter:" ) );
