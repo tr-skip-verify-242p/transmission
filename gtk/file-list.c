@@ -996,7 +996,7 @@ onViewPopupMenu( GtkWidget * w, gpointer gdata )
 }
 
 static gboolean
-filter_entry_changed( GtkEditable * entry, gpointer user_data )
+filter_entry_activated( GtkEditable * entry, gpointer user_data )
 {
     FileData * data = user_data;
     gtk_tree_model_filter_refilter( GTK_TREE_MODEL_FILTER( data->filter ) );
@@ -1026,7 +1026,7 @@ gtr_file_list_new( TrCore * core, int torrentId )
     GtkTreeSelection * sel;
     GtkTreeViewColumn * col;
     GtkTreeView * tree_view;
-    const char * title, * tooltip;
+    const char * title, * s;
     PangoLayout * pango_layout;
     PangoContext * pango_context;
     PangoFontDescription * pango_font_description;
@@ -1047,13 +1047,13 @@ gtr_file_list_new( TrCore * core, int torrentId )
     entry = gtk_entry_new( );
     gtk_widget_set_size_request( entry, 64, -1 );
     gtk_label_set_mnemonic_widget( GTK_LABEL( label ), entry );
-    tooltip = _( "Type in some text to control which files are displayed. "
-                 "Only files whose name contains the string (without regard "
-                 "to letter case) will be shown." );
-    gtr_widget_set_tooltip_text( entry, tooltip );
+    s = _( "Type in some text and press return to control which files "
+           "are displayed. Only files whose name contains the string "
+           "(without regard to letter case) will be shown." );
+    gtr_widget_set_tooltip_text( entry, s );
     data->filter_entry = entry;
-    g_signal_connect( G_OBJECT( entry ), "changed",
-                      G_CALLBACK( filter_entry_changed ), data );
+    g_signal_connect( G_OBJECT( entry ), "activate",
+                      G_CALLBACK( filter_entry_activated ), data );
     gtk_box_pack_start( GTK_BOX( hbox2 ), entry, FALSE, FALSE, 0 );
     align = gtk_alignment_new( 1, 0.5, 0, 0 );
     gtk_container_add( GTK_CONTAINER( align ), hbox2 );
