@@ -562,8 +562,8 @@ filter_func( GtkTreeModel * model, GtkTreeIter * iter, gpointer user_data )
 
 static void
 filter_row_inserted( GtkTreeModel * model,
-                     GtkTreePath  * path,
-                     GtkTreeIter  * iter,
+                     GtkTreePath  * path UNUSED,
+                     GtkTreeIter  * iter UNUSED,
                      gpointer       user_data )
 {
     FileData * data = user_data;
@@ -574,7 +574,7 @@ filter_row_inserted( GtkTreeModel * model,
 
 static void
 filter_row_deleted( GtkTreeModel * model,
-                    GtkTreePath  * path,
+                    GtkTreePath  * path UNUSED,
                     gpointer       user_data )
 {
     FileData * data = user_data;
@@ -997,7 +997,7 @@ onViewPopupMenu( GtkWidget * w, gpointer gdata )
 }
 
 static void
-filter_entry_activated( GtkEditable * entry, gpointer user_data )
+filter_entry_activated( GtkEditable * entry UNUSED, gpointer user_data )
 {
     FileData * data = user_data;
     gtk_tree_model_filter_refilter( GTK_TREE_MODEL_FILTER( data->filter ) );
@@ -1006,7 +1006,7 @@ filter_entry_activated( GtkEditable * entry, gpointer user_data )
 }
 
 static void
-view_selection_changed( GtkTreeSelection * sel, gpointer user_data )
+view_selection_changed( GtkTreeSelection * sel UNUSED, gpointer user_data )
 {
     FileData * data = user_data;
     refresh_status_label( data );
