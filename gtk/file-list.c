@@ -1048,7 +1048,7 @@ gtr_file_list_new( TrCore * core, int torrentId )
     gtk_widget_set_size_request( entry, 64, -1 );
     gtk_label_set_mnemonic_widget( GTK_LABEL( label ), entry );
     s = _( "Type in some text and press return to control which files "
-           "are displayed. Only files whose name contains the string "
+           "are displayed. Only files whose names contain the string "
            "(without regard to letter case) will be shown." );
     gtr_widget_set_tooltip_text( entry, s );
     data->filter_entry = entry;
