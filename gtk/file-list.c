@@ -18,6 +18,7 @@
 #include <gtk/gtk.h>
 
 #include <libtransmission/transmission.h>
+#include <libtransmission/utils.h>
 
 #include "file-list.h"
 #include "hig.h"
@@ -55,6 +56,10 @@ typedef struct
     TrCore        * core;
     GtkWidget     * top;
     GtkWidget     * view;
+    GtkWidget     * filter_entry;
+    GtkWidget     * status_label;
+    GtkTreeModel  * filter;
+    int             display_count;
     GtkTreeModel  * model; /* same object as store, but recast */
     GtkTreeStore  * store; /* same object as model, but recast */
     int             torrentId;
@@ -242,6 +247,34 @@ gtr_tree_model_foreach_postorder( GtkTreeModel            * model,
 }
 
 static void
+refresh_status_label( FileData * data )
+{
+    const int id = data->torrentId;
+    GtkTreeSelection * sel;
+    tr_session * session;
+    const tr_torrent * tor;
+    const tr_info * info;
+    gchar statstr[256];
+
+    session = tr_core_session( data->core );
+    if( !session || !( tor = tr_torrentFindFromId( session, id ) ) )
+    {
+        gtk_label_set_text( GTK_LABEL( data->status_label ), NULL );
+        return;
+    }
+
+    info = tr_torrentInfo( tor );
+    sel = gtk_tree_view_get_selection( GTK_TREE_VIEW( data->view ) );
+
+    g_snprintf( statstr, sizeof( statstr ),
+                "Files: %u   Selected: %d   Displayed: %d",
+                info->fileCount,
+                gtk_tree_selection_count_selected_rows( sel ),
+                data->display_count );
+    gtk_label_set_text( GTK_LABEL( data->status_label ), statstr );
+}
+
+static void
 refresh( FileData * data )
 {
     tr_torrent * tor = NULL;
@@ -261,12 +294,13 @@ refresh( FileData * data )
         tr_file_index_t fileCount;
         struct RefreshData refresh_data;
         GtkTreeSortable * sortable = GTK_TREE_SORTABLE( data->model );
+
         gtk_tree_sortable_get_sort_column_id( sortable, &sort_column_id, &order );
 
         refresh_data.sort_column_id = sort_column_id;
         refresh_data.resort_needed = FALSE;
         refresh_data.refresh_file_stat = tr_torrentFiles( tor, &fileCount );
-        refresh_data.tor = tr_torrentFindFromId( session, data->torrentId );
+        refresh_data.tor = tor;
         refresh_data.file_data = data;
 
         gtr_tree_model_foreach_postorder( data->model, refreshFilesForeach, &refresh_data );
@@ -276,6 +310,7 @@ refresh( FileData * data )
 
         tr_torrentFilesFree( refresh_data.refresh_file_stat, fileCount );
     }
+    refresh_status_label( data );
 }
 
 static gboolean
@@ -500,11 +535,63 @@ find_child( GNode* parent, const char * name )
     return child;
 }
 
+static gboolean
+filter_func( GtkTreeModel * model, GtkTreeIter * iter, gpointer user_data )
+{
+    FileData * data = user_data;
+    const gchar * pattern;
+    gboolean show;
+
+    if( gtk_tree_model_iter_has_child( model, iter ) )
+        return TRUE;
+
+    pattern = gtk_entry_get_text( GTK_ENTRY( data->filter_entry ) );
+    if( !pattern || pattern[0] == '\0' )
+    {
+        show = TRUE;
+    }
+    else
+    {
+        gchar * name;
+        gtk_tree_model_get( model, iter, FC_LABEL, &name, -1 );
+        show = ( tr_strcasestr( name, pattern ) != NULL );
+        g_free( name );
+    }
+
+    return show;
+}
+
+static void
+filter_row_inserted( GtkTreeModel * model,
+                     GtkTreePath  * path,
+                     GtkTreeIter  * iter,
+                     gpointer       user_data )
+{
+    FileData * data = user_data;
+    g_assert( data != NULL );
+    g_assert( data->filter == model );
+    data->display_count++;
+}
+
+static void
+filter_row_deleted( GtkTreeModel * model,
+                    GtkTreePath  * path,
+                    gpointer       user_data )
+{
+    FileData * data = user_data;
+    g_assert( data != NULL );
+    g_assert( data->filter == model );
+    data->display_count--;
+}
+
 void
 gtr_file_list_set_torrent( GtkWidget * w, int torrentId )
 {
     GtkTreeStore * store;
+    GtkTreeModelFilter * filter;
     FileData * data = g_object_get_data( G_OBJECT( w ), "file-data" );
+
+    g_assert( data != NULL );
 
     /* unset the old fields */
     clearData( data );
@@ -524,6 +611,7 @@ gtr_file_list_set_torrent( GtkWidget * w, int torrentId )
     data->store = store;
     data->model = GTK_TREE_MODEL( store );
     data->torrentId = torrentId;
+    data->display_count = 0;
 
     /* populate the model */
     if( torrentId > 0 )
@@ -572,6 +660,7 @@ gtr_file_list_set_torrent( GtkWidget * w, int torrentId )
             build.store = data->store;
             build.iter = NULL;
             g_node_children_foreach( root, G_TRAVERSE_ALL, buildTree, &build );
+            data->display_count = inf->fileCount;
 
             /* cleanup */
             g_node_destroy( root );
@@ -583,7 +672,15 @@ gtr_file_list_set_torrent( GtkWidget * w, int torrentId )
         data->timeout_tag = gtr_timeout_add_seconds( SECONDARY_WINDOW_REFRESH_INTERVAL_SECONDS, refreshModel, data );
     }
 
-    gtk_tree_view_set_model( GTK_TREE_VIEW( data->view ), data->model );
+    data->filter = gtk_tree_model_filter_new( data->model, NULL );
+    filter = GTK_TREE_MODEL_FILTER( data->filter );
+    gtk_tree_model_filter_set_visible_func( filter, filter_func, data, NULL );
+    g_signal_connect( G_OBJECT( filter ), "row-inserted",
+                      G_CALLBACK( filter_row_inserted ), data );
+    g_signal_connect( G_OBJECT( filter ), "row-deleted",
+                      G_CALLBACK( filter_row_deleted ), data );
+
+    gtk_tree_view_set_model( GTK_TREE_VIEW( data->view ), data->filter );
     gtk_tree_view_expand_all( GTK_TREE_VIEW( data->view ) );
 }
 
@@ -945,6 +1042,22 @@ onViewKeyPressed( GtkWidget * w, GdkEventKey * event, gpointer user_data )
     return FALSE;
 }
 
+static void
+filter_entry_activated( GtkEditable * entry, gpointer user_data )
+{
+    FileData * data = user_data;
+    gtk_tree_model_filter_refilter( GTK_TREE_MODEL_FILTER( data->filter ) );
+    gtk_tree_view_expand_all( GTK_TREE_VIEW( data->view ) );
+    refresh_status_label( data );
+}
+
+static void
+view_selection_changed( GtkTreeSelection * sel, gpointer user_data )
+{
+    FileData * data = user_data;
+    refresh_status_label( data );
+}
+
 GtkWidget *
 gtr_file_list_new( TrCore * core, int torrentId )
 {
@@ -952,15 +1065,44 @@ gtr_file_list_new( TrCore * core, int torrentId )
     GtkWidget * ret;
     GtkWidget * view;
     GtkWidget * scroll;
+    GtkWidget * vbox, * hbox, * hbox2, * align;
+    GtkWidget * label, * entry;
     GtkCellRenderer * rend;
     GtkTreeSelection * sel;
     GtkTreeViewColumn * col;
     GtkTreeView * tree_view;
-    const char * title;
+    const char * title, * s;
     PangoLayout * pango_layout;
     FileData * data = g_new0( FileData, 1 );
 
     data->core = core;
+
+    vbox = gtk_vbox_new( FALSE, GUI_PAD );
+    hbox = gtk_hbox_new( FALSE, 0 );
+
+    label = gtk_label_new( NULL );
+    data->status_label = label;
+    gtk_box_pack_start( GTK_BOX( hbox ), label, FALSE, FALSE, 0 );
+
+    hbox2 = gtk_hbox_new( FALSE, GUI_PAD_SMALL );
+    label = gtk_label_new_with_mnemonic( _( "_File display filter:" ) );
+    gtk_box_pack_start( GTK_BOX( hbox2 ), label, FALSE, FALSE, 0 );
+    entry = gtk_entry_new( );
+    gtk_widget_set_size_request( entry, 64, -1 );
+    gtk_label_set_mnemonic_widget( GTK_LABEL( label ), entry );
+    s = _( "Type in some text and press return to control which files "
+           "are displayed. Only files whose names contain the string "
+           "(without regard to letter case) will be shown." );
+    gtr_widget_set_tooltip_text( entry, s );
+    data->filter_entry = entry;
+    g_signal_connect( G_OBJECT( entry ), "activate",
+                      G_CALLBACK( filter_entry_activated ), data );
+    gtk_box_pack_start( GTK_BOX( hbox2 ), entry, FALSE, FALSE, 0 );
+    align = gtk_alignment_new( 1, 0.5, 0, 0 );
+    gtk_container_add( GTK_CONTAINER( align ), hbox2 );
+    gtk_box_pack_start( GTK_BOX( hbox ), align, TRUE, TRUE, 0 );
+
+    gtk_box_pack_start( GTK_BOX( vbox ), hbox, FALSE, FALSE, 0 );
 
     /* create the view */
     view = gtk_tree_view_new( );
@@ -981,6 +1123,8 @@ gtr_file_list_new( TrCore * core, int torrentId )
     /* set up view */
     sel = gtk_tree_view_get_selection( tree_view );
     gtk_tree_selection_set_mode( sel, GTK_SELECTION_MULTIPLE );
+    g_signal_connect( G_OBJECT( sel ), "changed",
+                      G_CALLBACK( view_selection_changed ), data );
     gtk_tree_view_expand_all( tree_view );
     gtk_tree_view_set_search_column( tree_view, FC_LABEL );
 
@@ -1071,9 +1215,11 @@ gtr_file_list_new( TrCore * core, int torrentId )
     gtk_container_add( GTK_CONTAINER( scroll ), view );
     gtk_widget_set_size_request ( scroll, -1, 200 );
 
-    ret = scroll;
+    gtk_box_pack_start( GTK_BOX( vbox ), scroll, TRUE, TRUE, 0 );
+
+    ret = vbox;
     data->view = view;
-    data->top = scroll;
+    data->top = ret;
     g_object_set_data_full( G_OBJECT( ret ), "file-data", data, freeData );
     gtr_file_list_set_torrent( ret, torrentId );
 

@@ -1298,7 +1298,7 @@ on_core_error( TrCore * core UNUSED, guint code, const char * msg, struct cbdata
 }
 
 #if GTK_CHECK_VERSION( 2, 8, 0 )
-static void
+static gboolean
 on_main_window_focus_in( GtkWidget      * widget UNUSED,
                          GdkEventFocus  * event  UNUSED,
                          gpointer                gdata )
@@ -1307,6 +1307,7 @@ on_main_window_focus_in( GtkWidget      * widget UNUSED,
 
     if( cbdata->wind )
         gtk_window_set_urgency_hint( cbdata->wind, FALSE );
+    return FALSE;
 }
 
 #endif
