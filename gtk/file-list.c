@@ -245,20 +245,29 @@ gtr_tree_model_foreach_postorder( GtkTreeModel            * model,
 }
 
 static void
-refresh_status_label( FileData * data, const tr_torrent * tor )
+refresh_status_label( FileData * data )
 {
+    const int id = data->torrentId;
+    GtkTreeSelection * sel;
+    tr_session * session;
+    const tr_torrent * tor;
     const tr_info * info;
     gchar statstr[256];
 
-    if( !tor )
+    session = tr_core_session( data->core );
+    if( !session || !( tor = tr_torrentFindFromId( session, id ) ) )
     {
         gtk_label_set_text( GTK_LABEL( data->status_label ), NULL );
         return;
     }
 
     info = tr_torrentInfo( tor );
+    sel = gtk_tree_view_get_selection( GTK_TREE_VIEW( data->view ) );
+
     g_snprintf( statstr, sizeof( statstr ),
-                "Files: %u", info->fileCount );
+                "Files: %u   Selected: %d",
+                info->fileCount,
+                gtk_tree_selection_count_selected_rows( sel ) );
     gtk_label_set_text( GTK_LABEL( data->status_label ), statstr );
 }
 
@@ -298,7 +307,7 @@ refresh( FileData * data )
 
         tr_torrentFilesFree( refresh_data.refresh_file_stat, fileCount );
     }
-    refresh_status_label( data, tor );
+    refresh_status_label( data );
 }
 
 static gboolean
@@ -960,6 +969,13 @@ filter_entry_changed( GtkEditable * entry, gpointer user_data )
     return FALSE;
 }
 
+static void
+view_selection_changed( GtkTreeSelection * sel, gpointer user_data )
+{
+    FileData * data = user_data;
+    refresh_status_label( data );
+}
+
 GtkWidget *
 gtr_file_list_new( TrCore * core, int torrentId )
 {
@@ -1033,6 +1049,8 @@ gtr_file_list_new( TrCore * core, int torrentId )
     /* set up view */
     sel = gtk_tree_view_get_selection( tree_view );
     gtk_tree_selection_set_mode( sel, GTK_SELECTION_MULTIPLE );
+    g_signal_connect( G_OBJECT( sel ), "changed",
+                      G_CALLBACK( view_selection_changed ), data );
     gtk_tree_view_expand_all( tree_view );
     gtk_tree_view_set_search_column( tree_view, FC_LABEL );
 
