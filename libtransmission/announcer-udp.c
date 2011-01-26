@@ -454,9 +454,9 @@ au_state_dns_callback( int result, char type, int count,
 {
     au_state * s = arg;
 
-    if( !s || !s->dnsreq )
-        return;
+    assert( s->dnsreq != NULL );
     s->dnsreq = NULL;
+
     if( result != DNS_ERR_NONE )
     {
         au_state_error( s, _( "DNS lookup failed (error %1$d): %2$s" ),
