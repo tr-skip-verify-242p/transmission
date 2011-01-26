@@ -13,6 +13,7 @@
 #ifndef TR_UTILS_H
 #define TR_UTILS_H 1
 
+#include <endian.h> /* __BYTE_ORDER */
 #include <inttypes.h>
 #include <stddef.h> /* size_t */
 #include <stdio.h> /* FILE* */
@@ -72,6 +73,14 @@ extern "C" {
  #else
   #define TR_GNUC_NULL_TERMINATED
   #define TR_GNUC_HOT
+ #endif
+#endif
+
+#ifndef TR_GNUC_PACKED
+ #ifdef __GNUC__
+  #define TR_GNUC_PACKED __attribute__ ( ( packed ) )
+ #else
+  #define TR_GNUC_PACKED
  #endif
 #endif
 
@@ -594,6 +603,35 @@ static inline char* tr_formatter_mem_MB( char * buf, double MBps, size_t buflen 
 char* tr_formatter_size_B( char * buf, int64_t bytes, size_t buflen );
 
 void tr_formatter_get_units( struct tr_benc * dict );
+
+/***
+****
+***/
+
+#if !defined( HAVE_HTONLL )
+#ifdef __GNUC__
+#define tr_bswap64( x ) __builtin_bswap64( x )
+#else
+#define tr_bswap64( x ) (((uint64_t)(x)  << 56) |                        \
+                         (((uint64_t)(x) << 40) & 0xff000000000000ULL) | \
+                         (((uint64_t)(x) << 24) & 0xff0000000000ULL) |   \
+                         (((uint64_t)(x) << 8)  & 0xff00000000ULL) |     \
+                         (((uint64_t)(x) >> 8)  & 0xff000000ULL) |       \
+                         (((uint64_t)(x) >> 24) & 0xff0000ULL) |         \
+                         (((uint64_t)(x) >> 40) & 0xff00ULL) |           \
+                         ((uint64_t)(x)  >> 56))
+#endif
+
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+#define htonll( x ) tr_bswap64( x )
+#define ntohll( x ) tr_bswap64( x )
+#elif __BYTE_ORDER == __BIG_ENDIAN
+#define htonll( x ) ( x )
+#define ntohll( x ) ( x )
+#else
+#error portme
+#endif
+#endif /* !defined( HAVE_HTONLL */
 
 /***
 ****
