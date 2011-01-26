@@ -146,7 +146,7 @@ auP_scrape_item;
 typedef struct
 {
     auP_response_header hdr;
-    /* auP_scrape_item* */
+    /* (auP_scrape_item item;)* */
 } TR_GNUC_PACKED
 auP_scrape_response;
 
@@ -168,7 +168,13 @@ typedef uint32_t annkey_t;
 typedef struct au_transaction au_transaction;
 typedef struct au_state au_state;
 
-static void au_state_error( au_state * s, const char * fmt, ... );
+static void au_transaction_error( au_transaction * t,
+                                  const char * fmt, ... )
+                                  TR_GNUC_PRINTF( 2, 3 );
+static void au_state_error( au_state * s,
+                            const char * fmt, ... )
+                            TR_GNUC_PRINTF( 2, 3 );
+
 static void au_state_send( au_state * s, au_transaction * t );
 static tr_bool au_state_connect( au_state * s );
 static tr_session * au_state_get_session( au_state * s );
@@ -445,13 +451,12 @@ au_state_dns_callback( int result, char type, int count,
 {
     au_state * s = arg;
 
-
     if( !s || !s->dnsreq )
         return;
     s->dnsreq = NULL;
     if( result != DNS_ERR_NONE )
     {
-        au_state_error( s, _( "DNS lookup failed (error %d): %s" ),
+        au_state_error( s, _( "DNS lookup failed (error %1$d): %2$s" ),
                         result, evdns_err_to_string( result ) );
         return;
     }
@@ -463,8 +468,8 @@ au_state_dns_callback( int result, char type, int count,
     }
     if( count < 1 )
     {
-        au_state_error( s, _( "DNS lookup did not return any "
-                              "addresses" ) );
+        au_state_error( s, "%s",
+            _( "DNS lookup did not return any addresses" ) );
         return;
     }
 
@@ -712,7 +717,8 @@ au_context_transmit( au_context * c, au_transaction * t )
     {
         const int err = evutil_socket_geterror( socket );
         const char * errstr = evutil_socket_error_to_string( err );
-        au_transaction_error( t, _( "Failed to send UDP packet: %s" ), errstr );
+        au_transaction_error( t,
+            _( "Failed to send UDP packet: %s" ), errstr );
         return;
     }
     au_transaction_sent( t );
@@ -953,7 +959,7 @@ handle_connect( au_transaction * t,
     {
         au_transaction_error( t,
             _( "Malformed connect response: expecting length "
-               "%u but got %u" ), sizeof( *res ), len );
+               "%1$u but got %2$u" ), sizeof( *res ), len );
         return;
     }
 
@@ -978,7 +984,7 @@ handle_announce( au_transaction * t,
     {
         au_transaction_error( t,
             _( "Malformed announce response: expecting length "
-               "at least %u but got %u" ), sizeof( *res ), len );
+               "at least %1$u but got %2$u" ), sizeof( *res ), len );
         return;
     }
 
@@ -997,7 +1003,7 @@ handle_scrape( au_transaction * t,
     {
         au_transaction_error( t,
             _( "Malformed scrape response: expecting length "
-               "at least %u but got %u" ), sizeof( *res ), len );
+               "at least %1$u but got %2$u" ), sizeof( *res ), len );
         return;
     }
 
@@ -1016,7 +1022,7 @@ handle_error( au_transaction * t,
     {
         au_transaction_error( t,
             _( "Malformed error response: expecting length "
-               "greater than %u but got %u" ), sizeof( *res ), len );
+               "greater than %1$u but got %2$u" ), sizeof( *res ), len );
         return;
     }
 
