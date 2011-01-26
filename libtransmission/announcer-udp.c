@@ -384,7 +384,7 @@ au_state_free( au_state * s )
     tr_free( s->endpoint );
     tr_free( s->errstr );
     tr_list_free( &s->queue, NULL );
-    memset( s, 0, sizeof( * s ) );
+    memset( s, 0, sizeof( *s ) );
     tr_free( s );
 }
 
