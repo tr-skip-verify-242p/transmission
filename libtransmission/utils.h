@@ -631,7 +631,7 @@ void tr_formatter_get_units( struct tr_benc * dict );
 #else
 #error portme
 #endif
-#endif /* !defined( HAVE_HTONLL */
+#endif /* !defined( HAVE_HTONLL ) */
 
 /***
 ****
