@@ -2988,6 +2988,8 @@ tr_torrentSetTopDir( tr_torrent * tor, const char * newname )
     if( !( p = strchr( orig, TR_PATH_DELIMITER ) ) )
         goto OUT;
     oldname = tr_strndup( orig, (int) ( p - orig ) );
+    if( !strcmp( newname, oldname ) )
+        goto OUT;
 
     restart = tor->isRunning;
     tr_torrentStop( tor );
