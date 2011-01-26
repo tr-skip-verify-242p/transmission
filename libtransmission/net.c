@@ -277,6 +277,81 @@ setup_sockaddr( const tr_address        * addr,
     }
 }
 
+void
+tr_addressUnpackSockaddr( tr_address * setme_addr, tr_port * setme_port,
+                          const struct sockaddr_storage * ss, socklen_t sslen )
+{
+    if( ss->ss_family == AF_INET )
+    {
+        const struct sockaddr_in * sock4 = (const struct sockaddr_in *) ss;
+        assert( sslen == sizeof( struct sockaddr_in ) );
+        setme_addr->type = TR_AF_INET;
+        setme_addr->addr.addr4.s_addr = sock4->sin_addr.s_addr;
+        if( setme_port )
+            *setme_port = ntohs( sock4->sin_port );
+    }
+    else
+    {
+        const struct sockaddr_in6 * sock6 = (const struct sockaddr_in6 *) ss;
+        assert( sslen == sizeof( struct sockaddr_in6 ) );
+        setme_addr->type = TR_AF_INET6;
+        setme_addr->addr.addr6 = sock6->sin6_addr;
+        if( setme_port )
+            *setme_port = ntohs( sock6->sin6_port );
+    }
+}
+
+void
+tr_addressUnpack( tr_address * dst, int type, const void * addr )
+{
+    dst->type = type;
+    if( type == TR_AF_INET )
+        memcpy( &dst->addr.addr4, addr, sizeof( dst->addr.addr4 ) );
+    else if( type == TR_AF_INET6 )
+        memcpy( &dst->addr.addr6, addr, sizeof( dst->addr.addr6 ) );
+    else
+        assert( FALSE /* Unsupported address type. */ );
+}
+
+int
+tr_netRecvFrom( int socket, uint8_t * buffer, size_t buflen,
+                tr_address * setme_addr, tr_port * setme_port )
+{
+    struct sockaddr_storage ss;
+    socklen_t sslen = sizeof( ss );
+    tr_address addr = tr_inaddr_any;
+    tr_port port = 0;
+    int rv;
+
+    rv = recvfrom( socket, buffer, buflen, 0,
+                   (struct sockaddr *) &ss, &sslen );
+
+    if( rv >= 0 )
+        tr_addressUnpackSockaddr( &addr, &port, &ss, sslen );
+
+    if( setme_addr )
+        *setme_addr = addr;
+    if( setme_port )
+        *setme_port = port;
+
+    return rv;
+}
+
+int
+tr_netSendTo( int socket, const void * buffer, size_t buflen,
+              const tr_address * addr, tr_port port )
+{
+    struct sockaddr_storage ss;
+    socklen_t sslen;
+    int rv;
+
+    sslen = setup_sockaddr( addr, htons( port ), &ss );
+
+    rv = sendto( socket, buffer, buflen, 0,
+                 (const struct sockaddr *) &ss, sslen );
+    return rv;
+}
+
 int
 tr_netOpenPeerSocket( tr_session        * session,
                       const tr_address  * addr,
