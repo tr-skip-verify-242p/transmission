@@ -291,7 +291,11 @@ au_transaction_inactive( const au_transaction * t )
 static void
 au_transaction_notify( au_transaction * t, const void * data, size_t len )
 {
+    tr_session * session;
     int code;
+
+    if( !t->callback )
+        return;
 
     if( au_transaction_has_error( t ) )
         code = HTTP_INTERNAL;
@@ -300,11 +304,10 @@ au_transaction_notify( au_transaction * t, const void * data, size_t len )
     else
         code = HTTP_OK;
 
-    if( t->callback )
-    {
-        tr_session * session = au_state_get_session( t->state );
-        t->callback( session, code, data, len, t->cbdata );
-    }
+    session = au_state_get_session( t->state );
+    t->callback( session, code, data, len, t->cbdata );
+    t->callback = NULL;
+    t->cbdata = NULL;
 }
 
 static void
