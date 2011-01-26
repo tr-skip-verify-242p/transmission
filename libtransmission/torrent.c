@@ -2999,7 +2999,10 @@ tr_torrentSetTopDir( tr_torrent * tor, const char * newname )
         if( rename( oldpath, newpath ) == -1 )
         {
             err = errno;
-            tr_torerr( tor, _( "Error renaming \"%s\" to \"%s\": %s" ),
+            /* %1$s is the original directory name.
+             * %2$s is the new directory name.
+             * %3$s is the error message. */
+            tr_torerr( tor, _( "Error renaming \"%1$s\" to \"%2$s\": %3$s" ),
                        oldpath, newpath, tr_strerror( err ) );
             goto OUT;
         }
