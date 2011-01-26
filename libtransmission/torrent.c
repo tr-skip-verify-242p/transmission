@@ -2980,9 +2980,11 @@ tr_torrentSetTopDir( tr_torrent * tor, const char * newname )
         return EINVAL;
 
     tr_torrentLock( tor );
-
     info = &tor->info;
+
+    /* NB: See note in docstring for this function in transmission.h. */
     orig = info->files[0].name;
+
     if( !( p = strchr( orig, TR_PATH_DELIMITER ) ) )
         goto OUT;
     oldname = tr_strndup( orig, (int) ( p - orig ) );
