@@ -244,7 +244,11 @@ au_transaction_cmp( const void * va, const void * vb )
 {
     const au_transaction * a = va;
     const au_transaction * b = vb;
-    return a->id - b->id;
+    if( a->id < b->id )
+        return -1;
+    if( a->id > b->id )
+        return 1;
+    return 0;
 }
 
 static tr_bool
