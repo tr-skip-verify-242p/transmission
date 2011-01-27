@@ -186,9 +186,9 @@ static void au_context_transmit( au_context * c, au_transaction * t );
 static tr_session * au_context_get_session( const au_context * c );
 
 #define ALLOC_PKT( bufptr, pktptr, pkttype ) do { \
-    static pkttype _PKT_dummy; \
+    static const pkttype _PKT_init; \
     bufptr = evbuffer_new( ); \
-    evbuffer_add( bufptr, &_PKT_dummy, sizeof( pkttype ) ); \
+    evbuffer_add( bufptr, &_PKT_init, sizeof( pkttype ) ); \
     pktptr = (pkttype *) evbuffer_pullup( bufptr, -1 ); \
     assert( evbuffer_get_length( bufptr ) == sizeof( pkttype ) ); \
 } while( 0 )
