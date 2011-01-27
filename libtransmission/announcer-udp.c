@@ -179,6 +179,7 @@ static void au_state_send( au_state * s, au_transaction * t );
 static tr_bool au_state_connect( au_state * s );
 static tr_session * au_state_get_session( au_state * s );
 
+static au_transaction * au_context_get_transaction( au_context * c, tnid_t id );
 static struct evdns_base * au_context_get_dns( au_context * c );
 static void au_context_add_transaction( au_context * c, au_transaction * t );
 static void au_context_transmit( au_context * c, au_transaction * t );
@@ -254,7 +255,7 @@ au_transaction_cmp( const void * va, const void * vb )
 static tr_bool
 au_transaction_is_valid( const au_transaction * t )
 {
-    return t->id != 0 && t->state != 0;
+    return t && t->id != 0 && t->state != 0;
 }
 
 static void
@@ -360,6 +361,7 @@ struct au_state
     tr_port port;
     conid_t con_id;
     time_t con_ts;
+    tnid_t con_tid;
     annkey_t key;
     tr_list * queue; /* au_transaction, not owned */
     char * errstr;
@@ -407,6 +409,12 @@ au_state_get_session( au_state * s )
 }
 
 static tr_bool
+au_state_is_connecting( const au_state * s )
+{
+    return s->con_tid != 0;
+}
+
+static tr_bool
 au_state_is_connected( au_state * s )
 {
     return s->resolved && s->con_id != 0;
@@ -429,6 +437,17 @@ au_state_check_connected( au_state * s, time_t now )
 {
     if( s->con_id && now - s->con_ts > AUC_CONNECTION_EXPIRE_TIME )
         s->con_id = 0;
+    if( s->con_tid )
+    {
+        au_transaction * t;
+        t = au_context_get_transaction( s->context, s->con_tid );
+        if( au_transaction_inactive( t ) )
+        {
+            s->con_tid = 0;
+            if( s->queue )
+                au_state_connect( s );
+        }
+    }
 }
 
 static tr_bool
@@ -560,12 +579,16 @@ au_state_connect( au_state * s )
     if( !au_state_lookup( s ) )
         return FALSE;
 
+    if( au_state_is_connecting( s ) )
+        return FALSE;
+
     ALLOC_PKT( pkt, req, auP_connect_request );
 
     req->protocol_id = htonll( AUC_PROTOCOL_ID );
     req->action = htonl( AUC_ACTION_CONNECT );
 
     t = au_transaction_new( s, pkt );
+    s->con_tid = t->id;
     au_context_add_transaction( s->context, t );
     au_context_transmit( s->context, t );
 
@@ -573,9 +596,27 @@ au_state_connect( au_state * s )
 }
 
 static void
+au_state_establish( au_state * s, au_transaction * t, conid_t cid )
+{
+    if( s->con_tid != t->id || !cid )
+        return;
+    s->con_id = cid;
+    s->con_ts = tr_time( );
+    s->con_tid = 0;
+    au_state_flush( s );
+}
+
+static void
 au_state_send( au_state * s, au_transaction * t )
 {
     auP_request_header * hdr;
+
+    if( t->id == s->con_tid )
+    {
+        au_context_transmit( s->context, t );
+        return;
+    }
+
     if( !au_state_connect( s ) )
     {
         tr_list_append( &s->queue, t );
@@ -974,10 +1015,7 @@ handle_connect( au_transaction * t,
 
     /* FIXME: What if we are already connected? */
 
-    s->con_id = ntohll( res->connection_id );
-    s->con_ts = tr_time( );
-
-    au_state_flush( s );
+    au_state_establish( s, t, ntohll( res->connection_id ) );
 }
 
 static void
