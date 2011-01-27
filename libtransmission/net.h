@@ -92,6 +92,7 @@ void tr_addressUnpackSockaddr( tr_address * setme_addr, tr_port * setme_port,
                                const struct sockaddr_storage * ss, socklen_t sslen );
 
 tr_bool tr_isValidPeerAddress( const tr_address * addr, tr_port port );
+tr_bool tr_isValidTrackerAddress( const tr_address * addr );
 
 static inline tr_bool tr_isAddress( const tr_address * a ) { return ( a != NULL ) && ( a->type==TR_AF_INET || a->type==TR_AF_INET6 ); }
 

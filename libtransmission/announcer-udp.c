@@ -476,33 +476,48 @@ au_state_dns_callback( int result, char type, int count,
                        int ttl UNUSED, void * addresses, void * arg )
 {
     au_state * s = arg;
+    tr_address addr;
 
     assert( s->dnsreq != NULL );
     s->dnsreq = NULL;
 
     if( result != DNS_ERR_NONE )
     {
-        au_state_error( s, _( "DNS lookup failed (error %1$d): %2$s" ),
-                        result, evdns_err_to_string( result ) );
+        au_state_error( s,
+            _( "DNS lookup for %1$s failed (error %2$d): %3$s" ),
+            s->endpoint, result, evdns_err_to_string( result ) );
         return;
     }
     if( type != DNS_IPv4_A )
     {
-        au_state_error( s, _( "DNS lookup returned unsupported "
-                              "address type %d" ), type );
+        au_state_error( s,
+            _( "DNS lookup for %1$s returned unsupported address "
+               "type %2$d" ),
+            s->endpoint, type );
         return;
     }
     if( count < 1 )
     {
-        au_state_error( s, "%s",
-            _( "DNS lookup did not return any addresses" ) );
+        au_state_error( s,
+            _( "DNS lookup for %s did not return any addresses" ),
+            s->endpoint );
         return;
     }
 
     /* FIXME: Handle multiple addresses. */
     /* FIXME: Handle TTL. */
 
-    tr_addressUnpack( &s->addr, TR_AF_INET, addresses );
+    tr_addressUnpack( &addr, TR_AF_INET, addresses );
+    if( !tr_isValidTrackerAddress( &addr ) )
+    {
+        char astr[128];
+        au_state_error( s,
+            _( "DNS lookup for %1$s return invalid address: %2$s" ),
+            s->endpoint, tr_ntop( &addr, astr, sizeof( astr ) ) );
+        return;
+    }
+
+    s->addr = addr;
     s->resolved = TRUE;
 
     au_state_flush( s );

@@ -765,3 +765,12 @@ tr_isValidPeerAddress( const tr_address * addr, tr_port port )
         && ( !isIPv4MappedAddress( addr ) )
         && ( !isMartianAddr( addr ) );
 }
+
+tr_bool
+tr_isValidTrackerAddress( const tr_address * addr )
+{
+    return tr_isAddress( addr )
+        && !isIPv6LinkLocalAddress( addr )
+        && !isIPv4MappedAddress( addr )
+        && !isMartianAddr( addr );
+}
