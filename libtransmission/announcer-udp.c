@@ -426,6 +426,9 @@ au_state_flush( au_state * s )
 {
     au_transaction * t;
 
+    if( !s->queue )
+        return;
+
     if( !au_state_connect( s ) )
         return;
 
