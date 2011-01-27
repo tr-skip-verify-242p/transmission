@@ -357,6 +357,7 @@ struct au_state
     struct evdns_request * dnsreq;
     char * endpoint;
     tr_bool resolved;
+    tr_bool resolving;
     tr_address addr;
     tr_port port;
     conid_t con_id;
@@ -448,12 +449,7 @@ au_state_check_connected( au_state * s, time_t now )
                 au_state_connect( s );
         }
     }
-}
-
-static tr_bool
-au_state_have_addr( const au_state * s )
-{
-    return s->resolved;
+    au_state_flush( s );
 }
 
 static void
@@ -478,8 +474,8 @@ au_state_dns_callback( int result, char type, int count,
     au_state * s = arg;
     tr_address addr;
 
-    assert( s->dnsreq != NULL );
     s->dnsreq = NULL;
+    s->resolving = FALSE;
 
     if( result != DNS_ERR_NONE )
     {
@@ -519,8 +515,6 @@ au_state_dns_callback( int result, char type, int count,
 
     s->addr = addr;
     s->resolved = TRUE;
-
-    au_state_flush( s );
 }
 
 static tr_bool
@@ -532,9 +526,9 @@ au_state_lookup( au_state * s )
     tr_address * addr;
     int port;
 
-    if( au_state_have_addr( s ) )
+    if( s->resolved )
         return TRUE;
-    if( s->dnsreq )
+    if( s->resolving )
         return FALSE;
 
     tr_strlcpy( buf, s->endpoint, sizeof( buf ) );
@@ -572,14 +566,22 @@ au_state_lookup( au_state * s )
     }
 
     base = au_context_get_dns( s->context );
+    s->resolving = TRUE;
     req = evdns_base_resolve_ipv4( base, buf, 0, au_state_dns_callback, s );
     if( !req )
     {
+        s->resolving = FALSE;
         au_state_error( s, _( "Failed to initiate DNS lookup for %s" ),
                         s->endpoint );
         return FALSE;
     }
-    s->dnsreq = req;
+
+    if( s->resolved )
+        return TRUE;
+
+    if( s->resolving )
+        s->dnsreq = req;
+
     return FALSE;
 }
 
