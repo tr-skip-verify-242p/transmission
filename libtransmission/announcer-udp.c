@@ -551,7 +551,8 @@ au_state_lookup( au_state * s )
     port = atoi( portstr );
     if( !( 0 < port && port <= USHRT_MAX ) )
     {
-        au_state_error( s, _( "Invalid UDP tracker port: %s" ), portstr );
+        au_state_error( s, _( "Tracker %1$s has invalid port \"%2$s\"" ),
+                        s->endpoint, portstr );
         return FALSE;
     }
     s->port = port;
@@ -561,8 +562,8 @@ au_state_lookup( au_state * s )
     {
         if( addr->type != TR_AF_INET )
         {
-            au_state_error( s, _( "Unsupported address type: %d" ),
-                            addr->type );
+            au_state_error( s, _( "Address type not supported: %s" ),
+                            s->endpoint );
             return FALSE;
         }
 
@@ -574,7 +575,8 @@ au_state_lookup( au_state * s )
     req = evdns_base_resolve_ipv4( base, buf, 0, au_state_dns_callback, s );
     if( !req )
     {
-        au_state_error( s, "%s", _( "Failed to initiate DNS lookup" ) );
+        au_state_error( s, _( "Failed to initiate DNS lookup for %s" ),
+                        s->endpoint );
         return FALSE;
     }
     s->dnsreq = req;
