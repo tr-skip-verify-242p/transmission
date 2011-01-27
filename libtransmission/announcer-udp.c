@@ -512,7 +512,7 @@ au_state_dns_callback( int result, char type, int count,
     {
         char astr[128];
         au_state_error( s,
-            _( "DNS lookup for %1$s return invalid address: %2$s" ),
+            _( "DNS lookup for %1$s returned invalid address: %2$s" ),
             s->endpoint, tr_ntop( &addr, astr, sizeof( astr ) ) );
         return;
     }
