@@ -3033,6 +3033,7 @@ OUT:
     tr_free( newpath );
     if( restart && !err )
         tr_torrentStart( tor );
+    tr_torrentSetDirty( tor );
     tr_torrentUnlock( tor );
     return err;
 }
