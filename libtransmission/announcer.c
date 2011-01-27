@@ -983,7 +983,6 @@ tr_announcerRemoveTorrent( tr_announcer * announcer, tr_torrent * tor )
 
             if( tier->isRunning )
             {
-
                 struct stop_message * s = stopNew( announcer, tor, tier );
                 tr_ptrArrayInsertSorted( &announcer->stops, s, compareStops );
             }
