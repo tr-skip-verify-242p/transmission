@@ -2969,7 +2969,7 @@ dirExists( const char * path )
 }
 
 int
-tr_torrentSetTopDir( tr_torrent * tor, const char * newname )
+tr_torrentRename( tr_torrent * tor, const char * newname )
 {
     tr_file_index_t fi;
     tr_info * info;

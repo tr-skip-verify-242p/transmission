@@ -1159,7 +1159,7 @@ void tr_torrentSetLocation( tr_torrent  * torrent,
  *
  * @see tr_torrentName()
  */
-int tr_torrentSetTopDir( tr_torrent * torrent, const char * new_name );
+int tr_torrentRename( tr_torrent * torrent, const char * new_name );
 
 /**
  * Get the toplevel directory name for this torrent.
@@ -1744,7 +1744,7 @@ struct tr_info
     /* the torrent's name */
     char             * name;
 
-    /** If non-NULL this is the value set by tr_torrentSetTopDir(). */
+    /** If non-NULL this is the value set by tr_torrentRename(). */
     char             * rename;
 
     /* Path to torrent Transmission's internal copy of the .torrent file. */

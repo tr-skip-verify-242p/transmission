@@ -1788,7 +1788,7 @@ gtr_actions_handler( const char * action_name, gpointer user_data )
             {
                 const char * newname;
                 newname = gtr_rename_top_dialog_get_new_name( w );
-                tr_torrentSetTopDir( tor, newname );
+                tr_torrentRename( tor, newname );
             }
             gtk_widget_destroy( w );
         }
