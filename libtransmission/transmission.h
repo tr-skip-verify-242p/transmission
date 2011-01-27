@@ -1135,16 +1135,18 @@ void tr_torrentSetLocation( tr_torrent  * torrent,
  * the new location. Running torrents will be stopped as a side-effect
  * of this function and restarted if no error occurs.
  *
- * If the torrent does not have a toplevel directory (e.g. it only
- * contains a single file), or the torrent has incomplete metadata,
- * this function does nothing.
+ * For single file torrents, the file itself will be renamed to
+ * @newname.
  *
- * If no errors occur, @a torrent->info.rename will be set to
- * @a new_name.
+ * If the torrent does not have a toplevel directory for some reason,
+ * or the torrent has incomplete metadata, this function does nothing.
  *
- * @param new_name The new directory name to use. It may not contain
- *                 path delimiters or be equal to "." or "..". NULL
- *                 and zero-length strings are also rejected.
+ * If no errors occur, the new name will be accessible via
+ * tr_torrentName() while the original will be in @a torrent->info.name.
+ *
+ * @param newname The new name to use. It may not contain path
+ *                delimiters or be equal to "." or "..". NULL and
+ *                zero-length strings are also rejected.
  *
  * @return 0 on success, otherwise an errno value. The torrent is
  *         not restarted if an error occurs.
@@ -1159,7 +1161,7 @@ void tr_torrentSetLocation( tr_torrent  * torrent,
  *
  * @see tr_torrentName()
  */
-int tr_torrentRename( tr_torrent * torrent, const char * new_name );
+int tr_torrentRename( tr_torrent * torrent, const char * newname );
 
 uint64_t tr_torrentGetBytesLeftToAllocate( const tr_torrent * torrent );
 

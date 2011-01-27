@@ -2971,11 +2971,10 @@ dirExists( const char * path )
 int
 tr_torrentRename( tr_torrent * tor, const char * newname )
 {
-    tr_file_index_t fi;
     tr_info * info;
     tr_bool restart = FALSE;
-    const char * root, * p, * orig;
-    char * oldpath = NULL, * newpath = NULL, * oldname = NULL;
+    const char * root, * p, * oldname, * base;
+    char * oldpath = NULL, * newpath = NULL, * subpath = NULL;
     int err = 0;
 
     assert( tr_isTorrent( tor ) );
@@ -2988,14 +2987,15 @@ tr_torrentRename( tr_torrent * tor, const char * newname )
         return EINVAL;
 
     tr_torrentLock( tor );
+
     info = &tor->info;
-
-    /* NB: See note in docstring for this function in transmission.h. */
-    orig = info->files[0].name;
-
-    if( !( p = strchr( orig, TR_PATH_DELIMITER ) ) )
+    oldname = tr_torrentName( tor );
+    if( ( p = strchr( oldname, TR_PATH_DELIMITER ) ) )
+    {
+        /* Should not happen, but just in case. */
+        err = EISDIR;
         goto OUT;
-    oldname = tr_strndup( orig, (int) ( p - orig ) );
+    }
     if( !strcmp( newname, oldname ) )
         goto OUT;
 
@@ -3003,45 +3003,69 @@ tr_torrentRename( tr_torrent * tor, const char * newname )
     tr_torrentStop( tor );
 
     root = tr_torrentGetCurrentDir( tor );
-    oldpath = tr_buildPath( root, oldname, NULL );
 
-    if( dirExists( oldpath ) )
+    if( info->fileCount > 1 )
     {
-        newpath = tr_buildPath( root, newname, NULL );
-        if( rename( oldpath, newpath ) == -1 )
+        tr_file_index_t fi;
+        oldpath = tr_buildPath( root, oldname, NULL );
+        if( dirExists( oldpath ) )
         {
-            err = errno;
-            /* %1$s is the original directory name.
-             * %2$s is the new directory name.
-             * %3$s is the error message. */
-            tr_torerr( tor, _( "Error renaming \"%1$s\" to \"%2$s\": %3$s" ),
-                       oldpath, newpath, tr_strerror( err ) );
-            goto OUT;
+            newpath = tr_buildPath( root, newname, NULL );
+            if( rename( oldpath, newpath ) == -1 )
+            {
+                err = errno;
+                /* %1$s is the original directory name.
+                 * %2$s is the new directory name.
+                 * %3$s is the error message. */
+                tr_torerr( tor, _( "Error renaming \"%1$s\" to \"%2$s\": %3$s" ),
+                           oldpath, newpath, tr_strerror( err ) );
+                goto OUT;
+            }
+        }
+
+        for( fi = 0; fi < info->fileCount; ++fi )
+        {
+            tr_file * file = &info->files[fi];
+            char * newfnam;
+
+            if( !( p = strchr( file->name, TR_PATH_DELIMITER ) ) )
+                continue;
+            newfnam = tr_buildPath( newname, p + 1, NULL );
+            tr_free( file->name );
+            file->name = newfnam;
         }
     }
-
-    for( fi = 0; fi < info->fileCount; ++fi )
+    else
     {
-        tr_file * file = &info->files[fi];
-        char * newfnam;
-
-        if( !( p = strchr( file->name, TR_PATH_DELIMITER ) ) )
-            continue;
-        newfnam = tr_buildPath( newname, p + 1, NULL );
-        tr_free( file->name );
-        file->name = newfnam;
+        if( tr_torrentFindFile2( tor, 0, &base, &subpath ) )
+        {
+            oldpath = tr_buildPath( base, subpath, NULL );
+            newpath = tr_buildPath( base, newname, NULL );
+            if( rename( oldpath, newpath ) == -1 )
+            {
+                err = errno;
+                /* %1$s is the original file name.
+                 * %2$s is the new file name.
+                 * %3$s is the error message. */
+                tr_torerr( tor, _( "Error renaming \"%1$s\" to \"%2$s\": %3$s" ),
+                           oldpath, newpath, tr_strerror( err ) );
+                goto OUT;
+            }
+        }
+        tr_free( info->files[0].name );
+        info->files[0].name = tr_strdup( newname );
     }
 
     tr_free( info->rename );
     info->rename = tr_strdup( newname );
+    tr_torrentSetDirty( tor );
 
 OUT:
-    tr_free( oldname );
     tr_free( oldpath );
     tr_free( newpath );
+    tr_free( subpath );
     if( restart && !err )
         tr_torrentStart( tor );
-    tr_torrentSetDirty( tor );
     tr_torrentUnlock( tor );
     return err;
 }
