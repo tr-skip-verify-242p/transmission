@@ -177,13 +177,13 @@ static void au_state_error( au_state * s,
 
 static void au_state_send( au_state * s, au_transaction * t );
 static tr_bool au_state_connect( au_state * s );
-static tr_session * au_state_get_session( au_state * s );
+static tr_session * au_state_get_session( const au_state * s );
 
 static au_transaction * au_context_get_transaction( au_context * c, tnid_t id );
-static struct evdns_base * au_context_get_dns( au_context * c );
+static struct evdns_base * au_context_get_dns( const au_context * c );
 static void au_context_add_transaction( au_context * c, au_transaction * t );
 static void au_context_transmit( au_context * c, au_transaction * t );
-static tr_session * au_context_get_session( au_context * c );
+static tr_session * au_context_get_session( const au_context * c );
 
 #define ALLOC_PKT( bufptr, pktptr, pkttype ) do { \
     static pkttype _PKT_dummy; \
@@ -404,7 +404,7 @@ au_state_cmp( const void * va, const void * vb )
 }
 
 static tr_session *
-au_state_get_session( au_state * s )
+au_state_get_session( const au_state * s )
 {
     return au_context_get_session( s->context );
 }
@@ -416,7 +416,7 @@ au_state_is_connecting( const au_state * s )
 }
 
 static tr_bool
-au_state_is_connected( au_state * s )
+au_state_is_connected( const au_state * s )
 {
     return s->resolved && s->con_id != 0;
 }
@@ -622,6 +622,9 @@ au_state_establish( au_state * s, au_transaction * t, conid_t cid )
 {
     if( s->con_tid != t->id || !cid )
         return;
+
+    /* FIXME: What if we are already connected? */
+
     s->con_id = cid;
     s->con_ts = tr_time( );
     s->con_tid = 0;
@@ -652,9 +655,9 @@ au_state_send( au_state * s, au_transaction * t )
 }
 
 static void
-au_state_get_destination( au_state   * s,
-                          tr_address * setme_addr,
-                          tr_port    * setme_port )
+au_state_get_destination( const au_state * s,
+                          tr_address     * setme_addr,
+                          tr_port        * setme_port )
 {
     if( setme_addr )
         *setme_addr = s->addr;
@@ -697,7 +700,7 @@ au_context_free( au_context * c )
 }
 
 static tr_session *
-au_context_get_session( au_context * c )
+au_context_get_session( const au_context * c )
 {
     return c->session;
 }
@@ -795,7 +798,7 @@ au_context_transmit( au_context * c, au_transaction * t )
 }
 
 static struct evdns_base *
-au_context_get_dns( au_context * c )
+au_context_get_dns( const au_context * c )
 {
     if( !c || !tr_isSession( c->session ) )
         return NULL;
@@ -820,10 +823,10 @@ get_event_id( const char * evstr )
 }
 
 static struct evbuffer *
-create_announce( tr_announcer          * announcer,
-                 const tr_torrent      * tor,
-                 const tr_tier         * tier,
-                 const char            * evstr )
+create_announce( tr_announcer     * announcer,
+                 const tr_torrent * tor,
+                 const tr_tier    * tier,
+                 const char       * evstr )
 {
     const tr_tracker_item * tracker = tier->currentTracker;
     au_context * c = announcer->udpctx;
@@ -1018,9 +1021,7 @@ au_parse_scrape( tr_tier * tier, const char * data, size_t len,
 ***/
 
 static void
-handle_connect( au_transaction * t,
-                const uint8_t * data,
-                size_t len )
+handle_connect( au_transaction * t, const uint8_t * data, size_t len )
 {
     const auP_connect_response * res;
     au_state * s = t->state;
@@ -1035,15 +1036,11 @@ handle_connect( au_transaction * t,
 
     res = (const auP_connect_response *) data;
 
-    /* FIXME: What if we are already connected? */
-
     au_state_establish( s, t, ntohll( res->connection_id ) );
 }
 
 static void
-handle_announce( au_transaction * t,
-                 const uint8_t * data,
-                 size_t len )
+handle_announce( au_transaction * t, const uint8_t * data, size_t len )
 {
     const auP_announce_response * res;
 
@@ -1060,9 +1057,7 @@ handle_announce( au_transaction * t,
 }
 
 static void
-handle_scrape( au_transaction * t,
-               const uint8_t * data,
-               size_t len )
+handle_scrape( au_transaction * t, const uint8_t * data, size_t len )
 {
     const auP_scrape_response * res;
 
@@ -1079,9 +1074,7 @@ handle_scrape( au_transaction * t,
 }
 
 static void
-handle_error( au_transaction * t,
-              const uint8_t * data,
-              size_t len )
+handle_error( au_transaction * t, const uint8_t * data, size_t len )
 {
     const auP_error_response * res;
 
