@@ -1161,15 +1161,6 @@ void tr_torrentSetLocation( tr_torrent  * torrent,
  */
 int tr_torrentRename( tr_torrent * torrent, const char * new_name );
 
-/**
- * Get the toplevel directory name for this torrent.
- *
- * @return A newly-allocated string which you must free when
- *         it is no longer needed, or NULL if the torrent does
- *         not have a toplevel directory.
- */
-char * tr_torrentGetTopDir( const tr_torrent * torrent );
-
 uint64_t tr_torrentGetBytesLeftToAllocate( const tr_torrent * torrent );
 
 /**
