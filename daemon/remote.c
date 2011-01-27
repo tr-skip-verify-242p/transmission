@@ -258,7 +258,7 @@ static tr_option opts[] =
     { 'l', "list",                   "List all torrents", "l",  0, NULL },
     { 960, "move",                   "Move current torrent's data to a new folder", NULL, 1, "<path>" },
     { 961, "find",                   "Tell Transmission where to find a torrent's data", NULL, 1, "<path>" },
-    { 966, "rename",                 "Rename torrent's toplevel directory", "rn", 1, "<directory name>" },
+    { 966, "rename",                 "Rename torrent", "rn", 1, "<new name>" },
     { 'm', "portmap",                "Enable portmapping via NAT-PMP or UPnP", "m",  0, NULL },
     { 'M', "no-portmap",             "Disable portmapping", "M",  0, NULL },
     { 'n', "auth",                   "Set username and password", "n",  1, "<user:pw>" },
