@@ -1776,7 +1776,7 @@ gtr_actions_handler( const char * action_name, gpointer user_data )
             gtk_widget_show( w );
         }
     }
-    else if( !strcmp( action_name, "rename-torrent-top" ) )
+    else if( !strcmp( action_name, "rename-torrent" ) )
     {
         tr_torrent * tor;
         if( ( tor = getFirstSelectedTorrent( data ) ) )
