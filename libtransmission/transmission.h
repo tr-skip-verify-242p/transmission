@@ -1084,6 +1084,13 @@ tr_torrent * tr_torrentNew( const tr_ctor   * ctor,
 /** @addtogroup tr_torrent Torrents
     @{ */
 
+/**
+ * The current name that should be shown for the torrent.
+ *
+ * @note This function is mainly intended for clients.
+ */
+const char * tr_torrentName( const tr_torrent * tor );
+
 /** @brief Frees memory allocated by tr_torrentNew().
            Running torrents are stopped first. */
 void tr_torrentFree( tr_torrent * torrent );
@@ -1132,6 +1139,9 @@ void tr_torrentSetLocation( tr_torrent  * torrent,
  * contains a single file), or the torrent has incomplete metadata,
  * this function does nothing.
  *
+ * If no errors occur, @a torrent->info.rename will be set to
+ * @a new_name.
+ *
  * @param new_name The new directory name to use. It may not contain
  *                 path delimiters or be equal to "." or "..". NULL
  *                 and zero-length strings are also rejected.
@@ -1145,7 +1155,9 @@ void tr_torrentSetLocation( tr_torrent  * torrent,
  *       prefix for all @a n.
  *
  * @note This function may modify @a torrent->info.files and
- *       @a torrent->info.name.
+ *       @a torrent->info.rename.
+ *
+ * @see tr_torrentName()
  */
 int tr_torrentSetTopDir( tr_torrent * torrent, const char * new_name );
 
@@ -1731,6 +1743,9 @@ struct tr_info
 
     /* the torrent's name */
     char             * name;
+
+    /** If non-NULL this is the value set by tr_torrentSetTopDir(). */
+    char             * rename;
 
     /* Path to torrent Transmission's internal copy of the .torrent file. */
     char             * torrent;

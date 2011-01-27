@@ -135,6 +135,14 @@ tr_torrentFindFromObfuscatedHash( tr_session * session,
     return NULL;
 }
 
+const char *
+tr_torrentName( const tr_torrent * tor )
+{
+    assert( tr_isTorrent( tor ) );
+
+    return tor->info.rename ? tor->info.rename : tor->info.name;
+}
+
 tr_bool
 tr_torrentIsPieceTransferAllowed( const tr_torrent  * tor,
                                   tr_direction        direction )
@@ -3024,8 +3032,8 @@ tr_torrentSetTopDir( tr_torrent * tor, const char * newname )
         file->name = newfnam;
     }
 
-    tr_free( info->name );
-    info->name = tr_utf8clean( newname, -1 );
+    tr_free( info->rename );
+    info->rename = tr_strdup( newname );
 
 OUT:
     tr_free( oldname );

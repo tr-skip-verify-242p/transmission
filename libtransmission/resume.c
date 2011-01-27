@@ -39,6 +39,7 @@
 #define KEY_PEERS6              "peers2-6"
 #define KEY_FILE_PRIORITIES     "priority"
 #define KEY_FILE_NAMES          "name"
+#define KEY_RENAME              "rename"
 #define KEY_BANDWIDTH_PRIORITY  "bandwidth-priority"
 #define KEY_PROGRESS            "progress"
 #define KEY_SPEEDLIMIT_OLD      "speed-limit"
@@ -557,6 +558,8 @@ tr_torrentSaveResume( tr_torrent * tor )
     savePeers( &top, tor );
     if( tr_torrentHasMetadata( tor ) )
     {
+        if( tor->info.rename )
+            tr_bencDictAddStr( &top, KEY_RENAME, tor->info.rename );
         saveFileNames( &top, tor );
         saveFilePriorities( &top, tor );
         saveDND( &top, tor );
@@ -704,6 +707,14 @@ loadFromFile( tr_torrent * tor,
 
     if( fieldsToLoad & TR_FR_FILE_NAMES )
         fieldsLoaded |= loadFileNames( &top, tor );
+
+    if( ( fieldsToLoad & TR_FR_RENAME )
+        && tr_bencDictFindStr( &top, KEY_RENAME, &str )
+        && str && str[0] )
+    {
+        tr_free( tor->info.rename );
+        tor->info.rename = tr_strdup( str );
+    }
 
     if( fieldsToLoad & TR_FR_PROGRESS )
         fieldsLoaded |= loadProgress( &top, tor );
