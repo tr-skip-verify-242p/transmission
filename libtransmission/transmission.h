@@ -1129,10 +1129,12 @@ void tr_torrentSetLocation( tr_torrent  * torrent,
  * of this function and restarted if no error occurs.
  *
  * If the torrent does not have a toplevel directory (e.g. it only
- * contains a single file), this function does nothing.
+ * contains a single file), or the torrent has incomplete metadata,
+ * this function does nothing.
  *
  * @param new_name The new directory name to use. It may not contain
- *                 path delimiters or be equal to "." or "..".
+ *                 path delimiters or be equal to "." or "..". NULL
+ *                 and zero-length strings are also rejected.
  *
  * @return 0 on success, otherwise an errno value. The torrent is
  *         not restarted if an error occurs.
@@ -1141,6 +1143,9 @@ void tr_torrentSetLocation( tr_torrent  * torrent,
  *       directory, all of its files will be in it, i.e.
  *       @a torrent->info.files[n].name have the same directory
  *       prefix for all @a n.
+ *
+ * @note This function may modify @a torrent->info.files and
+ *       @a torrent->info.name.
  */
 int tr_torrentSetTopDir( tr_torrent * torrent, const char * new_name );
 

@@ -2972,10 +2972,10 @@ tr_torrentSetTopDir( tr_torrent * tor, const char * newname )
 
     assert( tr_isTorrent( tor ) );
 
-    if( !newname || !newname[0] || !tr_torrentHasMetadata( tor ) )
+    if( !tr_torrentHasMetadata( tor ) )
         return 0;
 
-    if( strchr( newname, TR_PATH_DELIMITER )
+    if( !newname || !newname[0] || strchr( newname, TR_PATH_DELIMITER )
         || !strcmp( newname, "." ) || !strcmp( newname,  ".." ) )
         return EINVAL;
 
@@ -3023,6 +3023,9 @@ tr_torrentSetTopDir( tr_torrent * tor, const char * newname )
         tr_free( file->name );
         file->name = newfnam;
     }
+
+    tr_free( info->name );
+    info->name = tr_utf8clean( newname, -1 );
 
 OUT:
     tr_free( oldname );
