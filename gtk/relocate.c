@@ -61,7 +61,7 @@ startMovingNextTorrent( struct relocate_dialog_data * data )
     data->torrent_ids = g_slist_delete_link( data->torrent_ids,
                                              data->torrent_ids );
 
-    str = g_strdup_printf( _( "Moving \"%s\"" ), tr_torrentInfo(tor)->name );
+    str = g_strdup_printf( _( "Moving \"%s\"" ), tr_torrentName( tor ) );
     gtk_message_dialog_set_markup( GTK_MESSAGE_DIALOG( data->message_dialog ), str );
     g_free( str );
 }
@@ -210,7 +210,6 @@ gtr_rename_top_dialog_new( GtkWindow  * parent,
 {
     const tr_info * info = tr_torrentInfo( tor );
     GtkWidget * d, * e, * t, * l;
-    char * curdir;
     int row;
 
     d = gtk_dialog_new_with_buttons( _( "Rename Torrent Directory" ), parent,
@@ -238,9 +237,7 @@ gtr_rename_top_dialog_new( GtkWindow  * parent,
 
     e = gtk_entry_new( );
     gtk_entry_set_width_chars( GTK_ENTRY( e ), 64 );
-    curdir = tr_torrentGetTopDir( tor );
-    gtk_entry_set_text( GTK_ENTRY( e ), curdir );
-    g_free( curdir );
+    gtk_entry_set_text( GTK_ENTRY( e ), tr_torrentName( tor ) );
     g_object_set_data( G_OBJECT( d ), "rename-entry", e );
     g_signal_connect( e, "activate",
                       G_CALLBACK( onRenameEntryActivate ), d );
