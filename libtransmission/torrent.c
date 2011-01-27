@@ -3057,7 +3057,10 @@ tr_torrentRename( tr_torrent * tor, const char * newname )
     }
 
     tr_free( info->rename );
-    info->rename = tr_strdup( newname );
+    if( !strcmp( newname, info->name ) )
+        info->rename = NULL;
+    else
+        info->rename = tr_strdup( newname );
     tr_torrentSetDirty( tor );
 
 OUT:
