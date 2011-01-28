@@ -960,9 +960,11 @@ au_parse_announce( tr_tier * tier, const char * data,
 
     if( action == AUC_ACTION_ERROR )
     {
-        assert( len > sizeof( res->hdr ) );
-        tr_strlcpy( tier->lastAnnounceStr, data + sizeof( res->hdr ),
-                    sizeof( tier->lastAnnounceStr ) );
+        const size_t rlen = sizeof( tier->lastAnnounceStr );
+        assert( len > sizeof( auP_error_response ) );
+        data += sizeof( auP_error_response );
+        len -= sizeof( auP_error_response );
+        tr_strlcpy( tier->lastAnnounceStr, data, MIN( len, rlen ) );
         publishMessage( tier, tier->lastAnnounceStr, TR_TRACKER_ERROR );
         return FALSE;
     }
@@ -992,18 +994,30 @@ au_parse_scrape( tr_tier * tier, const char * data, size_t len,
     tr_tracker_item * tracker = tier->currentTracker;
     const auP_scrape_response * res;
     const auP_scrape_item * item;
+    int action;
 
-    assert( len >= sizeof( *res ) );
+    res = (const auP_scrape_response *) data;
+    action = ntohl( res->hdr.action );
+
+    if( action == AUC_ACTION_ERROR )
+    {
+        assert( len > sizeof( auP_error_response ) );
+        data += sizeof( auP_error_response );
+        len -= sizeof( auP_error_response );
+        tr_strlcpy( result, data, MIN( resultlen, len ) );
+        return FALSE;
+    }
+
     data += sizeof( *res );
     len -= sizeof( *res );
-
-    publishErrorClear( tier );
 
     if( len < sizeof( *item ) )
     {
         tr_strlcpy( result, _( "Error parsing response" ), resultlen );
         return FALSE;
     }
+
+    publishErrorClear( tier );
 
     /* FIXME: What about multiple scrapes at once? */
 
