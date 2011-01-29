@@ -66,7 +66,7 @@ notify( void * vres )
     tr_free( res );
 }
 
-static void 
+static void
 worker( void * varg UNUSED )
 {
     while( 1 )
