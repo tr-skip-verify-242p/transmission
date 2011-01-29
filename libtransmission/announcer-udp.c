@@ -365,7 +365,6 @@ struct au_state
     tnid_t con_tid;
     annkey_t key;
     tr_list * queue; /* au_transaction, not owned */
-    char * errstr;
 };
 
 static au_state *
@@ -389,7 +388,6 @@ au_state_free( au_state * s )
         evdns_cancel_request( base, s->dnsreq );
     }
     tr_free( s->endpoint );
-    tr_free( s->errstr );
     tr_list_free( &s->queue, NULL );
     memset( s, 0, sizeof( *s ) );
     tr_free( s );
