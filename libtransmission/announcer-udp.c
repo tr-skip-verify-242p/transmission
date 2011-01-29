@@ -846,20 +846,31 @@ create_scrape( tr_announcer          * a UNUSED,
 }
 
 struct evbuffer *
-au_create_stop( tr_announcer     * a,
+au_create_stop( tr_announcer     * announcer,
                 const tr_torrent * tor,
                 const tr_tier    * tier )
 {
-    return create_announce( a, tor, tier, "stopped" );
+    assert( announcer != NULL );
+    assert( tr_isTorrent( tor ) );
+    assert( tier != NULL );
+    assert( tier->currentTracker != NULL );
+    assert( tier->currentTracker->type == TR_TRACKER_TYPE_UDP );
+
+    return create_announce( announcer, tor, tier, "stopped" );
 }
 
 void
-au_send_stop( tr_announcer * a, tr_host * host, struct evbuffer * pkt )
+au_send_stop( tr_announcer * announcer, tr_host * host, struct evbuffer * pkt )
 {
-    au_context * c = a->udpctx;
+    au_context * c;
     au_transaction * t;
     au_state * s;
 
+    assert( announcer != NULL );
+    assert( host != NULL );
+    assert( pkt != NULL );
+
+    c = announcer->udpctx;
     s = au_context_get_state( c, host );
     t = au_transaction_new( s, pkt );
     au_context_add_transaction( c, t );
@@ -867,21 +878,32 @@ au_send_stop( tr_announcer * a, tr_host * host, struct evbuffer * pkt )
 }
 
 void
-au_send_announce( tr_announcer     * a,
+au_send_announce( tr_announcer     * announcer,
                   const tr_torrent * tor,
                   const tr_tier    * tier,
                   const char       * evstr,
                   tr_web_done_func * callback,
                   void             * cbdata )
 {
-    const tr_tracker_item * tracker = tier->currentTracker;
-    au_context * c = a->udpctx;
+    const tr_tracker_item * tracker;
+    au_context * c;
     struct evbuffer * pkt;
     au_transaction * t;
     au_state * s;
 
+    assert( announcer != NULL );
+    assert( tr_isTorrent( tor ) );
+    assert( tier != NULL );
+    assert( tier->currentTracker != NULL );
+
+    tracker = tier->currentTracker;
+
+    assert( tracker != NULL );
+    assert( tracker->type == TR_TRACKER_TYPE_UDP );
+
+    c = announcer->udpctx;
     s = au_context_get_state( c, tracker->host );
-    pkt = create_announce( a, tor, tier, evstr );
+    pkt = create_announce( announcer, tor, tier, evstr );
     t = au_transaction_new( s, pkt );
     au_transaction_set_callback( t, callback, cbdata );
     au_context_add_transaction( c, t );
@@ -889,20 +911,31 @@ au_send_announce( tr_announcer     * a,
 }
 
 void
-au_send_scrape( tr_announcer     * a,
+au_send_scrape( tr_announcer     * announcer,
                 const tr_torrent * tor,
                 const tr_tier    * tier,
                 tr_web_done_func * callback,
                 void             * cbdata )
 {
-    const tr_tracker_item * tracker = tier->currentTracker;
-    au_context * c = a->udpctx;
+    const tr_tracker_item * tracker;
+    au_context * c;
     struct evbuffer * pkt;
     au_transaction * t;
     au_state * s;
 
+    assert( announcer != NULL );
+    assert( tr_isTorrent( tor ) );
+    assert( tier != NULL );
+    assert( tier->currentTracker != NULL );
+
+    tracker = tier->currentTracker;
+
+    assert( tracker != NULL );
+    assert( tracker->type == TR_TRACKER_TYPE_UDP );
+
+    c = announcer->udpctx;
     s = au_context_get_state( c, tracker->host );
-    pkt = create_scrape( a, tor, tracker );
+    pkt = create_scrape( announcer, tor, tracker );
     t = au_transaction_new( s, pkt );
     au_transaction_set_callback( t, callback, cbdata );
     au_context_add_transaction( c, t );
