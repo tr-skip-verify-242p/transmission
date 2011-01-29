@@ -282,7 +282,13 @@ au_transaction_has_error( const au_transaction * t )
 static tr_bool
 au_transaction_has_timeout( const au_transaction * t )
 {
-    return t->retries > AUC_MAXIMUM_RETRY_COUNT;
+    return t->retries >= AUC_MAXIMUM_RETRY_COUNT;
+}
+
+static void
+au_transaction_set_timeout( au_transaction * t )
+{
+    t->retries = AUC_MAXIMUM_RETRY_COUNT;
 }
 
 static tr_bool
@@ -318,6 +324,15 @@ au_transaction_notify( au_transaction * t, const void * data, size_t len )
 static void
 au_transaction_check_timeout( au_transaction * t, time_t now )
 {
+    if( !au_transaction_is_valid( t ) )
+        return;
+
+    if( au_transaction_has_timeout( t ) )
+    {
+        au_transaction_notify( t, NULL, 0 );
+        return;
+    }
+
     if( !t->send_ts )
         return;
 
@@ -437,20 +452,21 @@ au_state_flush( au_state * s )
 static void
 au_state_check_connected( au_state * s, time_t now )
 {
-    if( s->con_id && now - s->con_ts > AUC_CONNECTION_EXPIRE_TIME )
+    if( au_state_is_connected( s )
+        && now - s->con_ts > AUC_CONNECTION_EXPIRE_TIME )
         s->con_id = 0;
-    if( s->con_tid )
+
+    if( au_state_is_connecting( s ) )
     {
         au_transaction * t;
         t = au_context_get_transaction( s->context, s->con_tid );
         if( au_transaction_inactive( t ) )
         {
             s->con_tid = 0;
-            if( s->queue )
-                au_state_connect( s );
+            while( ( t = tr_list_pop_front( &s->queue ) ) )
+                au_transaction_set_timeout( t );
         }
     }
-    au_state_flush( s );
 }
 
 static void
