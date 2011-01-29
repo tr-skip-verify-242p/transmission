@@ -32,7 +32,7 @@
 #include "session.h"
 #include "utils.h"
 #include "trevent.h"
-#include "tr-resolver.h"
+#include "resolver.h"
 
 typedef struct
 {

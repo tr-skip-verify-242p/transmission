@@ -46,6 +46,7 @@ libtransmission_a_SOURCES = \
     port-forwarding.c \
     ptrarray.c \
     ratecontrol.c \
+    resolver.c \
     resume.c \
     rpcimpl.c \
     rpc-server.c \
@@ -56,7 +57,6 @@ libtransmission_a_SOURCES = \
     torrent-magnet.c \
     tr-dht.c \
     tr-lpd.c \
-    tr-resolver.c \
     tr-udp.c \
     tr-getopt.c \
     trevent.c \
@@ -101,6 +101,7 @@ noinst_HEADERS = \
     port-forwarding.h \
     ptrarray.h \
     ratecontrol.h \
+    resolver.h \
     resume.h \
     rpcimpl.h \
     rpc-server.h \
@@ -111,7 +112,6 @@ noinst_HEADERS = \
     tr-getopt.h \
     transmission.h \
     tr-dht.h \
-    tr-resolver.h \
     tr-udp.h \
     tr-lpd.h \
     trevent.h \
