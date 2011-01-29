@@ -542,7 +542,7 @@ au_state_lookup( au_state * s )
     }
 
     s->resolving = TRUE;
-    tr_resolve_address( au_context_get_session( s->context ),
+    tr_resolve_address( au_state_get_session( s ),
                         buf, portstr, TR_AF_INET,
                         resolver_callback, s );
     return FALSE;
