@@ -847,6 +847,7 @@ tr_isValidPeerProxyAddress( const tr_address * addr, tr_port port )
         && ( tr_isAddress( addr ) );
 }
 
+tr_bool
 tr_isValidTrackerAddress( const tr_address * addr )
 {
     return tr_isAddress( addr )
