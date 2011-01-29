@@ -853,17 +853,13 @@ isInEndgame( Torrent * t )
 {
     int64_t blocksMissing = 0;
     tr_completion * cp = &t->tor->completion;
-    struct weighted_piece * p;
+    int i;
 
     if( ( t->pieces == NULL ) || ( t->pieceCount == 0 ) )
         return FALSE;
 
-    p = t->pieces;
-
-    for( int i = 0; i < t->pieceCount; ++i ) {
-        blocksMissing += tr_cpMissingBlocksInPiece( cp, p->index );
-        p++;
-    }
+    for( i = 0; i < t->pieceCount; ++i )
+        blocksMissing += tr_cpMissingBlocksInPiece( cp, t->pieces[i].index );
 
     return t->requestCount >= blocksMissing;
 }
