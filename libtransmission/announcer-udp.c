@@ -28,7 +28,6 @@
 #include <stdarg.h>
 
 #include <event2/buffer.h>
-#include <event2/dns.h>
 #include <event2/http.h>
 
 #include "transmission.h"
@@ -180,7 +179,6 @@ static tr_bool au_state_connect( au_state * s );
 static tr_session * au_state_get_session( const au_state * s );
 
 static au_transaction * au_context_get_transaction( au_context * c, tnid_t id );
-static struct evdns_base * au_context_get_dns( const au_context * c );
 static void au_context_add_transaction( au_context * c, au_transaction * t );
 static void au_context_transmit( au_context * c, au_transaction * t );
 static tr_session * au_context_get_session( const au_context * c );
@@ -354,10 +352,8 @@ au_transaction_set_callback( au_transaction   * t,
 struct au_state
 {
     au_context * context; /* not owned */
-    struct evdns_request * dnsreq;
     char * endpoint;
     tr_bool resolved;
-    tr_bool resolving;
     tr_address addr;
     tr_port port;
     conid_t con_id;
@@ -383,11 +379,6 @@ au_state_free( au_state * s )
 {
     if( !s )
         return;
-    if( s->dnsreq && s->context )
-    {
-        struct evdns_base * base = au_context_get_dns( s->context );
-        evdns_cancel_request( base, s->dnsreq );
-    }
     tr_free( s->endpoint );
     tr_free( s->errstr );
     tr_list_free( &s->queue, NULL );
@@ -470,69 +461,16 @@ au_state_error( au_state * s, const char * fmt, ... )
         au_transaction_error( t, "%s", buf );
 }
 
-static void
-au_state_dns_callback( int result, char type, int count,
-                       int ttl UNUSED, void * addresses, void * arg )
-{
-    au_state * s = arg;
-    tr_address addr;
-
-    s->dnsreq = NULL;
-    s->resolving = FALSE;
-
-    if( result != DNS_ERR_NONE )
-    {
-        au_state_error( s,
-            _( "DNS lookup for %1$s failed (error %2$d): %3$s" ),
-            s->endpoint, result, evdns_err_to_string( result ) );
-        return;
-    }
-    if( type != DNS_IPv4_A )
-    {
-        au_state_error( s,
-            _( "DNS lookup for %1$s returned unsupported address "
-               "type %2$d" ),
-            s->endpoint, type );
-        return;
-    }
-    if( count < 1 )
-    {
-        au_state_error( s,
-            _( "DNS lookup for %s did not return any addresses" ),
-            s->endpoint );
-        return;
-    }
-
-    /* FIXME: Handle multiple addresses. */
-    /* FIXME: Handle TTL. */
-
-    tr_addressUnpack( &addr, TR_AF_INET, addresses );
-    if( !tr_isValidTrackerAddress( &addr ) )
-    {
-        char astr[128];
-        au_state_error( s,
-            _( "DNS lookup for %1$s returned invalid address: %2$s" ),
-            s->endpoint, tr_ntop( &addr, astr, sizeof( astr ) ) );
-        return;
-    }
-
-    s->addr = addr;
-    s->resolved = TRUE;
-}
-
 static tr_bool
 au_state_lookup( au_state * s )
 {
-    struct evdns_base * base;
-    struct evdns_request * req;
     char buf[512], * portstr;
+    const char * err = NULL;
     tr_address * addr;
     int port;
 
     if( s->resolved )
         return TRUE;
-    if( s->resolving )
-        return FALSE;
 
     tr_strlcpy( buf, s->endpoint, sizeof( buf ) );
     portstr = strchr( buf, ':' );
@@ -568,24 +506,25 @@ au_state_lookup( au_state * s )
         return TRUE;
     }
 
-    base = au_context_get_dns( s->context );
-    s->resolving = TRUE;
-    req = evdns_base_resolve_ipv4( base, buf, 0, au_state_dns_callback, s );
-    if( !req )
+    s->addr.type = TR_AF_INET;
+    if( ( err = tr_netGetAddress( buf, portstr, &s->addr ) ) )
     {
-        s->resolving = FALSE;
-        au_state_error( s, _( "Failed to initiate DNS lookup for %s" ),
-                        s->endpoint );
+        au_state_error( s, _( "DNS lookup for %1$s failed: %2$s" ),
+                        s->endpoint, err );
         return FALSE;
     }
 
-    if( s->resolved )
-        return TRUE;
+    if( !tr_isValidTrackerAddress( &s->addr ) )
+    {
+        char astr[128];
+        au_state_error( s,
+            _( "DNS lookup for %1$s returned invalid address: %2$s" ),
+            s->endpoint, tr_ntop( &s->addr, astr, sizeof( astr ) ) );
+        return FALSE;
+    }
 
-    if( s->resolving )
-        s->dnsreq = req;
-
-    return FALSE;
+    s->resolved = TRUE;
+    return TRUE;
 }
 
 static tr_bool
@@ -795,14 +734,6 @@ au_context_transmit( au_context * c, au_transaction * t )
         return;
     }
     au_transaction_sent( t );
-}
-
-static struct evdns_base *
-au_context_get_dns( const au_context * c )
-{
-    if( !c || !tr_isSession( c->session ) )
-        return NULL;
-    return c->session->dns_base;
 }
 
 /***

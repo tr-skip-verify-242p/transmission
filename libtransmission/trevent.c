@@ -19,7 +19,6 @@
 #include <signal.h>
 
 #include <event2/event.h>
-#include <event2/dns.h>
 
 #include "transmission.h"
 #include "net.h"
@@ -224,7 +223,6 @@ static void
 libeventThreadFunc( void * veh )
 {
     struct event_base * base;
-    struct evdns_base * dns_base;
     tr_event_handle * eh = veh;
 
 #ifndef WIN32
@@ -233,10 +231,8 @@ libeventThreadFunc( void * veh )
 #endif
 
     base = event_base_new( );
-    dns_base = evdns_base_new( base, 1 );
     eh->base = base;
     eh->session->event_base = base;
-    eh->session->dns_base = dns_base;
     eh->session->events = eh;
 
     /* listen to the pipe's read fd */
@@ -251,7 +247,6 @@ libeventThreadFunc( void * veh )
     /* shut down the thread */
     tr_lockFree( eh->lock );
     event_base_free( base );
-    evdns_base_free( dns_base, 0 );
     eh->session->events = NULL;
     tr_free( eh );
     tr_dbg( "Closing libevent thread" );

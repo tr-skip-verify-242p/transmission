@@ -38,7 +38,6 @@ uint8_t*       tr_peerIdNew( void );
 const uint8_t* tr_getPeerId( void );
 
 struct event_base;
-struct evdns_base;
 struct tr_address;
 struct tr_announcer;
 struct tr_bandwidth;
@@ -122,7 +121,6 @@ struct tr_session
     tr_preallocation_mode        preallocationMode;
 
     struct event_base          * event_base;
-    struct evdns_base          * dns_base;
     struct tr_event_handle     * events;
 
     uint16_t                     peerLimitPerTorrent;

@@ -131,6 +131,42 @@ inet_pton( int af, const char * src, void * dst )
 }
 #endif
 
+const char *
+tr_netGetAddress( const char * node, const char * service, tr_address * addr )
+{
+    struct addrinfo hints, * res, * p;
+    struct sockaddr_storage * ss;
+    int rv, family = AF_UNSPEC;
+    const char * err = NULL;
+
+    if( !addr )
+        return _( "Invalid address argument" );
+
+    memset( &hints, 0, sizeof( hints ) );
+    if( addr->type == TR_AF_INET )
+        family = AF_INET;
+    else if( addr->type == TR_AF_INET6 )
+        family = AF_INET6;
+    hints.ai_family = family;
+
+    if( ( rv = getaddrinfo( node, service, &hints, &res ) ) != 0 )
+        return gai_strerror( rv );
+
+    for( p = res; p; p = p->ai_next )
+    {
+        if( family != AF_UNSPEC && p->ai_family != family )
+            continue;
+        ss = (struct sockaddr_storage *) p->ai_addr;
+        tr_addressUnpackSockaddr( addr, NULL, ss, p->ai_addrlen );
+        break;
+    }
+
+    if( p == NULL )
+        err = _( "No matching addresses found" );
+    freeaddrinfo( res );
+    return err;
+}
+
 void
 tr_netInit( void )
 {
