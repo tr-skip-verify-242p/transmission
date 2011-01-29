@@ -39,6 +39,9 @@
  * number, a new worker thread is created. */
 #define WORKER_LOAD 5
 
+/* Never create more worker threads than this. */
+#define WORKER_MAX  10
+
 typedef struct
 {
     tr_session * session;
@@ -110,7 +113,8 @@ static void
 spawn_workers( )
 {
     tr_lockLock( lock );
-    if( queue && ( workers < 1 || tasks / workers > WORKER_LOAD ) )
+    if( queue && ( workers < 1 || tasks / workers > WORKER_LOAD )
+        && workers < WORKER_MAX )
     {
         workers++;
         tr_threadNew( worker, NULL );
