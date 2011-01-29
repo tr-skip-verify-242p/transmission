@@ -18,6 +18,7 @@
 #define _TR_ANNOUNCER_H_
 
 #include "transmission.h"
+#include "net.h"
 
 struct tr_announcer;
 struct tr_torrent_tiers;
@@ -85,6 +86,12 @@ void tr_announcerRemoveTorrent( struct tr_announcer * ,
                                 tr_torrent          * );
 
 void tr_announcerChangeMyPort( tr_torrent * );
+
+tr_bool tr_announcerHandleUDP( struct tr_announcer * announcer,
+                               const uint8_t       * data,
+                               size_t                len,
+                               const tr_address    * from_addr,
+                               const tr_port         from_port );
 
 tr_bool tr_announcerCanManualAnnounce( const tr_torrent * );
 

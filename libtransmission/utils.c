@@ -1037,11 +1037,13 @@ tr_urlIsValidTracker( const char * url )
     tr_bool valid;
     char * scheme = NULL;
     const int len = url ? strlen(url) : 0;
+    int port = 0;
 
     valid = isValidURLChars( url, len )
-         && !tr_urlParse( url, len, &scheme, NULL, NULL, NULL )
+         && !tr_urlParse( url, len, &scheme, NULL, &port, NULL )
          && ( scheme != NULL )
-         && ( !strcmp(scheme,"http") || !strcmp(scheme,"https") );
+         && ( ( !strcmp( scheme, "http" ) || !strcmp( scheme, "https" ) )
+              || ( !strcmp( scheme, "udp" ) && port > 0 ) );
 
     tr_free( scheme );
     return valid;
