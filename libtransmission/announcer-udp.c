@@ -35,6 +35,7 @@
 #include "crypto.h"
 #include "list.h"
 #include "ptrarray.h"
+#include "resolver.h"
 #include "session.h"
 #include "torrent.h"
 #include "utils.h"
@@ -354,6 +355,7 @@ struct au_state
     au_context * context; /* not owned */
     char * endpoint;
     tr_bool resolved;
+    tr_bool resolving;
     tr_address addr;
     tr_port port;
     conid_t con_id;
@@ -461,16 +463,49 @@ au_state_error( au_state * s, const char * fmt, ... )
         au_transaction_error( t, "%s", buf );
 }
 
+static void
+resolver_callback( const char       * err,
+                   const tr_address * addr,
+                   void             * user_data )
+{
+    au_state * s = user_data;
+    if( !s || !s->resolving )
+        return;
+    s->resolving = FALSE;
+
+    if( err )
+    {
+        au_state_error( s, _( "DNS lookup for %1$s failed: %2$s" ),
+                        s->endpoint, err );
+        return;
+    }
+
+    if( !tr_isValidTrackerAddress( addr ) )
+    {
+        char astr[128];
+        au_state_error( s,
+            _( "DNS lookup for %1$s returned invalid address: %2$s" ),
+            s->endpoint, tr_ntop( addr, astr, sizeof( astr ) ) );
+        return;
+    }
+
+    s->addr = *addr;
+    s->resolved = TRUE;
+    au_state_flush( s );
+}
+
 static tr_bool
 au_state_lookup( au_state * s )
 {
     char buf[512], * portstr;
-    const char * err = NULL;
     tr_address * addr;
     int port;
 
     if( s->resolved )
         return TRUE;
+
+    if( s->resolving )
+        return FALSE;
 
     tr_strlcpy( buf, s->endpoint, sizeof( buf ) );
     portstr = strchr( buf, ':' );
@@ -506,25 +541,11 @@ au_state_lookup( au_state * s )
         return TRUE;
     }
 
-    s->addr.type = TR_AF_INET;
-    if( ( err = tr_netGetAddress( buf, portstr, &s->addr ) ) )
-    {
-        au_state_error( s, _( "DNS lookup for %1$s failed: %2$s" ),
-                        s->endpoint, err );
-        return FALSE;
-    }
-
-    if( !tr_isValidTrackerAddress( &s->addr ) )
-    {
-        char astr[128];
-        au_state_error( s,
-            _( "DNS lookup for %1$s returned invalid address: %2$s" ),
-            s->endpoint, tr_ntop( &s->addr, astr, sizeof( astr ) ) );
-        return FALSE;
-    }
-
-    s->resolved = TRUE;
-    return TRUE;
+    s->resolving = TRUE;
+    tr_resolve_address( au_context_get_session( s->context ),
+                        buf, portstr, TR_AF_INET,
+                        resolver_callback, s );
+    return FALSE;
 }
 
 static tr_bool
