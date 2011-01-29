@@ -43,7 +43,7 @@ typedef void ( * tr_resolver_callback )( const char       * err,
  * another thread. If you do not care about blocking the current
  * thread, you can just use tr_netGetAddress().
  *
- * @param session @callback will be run in the event thread of this
+ * @param session @a callback will be run in the event thread of this
  *                session.
  * @param node The name of the node to resolve. This will generally
  *             just be the hostname.
