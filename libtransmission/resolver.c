@@ -34,6 +34,11 @@
 #include "trevent.h"
 #include "resolver.h"
 
+/* If the number of tasks waiting in the queue divided
+ * by the current number of workers is greater than this
+ * number, a new worker thread is created. */
+#define WORKER_LOAD 5
+
 typedef struct
 {
     tr_session * session;
@@ -105,7 +110,7 @@ static void
 spawn_workers( )
 {
     tr_lockLock( lock );
-    if( workers < 1 || tasks / workers >= 5 )
+    if( queue && ( workers < 1 || tasks / workers > WORKER_LOAD ) )
     {
         workers++;
         tr_threadNew( worker, NULL );
@@ -134,7 +139,10 @@ tr_resolve_address( tr_session           * session,
     task->user_data = user_data;
 
     if( !lock )
+    {
+        assert( tr_amInEventThread( session ) );
         lock = tr_lockNew( );
+    }
     tr_lockLock( lock );
     tr_list_append( &queue, task );
     tasks++;
