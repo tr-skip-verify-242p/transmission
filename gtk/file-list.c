@@ -61,6 +61,7 @@ typedef struct
     GtkWidget     * status_label;
     GtkTreeModel  * filter;
     GRegex        * filter_regex;
+    gboolean        filter_caseless;
     int             display_count;
     GtkTreeModel  * model; /* same object as store, but recast */
     GtkTreeStore  * store; /* same object as model, but recast */
@@ -1035,10 +1036,12 @@ filter_entry_activated( GtkEditable * entry, gpointer user_data )
     {
         GError * err = NULL;
         GRegex * regex;
+        GRegexCompileFlags flags = G_REGEX_OPTIMIZE;
 
-        regex = g_regex_new( pattern,
-                             G_REGEX_CASELESS | G_REGEX_OPTIMIZE,
-                             0, &err );
+        if( data->filter_caseless )
+            flags |= G_REGEX_CASELESS;
+
+        regex = g_regex_new( pattern, flags, 0, &err );
         if( err )
         {
             GtkWidget * w;
@@ -1077,6 +1080,13 @@ view_selection_changed( GtkTreeSelection * sel UNUSED, gpointer user_data )
     refresh_status_label( data );
 }
 
+static void
+case_flag_toggled( GtkToggleButton * toggle, gpointer user_data )
+{
+    FileData * data = user_data;
+    data->filter_caseless = gtk_toggle_button_get_active( toggle );
+}
+
 GtkWidget *
 gtr_file_list_new( TrCore * core, int torrentId )
 {
@@ -1086,7 +1096,7 @@ gtr_file_list_new( TrCore * core, int torrentId )
     GtkWidget * view;
     GtkWidget * scroll;
     GtkWidget * vbox, * hbox, * hbox2, * align;
-    GtkWidget * label, * entry;
+    GtkWidget * label, * entry, * toggle;
     GtkCellRenderer * rend;
     GtkTreeSelection * sel;
     GtkTreeViewColumn * col;
@@ -1107,19 +1117,31 @@ gtr_file_list_new( TrCore * core, int torrentId )
     gtk_box_pack_start( GTK_BOX( hbox ), label, FALSE, FALSE, 0 );
 
     hbox2 = gtk_hbox_new( FALSE, GUI_PAD_SMALL );
+
     label = gtk_label_new_with_mnemonic( _( "_File display filter:" ) );
     gtk_box_pack_start( GTK_BOX( hbox2 ), label, FALSE, FALSE, 0 );
+
     entry = gtk_entry_new( );
     gtk_widget_set_size_request( entry, 64, -1 );
     gtk_label_set_mnemonic_widget( GTK_LABEL( label ), entry );
     s = _( "Enter a regular expression and press return to control "
            "which files are displayed. Only files whose names match "
-           "the regex will be shown (letter case is ignored)." );
+           "the regex will be shown." );
     gtr_widget_set_tooltip_text( entry, s );
     data->filter_entry = entry;
     g_signal_connect( G_OBJECT( entry ), "activate",
                       G_CALLBACK( filter_entry_activated ), data );
     gtk_box_pack_start( GTK_BOX( hbox2 ), entry, FALSE, FALSE, 0 );
+
+    toggle = gtk_toggle_button_new_with_label( "i" );
+    s = _( "When this toggle button is set, the letter case will be "
+           "ignored when matching with the regular expression. " );
+    gtr_widget_set_tooltip_text( toggle, s );
+    g_object_set( G_OBJECT( toggle ), "can-focus", FALSE, NULL );
+    g_signal_connect( G_OBJECT( toggle ), "toggled",
+                      G_CALLBACK( case_flag_toggled ), data );
+    gtk_box_pack_start( GTK_BOX( hbox2 ), toggle, FALSE, FALSE, 0 );
+
     align = gtk_alignment_new( 1, 0.5, 0, 0 );
     gtk_container_add( GTK_CONTAINER( align ), hbox2 );
     gtk_box_pack_start( GTK_BOX( hbox ), align, TRUE, TRUE, 0 );
