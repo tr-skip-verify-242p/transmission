@@ -124,12 +124,19 @@ on_content_changed( struct evbuffer                * buf UNUSED,
 
 static void task_request_next_chunk( struct tr_webseed_task * task );
 
+static tr_bool
+webseed_has_tasks( const tr_webseed * w )
+{
+    return w->tasks != NULL;
+}
+
+
 static void
 on_idle( tr_webseed * w )
 {
     tr_torrent * tor = tr_torrentFindFromId( w->session, w->torrent_id );
 
-    if( w->is_stopping && !tr_webseedIsActive( w ) )
+    if( w->is_stopping && !webseed_has_tasks( w ) )
     {
         webseed_free( w );
     }
@@ -193,7 +200,7 @@ web_response_func( tr_session    * session,
 
             tr_cacheWriteBlock( session->cache, tor,
                                 t->piece_index, t->piece_offset, t->length,
-                                evbuffer_pullup( t->content, -1 ) );
+                                t->content );
             fire_client_got_block( tor, w, t->block );
 
             tr_list_remove_data( &w->tasks, t );
@@ -258,17 +265,18 @@ task_request_next_chunk( struct tr_webseed_task * t )
 }
 
 tr_bool
-tr_webseedIsActive( const tr_webseed * w )
+tr_webseedGetSpeed_Bps( const tr_webseed * w, uint64_t now, int * setme_Bps )
 {
-    return w->tasks != NULL;
+    const tr_bool is_active = webseed_has_tasks( w );
+    *setme_Bps = is_active ? tr_rcRate_Bps( &w->download_rate, now ) : 0;
+    return is_active;
 }
 
 tr_bool
-tr_webseedGetSpeed_Bps( const tr_webseed * w, uint64_t now, int * setme_Bps )
+tr_webseedIsActive( const tr_webseed * w )
 {
-    const tr_bool is_active = tr_webseedIsActive( w );
-    *setme_Bps = is_active ? tr_rcRate_Bps( &w->download_rate, now ) : 0;
-    return is_active;
+    int Bps = 0;
+    return tr_webseedGetSpeed_Bps( w, tr_time_msec(), &Bps ) && ( Bps > 0 );
 }
 
 /***
@@ -317,7 +325,7 @@ tr_webseedFree( tr_webseed * w )
 {
     if( w )
     {
-        if( tr_webseedIsActive( w ) )
+        if( webseed_has_tasks( w ) )
             w->is_stopping = TRUE;
         else
             webseed_free( w );

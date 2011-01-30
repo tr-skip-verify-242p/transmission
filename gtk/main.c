@@ -632,7 +632,7 @@ applyDesktopProxySettings( CURL * easy, GConfClient * client, const char * host_
 #endif
 
 static void
-curlConfigFunc( tr_session * session UNUSED, void * vcurl UNUSED, const char * destination )
+curlConfigFunc( tr_session * session UNUSED, void * vcurl UNUSED, const char * destination UNUSED )
 {
 #ifdef HAVE_GCONF2
     const char * str;
@@ -1287,7 +1287,7 @@ on_core_error( TrCore * core UNUSED, guint code, const char * msg, struct cbdata
 }
 
 #if GTK_CHECK_VERSION( 2, 8, 0 )
-static void
+static gboolean
 on_main_window_focus_in( GtkWidget      * widget UNUSED,
                          GdkEventFocus  * event  UNUSED,
                          gpointer                gdata )
@@ -1296,6 +1296,7 @@ on_main_window_focus_in( GtkWidget      * widget UNUSED,
 
     if( cbdata->wind )
         gtk_window_set_urgency_hint( cbdata->wind, FALSE );
+    return FALSE;
 }
 
 #endif
@@ -1435,6 +1436,34 @@ on_prefs_changed( TrCore * core UNUSED, const char * key, gpointer data )
     else if( !strcmp( key, TR_PREFS_KEY_RPC_AUTH_REQUIRED ) )
     {
         tr_sessionSetRPCPasswordEnabled( tr, gtr_pref_flag_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_PROXY ) )
+    {
+        tr_sessionSetProxy( tr, gtr_pref_string_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_PROXY_TYPE ) )
+    {
+        tr_sessionSetProxyType( tr, gtr_pref_int_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_PROXY_ENABLED ) )
+    {
+        tr_sessionSetProxyEnabled( tr, gtr_pref_flag_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_PROXY_AUTH_ENABLED ) )
+    {
+        tr_sessionSetProxyAuthEnabled( tr, gtr_pref_flag_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_PROXY_USERNAME ) )
+    {
+        tr_sessionSetProxyUsername( tr, gtr_pref_string_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_PROXY_PASSWORD ) )
+    {
+        tr_sessionSetProxyPassword( tr, gtr_pref_string_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_PROXY_PORT ) )
+    {
+        tr_sessionSetProxyPort( tr, gtr_pref_int_get( key ) );
     }
     else if( !strcmp( key, TR_PREFS_KEY_PROXY ) )
     {
