@@ -938,13 +938,13 @@ proxy_combo_box_new( GObject * core, const char * key )
     return w;
 }
 
-static GtkWidget*
+static GtkWidget *
 proxyPage( GObject * core )
 {
     struct ProxyPage * page;
-    GtkWidget * t, * w;
+    GtkWidget * t, * t2, * w, * hbox;
     const char * s;
-    int row = 0;
+    int row = 0, row2;
 
     page = tr_new0( struct ProxyPage, 1 );
 
@@ -960,43 +960,64 @@ proxyPage( GObject * core )
     g_signal_connect( w, "toggled", G_CALLBACK( onProxyToggled ), page );
     hig_workarea_add_wide_control( t, &row, w );
 
+    hbox = gtk_hbox_new( FALSE, 0 );
+    t2 = hig_workarea_create( );
+    gtk_container_set_border_width( GTK_CONTAINER( t2 ), 0 );
+    row2 = 0;
+
     s = _( "Proxy _server:" );
     w = new_entry( TR_PREFS_KEY_PROXY, core );
+    gtk_entry_set_width_chars( GTK_ENTRY( w ), 20 );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
-    w = hig_workarea_add_row( t, &row, s, w, NULL );
+    w = hig_workarea_add_row_full( t2, &row2, s, w, NULL, FALSE );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
 
+    s = _( "Proxy _port:" );
     w = new_spin_button( TR_PREFS_KEY_PROXY_PORT, core, 0, USHRT_MAX, 1 );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
-    w = hig_workarea_add_row( t, &row, _( "Proxy _port:" ), w, NULL );
+    w = hig_workarea_add_row_full( t2, &row2, s, w, NULL, FALSE );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
 
     s = _( "Proxy _type:" );
     w = proxy_combo_box_new( core, TR_PREFS_KEY_PROXY_TYPE );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
-    w = hig_workarea_add_row( t, &row, s, w, NULL );
+    w = hig_workarea_add_row_full( t2, &row2, s, w, NULL, FALSE );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
+
+    hig_workarea_finish( t2, &row2 );
+    gtk_box_pack_start( GTK_BOX( hbox ), t2, FALSE, FALSE, 0 );
+
+    t2 = hig_workarea_create( );
+    gtk_container_set_border_width( GTK_CONTAINER( t2 ), 0 );
+    row2 = 0;
 
     s = _( "Use _authentication" );
     w = new_check_button( s, TR_PREFS_KEY_PROXY_AUTH_ENABLED, core );
     g_signal_connect( w, "toggled", G_CALLBACK( onProxyToggled ), page );
-    hig_workarea_add_wide_control( t, &row, w );
+    hig_workarea_add_wide_control( t2, &row2, w );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
 
     s = _( "_Username:" );
     w = new_entry( TR_PREFS_KEY_PROXY_USERNAME, core );
+    gtk_entry_set_width_chars( GTK_ENTRY( w ), 20 );
     page->proxy_auth_widgets = g_slist_append( page->proxy_auth_widgets, w );
-    w = hig_workarea_add_row( t, &row, s, w, NULL );
+    w = hig_workarea_add_row( t2, &row2, s, w, NULL );
     page->proxy_auth_widgets = g_slist_append( page->proxy_auth_widgets, w );
 
     s = _( "Pass_word:" );
     w = new_entry( TR_PREFS_KEY_PROXY_PASSWORD, core );
+    gtk_entry_set_width_chars( GTK_ENTRY( w ), 20 );
     gtk_entry_set_visibility( GTK_ENTRY( w ), FALSE );
     page->proxy_auth_widgets = g_slist_append( page->proxy_auth_widgets, w );
-    w = hig_workarea_add_row( t, &row, s, w, NULL );
+    w = hig_workarea_add_row( t2, &row2, s, w, NULL );
     page->proxy_auth_widgets = g_slist_append( page->proxy_auth_widgets, w );
 
+    hig_workarea_finish( t2, &row2 );
+    gtk_box_pack_start( GTK_BOX( hbox ), t2, FALSE, FALSE, 0 );
+
+    hig_workarea_add_wide_tall_control( t, &row, hbox );
     hig_workarea_finish( t, &row );
+
     g_object_set_data_full( G_OBJECT( t ), "page", page, proxyPageFree );
 
     refreshProxySensitivity( page );

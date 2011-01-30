@@ -66,6 +66,13 @@ GtkWidget* hig_workarea_add_row( GtkWidget *  table,
                                  GtkWidget *  control,
                                  GtkWidget *  mnemonic_or_null_for_control );
 
+GtkWidget * hig_workarea_add_row_full( GtkWidget  * t,
+                                       int        * row,
+                                       const char * mnemonic_string,
+                                       GtkWidget  * control,
+                                       GtkWidget  * mnemonic,
+                                       gboolean     indent );
+
 void       hig_workarea_add_row_w( GtkWidget * table,
                                    int *       row,
                                    GtkWidget * label,
