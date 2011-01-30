@@ -60,7 +60,7 @@ typedef struct
     GtkWidget     * filter_entry;
     GtkWidget     * status_label;
     GtkTreeModel  * filter;
-    char          * filter_pattern;
+    GRegex        * filter_regex;
     int             display_count;
     GtkTreeModel  * model; /* same object as store, but recast */
     GtkTreeStore  * store; /* same object as model, but recast */
@@ -955,7 +955,7 @@ filter_foreach( GtkTreeModel * model,
                 gpointer       user_data )
 {
     FileData * data = user_data;
-    const gchar * pattern = data->filter_pattern;
+    GRegex * regex = data->filter_regex;
     gboolean visible, new_visible;
 
     gtk_tree_model_get( model, iter, FC_VISIBLE, &visible, -1 );
@@ -967,7 +967,7 @@ filter_foreach( GtkTreeModel * model,
         return FALSE;
     }
 
-    if( !pattern || !pattern[0] )
+    if( !regex )
     {
         new_visible = TRUE;
     }
@@ -975,7 +975,7 @@ filter_foreach( GtkTreeModel * model,
     {
         gchar * name;
         gtk_tree_model_get( model, iter, FC_LABEL, &name, -1 );
-        new_visible = ( tr_strcasestr( name, pattern ) != NULL );
+        new_visible = g_regex_match( regex, name, 0, NULL );
         g_free( name );
     }
     if( visible != new_visible )
@@ -1031,11 +1031,41 @@ filter_entry_activated( GtkEditable * entry, gpointer user_data )
     const gchar * pattern;
 
     pattern = gtk_entry_get_text( GTK_ENTRY( entry ) );
-    data->filter_pattern = g_strdup( pattern );
+    if( pattern && pattern[0] )
+    {
+        GError * err = NULL;
+        GRegex * regex;
+
+        regex = g_regex_new( pattern,
+                             G_REGEX_CASELESS | G_REGEX_OPTIMIZE,
+                             0, &err );
+        if( err )
+        {
+            GtkWidget * w;
+            w = gtk_message_dialog_new( NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR,
+                                        GTK_BUTTONS_CLOSE, "%s", err->message );
+            gtk_dialog_run( GTK_DIALOG( w ) );
+            gtk_widget_destroy( w );
+            g_error_free( err );
+            if( regex )
+                g_regex_unref( regex );
+            return;
+        }
+        data->filter_regex = regex;
+    }
+    else
+    {
+        data->filter_regex = NULL;
+    }
+
     gtr_tree_model_foreach_postorder( data->model, filter_foreach, data );
     filter_empty( data );
-    g_free( data->filter_pattern );
-    data->filter_pattern = NULL;
+    if( data->filter_regex )
+    {
+        g_regex_unref( data->filter_regex );
+        data->filter_regex = NULL;
+    }
+
     gtk_tree_view_expand_all( GTK_TREE_VIEW( data->view ) );
     refresh_status_label( data );
 }
