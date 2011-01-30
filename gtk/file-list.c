@@ -48,6 +48,7 @@ enum
     FC_HAVE,
     FC_PRIORITY,
     FC_ENABLED,
+    FC_VISIBLE,
     N_FILE_COLS
 };
 
@@ -59,6 +60,7 @@ typedef struct
     GtkWidget     * filter_entry;
     GtkWidget     * status_label;
     GtkTreeModel  * filter;
+    char          * filter_pattern;
     int             display_count;
     GtkTreeModel  * model; /* same object as store, but recast */
     GtkTreeStore  * store; /* same object as model, but recast */
@@ -493,6 +495,7 @@ buildTree( GNode * node, gpointer gdata )
                                        FC_ICON, icon,
                                        FC_PRIORITY, priority,
                                        FC_ENABLED, enabled,
+                                       FC_VISIBLE, TRUE,
                                        -1 );
 #else
     gtk_tree_store_append( build->store, &child_iter, build->iter );
@@ -504,6 +507,7 @@ buildTree( GNode * node, gpointer gdata )
                         FC_ICON, icon,
                         FC_PRIORITY, priority,
                         FC_ENABLED, enabled,
+                        FC_VISIBLE, TRUE,
                         -1 );
 #endif
 
@@ -532,32 +536,6 @@ find_child( GNode* parent, const char * name )
         child = child->next;
     }
     return child;
-}
-
-static gboolean
-filter_func( GtkTreeModel * model, GtkTreeIter * iter, gpointer user_data )
-{
-    FileData * data = user_data;
-    const gchar * pattern;
-    gboolean show;
-
-    if( gtk_tree_model_iter_has_child( model, iter ) )
-        return TRUE;
-
-    pattern = gtk_entry_get_text( GTK_ENTRY( data->filter_entry ) );
-    if( !pattern || pattern[0] == '\0' )
-    {
-        show = TRUE;
-    }
-    else
-    {
-        gchar * name;
-        gtk_tree_model_get( model, iter, FC_LABEL, &name, -1 );
-        show = ( tr_strcasestr( name, pattern ) != NULL );
-        g_free( name );
-    }
-
-    return show;
 }
 
 static void
@@ -605,7 +583,8 @@ gtr_file_list_set_torrent( GtkWidget * w, int torrentId )
                                  G_TYPE_STRING,    /* size str */
                                  G_TYPE_UINT64,    /* have */
                                  G_TYPE_INT,       /* priority */
-                                 G_TYPE_INT );     /* dl enabled */
+                                 G_TYPE_INT,       /* dl enabled */
+                                 G_TYPE_BOOLEAN ); /* visible */
 
     data->store = store;
     data->model = GTK_TREE_MODEL( store );
@@ -673,7 +652,7 @@ gtr_file_list_set_torrent( GtkWidget * w, int torrentId )
 
     data->filter = gtk_tree_model_filter_new( data->model, NULL );
     filter = GTK_TREE_MODEL_FILTER( data->filter );
-    gtk_tree_model_filter_set_visible_func( filter, filter_func, data, NULL );
+    gtk_tree_model_filter_set_visible_column( filter, FC_VISIBLE );
     g_signal_connect( G_OBJECT( filter ), "row-inserted",
                       G_CALLBACK( filter_row_inserted ), data );
     g_signal_connect( G_OBJECT( filter ), "row-deleted",
@@ -996,11 +975,44 @@ onViewPopupMenu( GtkWidget * w, gpointer gdata )
     return TRUE;
 }
 
-static void
-filter_entry_activated( GtkEditable * entry UNUSED, gpointer user_data )
+static gboolean
+filter_foreach( GtkTreeModel * model,
+                GtkTreePath  * path UNUSED,
+                GtkTreeIter  * iter,
+                gpointer       user_data )
 {
     FileData * data = user_data;
-    gtk_tree_model_filter_refilter( GTK_TREE_MODEL_FILTER( data->filter ) );
+    const gchar * pattern = data->filter_pattern;
+    gchar * name;
+    gboolean visible, new_visible;
+
+    if( gtk_tree_model_iter_has_child( model, iter ) )
+        return FALSE;
+
+    gtk_tree_model_get( model, iter, FC_LABEL, &name,
+                        FC_VISIBLE, &visible, -1 );
+    if( !pattern || !pattern[0] )
+        new_visible = TRUE;
+    else
+        new_visible = ( tr_strcasestr( name, pattern ) != NULL );
+    g_free( name );
+    if( visible != new_visible )
+        gtk_tree_store_set( GTK_TREE_STORE( model ), iter,
+                            FC_VISIBLE, new_visible, -1 );
+    return FALSE;
+}
+
+static void
+filter_entry_activated( GtkEditable * entry, gpointer user_data )
+{
+    FileData * data = user_data;
+    const gchar * pattern;
+
+    pattern = gtk_entry_get_text( GTK_ENTRY( entry ) );
+    data->filter_pattern = g_strdup( pattern );
+    gtk_tree_model_foreach( data->model, filter_foreach, data );
+    g_free( data->filter_pattern );
+    data->filter_pattern = NULL;
     gtk_tree_view_expand_all( GTK_TREE_VIEW( data->view ) );
     refresh_status_label( data );
 }
