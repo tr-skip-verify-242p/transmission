@@ -857,10 +857,14 @@ tr_core_session( TrCore * core )
 }
 
 static char*
-get_collated_name( const tr_info * inf )
+get_collated_name( TrTorrent * gtor )
 {
-    char * down = g_utf8_strdown( inf->name ? inf->name : "", -1 );
-    char * collated = g_strdup_printf( "%s\t%s", down, inf->hashString );
+    const tr_torrent * tor = tr_torrent_handle( gtor );
+    const tr_info * inf = tr_torrent_info( gtor );
+    const char * name = tor ? tr_torrentName( tor ) : "";
+    const char * hash = inf ? inf->hashString : "";
+    char * down = g_utf8_strdown( name, -1 );
+    char * collated = g_strdup_printf( "%s\t%s", down, hash );
     g_free( down );
     return collated;
 }
@@ -870,16 +874,15 @@ tr_core_add_torrent( TrCore     * self,
                      TrTorrent  * gtor,
                      gboolean     doNotify )
 {
-    const tr_info * inf = tr_torrent_info( gtor );
     const tr_stat * st = tr_torrent_stat( gtor );
     tr_torrent * tor = tr_torrent_handle( gtor );
-    char *  collated = get_collated_name( inf );
+    char *  collated = get_collated_name( gtor );
     char *  trackers = torrentTrackerString( tor );
     GtkListStore *  store = GTK_LIST_STORE( tr_core_model( self ) );
     GtkTreeIter  unused;
 
     gtk_list_store_insert_with_values( store, &unused, 0,
-                                       MC_NAME,          inf->name,
+                                       MC_NAME,          tr_torrentName( tor ),
                                        MC_NAME_COLLATED, collated,
                                        MC_TORRENT,       gtor,
                                        MC_TORRENT_RAW,   tor,
@@ -893,7 +896,7 @@ tr_core_add_torrent( TrCore     * self,
                                        -1 );
 
     if( doNotify )
-        gtr_notify_added( inf->name );
+        gtr_notify_added( tr_torrentName( tor ) );
 
     /* cleanup */
     g_object_unref( G_OBJECT( gtor ) );
@@ -1321,7 +1324,7 @@ update_foreach( GtkTreeModel * model,
     newDownSpeed = st->pieceDownloadSpeed_KBps;
     newActivePeerCount = st->peersSendingToUs + st->peersGettingFromUs + st->webseedsSendingToUs;
     newError = st->error;
-    newCollatedName = get_collated_name( tr_torrent_info( gtor ) );
+    newCollatedName = get_collated_name( gtor );
 
     /* updating the model triggers off resort/refresh,
        so don't do it unless something's actually changed... */

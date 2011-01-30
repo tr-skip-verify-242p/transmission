@@ -1832,7 +1832,7 @@ gtr_actions_handler( const char * action_name, gpointer user_data )
             gtk_widget_show( w );
         }
     }
-    else if( !strcmp( action_name, "rename-torrent-top" ) )
+    else if( !strcmp( action_name, "rename-torrent" ) )
     {
         tr_torrent * tor;
         if( ( tor = getFirstSelectedTorrent( data ) ) )
@@ -1844,7 +1844,7 @@ gtr_actions_handler( const char * action_name, gpointer user_data )
             {
                 const char * newname;
                 newname = gtr_rename_top_dialog_get_new_name( w );
-                tr_torrentSetTopDir( tor, newname );
+                tr_torrentRename( tor, newname );
             }
             gtk_widget_destroy( w );
         }

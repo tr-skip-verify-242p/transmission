@@ -1144,6 +1144,13 @@ tr_torrent * tr_torrentNew( const tr_ctor   * ctor,
 /** @addtogroup tr_torrent Torrents
     @{ */
 
+/**
+ * The current name that should be shown for the torrent.
+ *
+ * @note This function is mainly intended for clients.
+ */
+const char * tr_torrentName( const tr_torrent * tor );
+
 /** @brief Frees memory allocated by tr_torrentNew().
            Running torrents are stopped first. */
 void tr_torrentFree( tr_torrent * torrent );
@@ -1188,11 +1195,18 @@ void tr_torrentSetLocation( tr_torrent  * torrent,
  * the new location. Running torrents will be stopped as a side-effect
  * of this function and restarted if no error occurs.
  *
- * If the torrent does not have a toplevel directory (e.g. it only
- * contains a single file), this function does nothing.
+ * For single file torrents, the file itself will be renamed to
+ * @newname.
  *
- * @param new_name The new directory name to use. It may not contain
- *                 path delimiters or be equal to "." or "..".
+ * If the torrent does not have a toplevel directory for some reason,
+ * or the torrent has incomplete metadata, this function does nothing.
+ *
+ * If no errors occur, the new name will be accessible via
+ * tr_torrentName() while the original will be in @a torrent->info.name.
+ *
+ * @param newname The new name to use. It may not contain path
+ *                delimiters or be equal to "." or "..". NULL and
+ *                zero-length strings are also rejected.
  *
  * @return 0 on success, otherwise an errno value. The torrent is
  *         not restarted if an error occurs.
@@ -1201,17 +1215,13 @@ void tr_torrentSetLocation( tr_torrent  * torrent,
  *       directory, all of its files will be in it, i.e.
  *       @a torrent->info.files[n].name have the same directory
  *       prefix for all @a n.
- */
-int tr_torrentSetTopDir( tr_torrent * torrent, const char * new_name );
-
-/**
- * Get the toplevel directory name for this torrent.
  *
- * @return A newly-allocated string which you must free when
- *         it is no longer needed, or NULL if the torrent does
- *         not have a toplevel directory.
+ * @note This function may modify @a torrent->info.files and
+ *       @a torrent->info.rename.
+ *
+ * @see tr_torrentName()
  */
-char * tr_torrentGetTopDir( const tr_torrent * torrent );
+int tr_torrentRename( tr_torrent * torrent, const char * newname );
 
 uint64_t tr_torrentGetBytesLeftToAllocate( const tr_torrent * torrent );
 
@@ -1823,6 +1833,9 @@ struct tr_info
 
     /* the torrent's name */
     char             * name;
+
+    /** If non-NULL this is the value set by tr_torrentRename(). */
+    char             * rename;
 
     /* Path to torrent Transmission's internal copy of the .torrent file. */
     char             * torrent;

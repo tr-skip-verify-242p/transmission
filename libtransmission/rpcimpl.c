@@ -559,7 +559,7 @@ addField( const tr_torrent * tor, tr_benc * d, const char * key )
     else if( tr_streq( key, keylen, "metadataPercentComplete" ) )
         tr_bencDictAddReal( d, key, st->metadataPercentComplete );
     else if( tr_streq( key, keylen, "name" ) )
-        tr_bencDictAddStr( d, key, inf->name );
+        tr_bencDictAddStr( d, key, tr_torrentName( tor ) );
     else if( tr_streq( key, keylen, "percentDone" ) )
         tr_bencDictAddReal( d, key, st->percentDone );
     else if( tr_streq( key, keylen, "peer-limit" ) )
@@ -1018,9 +1018,9 @@ removeTrackers( tr_torrent * tor, tr_benc * ids )
 }
 
 static const char *
-setTopDir( tr_torrent * tor, const char * str )
+renameTorrent( tr_torrent * tor, const char * str )
 {
-    int err = tr_torrentSetTopDir( tor, str );
+    int err = tr_torrentRename( tor, str );
     return err == 0 ? NULL : tr_strerror( err );
 }
 
@@ -1081,8 +1081,8 @@ torrentSet( tr_session               * session,
             tr_torrentSetRatioLimit( tor, d );
         if( tr_bencDictFindInt( args_in, "seedRatioMode", &tmp ) )
             tr_torrentSetRatioMode( tor, tmp );
-        if( !errmsg && tr_bencDictFindStr( args_in, "top-dir", &str ) )
-            errmsg = setTopDir( tor, str );
+        if( !errmsg && tr_bencDictFindStr( args_in, "rename", &str ) )
+            errmsg = renameTorrent( tor, str );
         if( !errmsg && tr_bencDictFindList( args_in, "trackerAdd", &trackers ) )
             errmsg = addTrackerUrls( tor, trackers );
         if( !errmsg && tr_bencDictFindList( args_in, "trackerRemove", &trackers ) )
