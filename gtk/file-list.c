@@ -1112,9 +1112,9 @@ gtr_file_list_new( TrCore * core, int torrentId )
     entry = gtk_entry_new( );
     gtk_widget_set_size_request( entry, 64, -1 );
     gtk_label_set_mnemonic_widget( GTK_LABEL( label ), entry );
-    s = _( "Type in some text and press return to control which files "
-           "are displayed. Only files whose names contain the string "
-           "(without regard to letter case) will be shown." );
+    s = _( "Enter a regular expression and press return to control "
+           "which files are displayed. Only files whose names match "
+           "the regex will be shown (letter case is ignored)." );
     gtr_widget_set_tooltip_text( entry, s );
     data->filter_entry = entry;
     g_signal_connect( G_OBJECT( entry ), "activate",
