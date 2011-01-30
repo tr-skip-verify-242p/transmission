@@ -62,6 +62,7 @@ typedef struct
     GtkTreeModel  * filter;
     GRegex        * filter_regex;
     gboolean        filter_caseless;
+    gboolean        filter_invert;
     int             display_count;
     GtkTreeModel  * model; /* same object as store, but recast */
     GtkTreeStore  * store; /* same object as model, but recast */
@@ -977,6 +978,8 @@ filter_foreach( GtkTreeModel * model,
         gchar * name;
         gtk_tree_model_get( model, iter, FC_LABEL, &name, -1 );
         new_visible = g_regex_match( regex, name, 0, NULL );
+        if( data->filter_invert )
+            new_visible = !new_visible;
         g_free( name );
     }
     if( visible != new_visible )
@@ -1081,10 +1084,17 @@ view_selection_changed( GtkTreeSelection * sel UNUSED, gpointer user_data )
 }
 
 static void
-case_flag_toggled( GtkToggleButton * toggle, gpointer user_data )
+caseless_toggled( GtkToggleButton * toggle, gpointer user_data )
 {
     FileData * data = user_data;
     data->filter_caseless = gtk_toggle_button_get_active( toggle );
+}
+
+static void
+invert_toggled( GtkToggleButton * toggle, gpointer user_data )
+{
+    FileData * data = user_data;
+    data->filter_invert = gtk_toggle_button_get_active( toggle );
 }
 
 GtkWidget *
@@ -1126,7 +1136,8 @@ gtr_file_list_new( TrCore * core, int torrentId )
     gtk_label_set_mnemonic_widget( GTK_LABEL( label ), entry );
     s = _( "Enter a regular expression and press return to control "
            "which files are displayed. Only files whose names match "
-           "the regex will be shown." );
+           "the regex will be shown. Using an empty string will show "
+           "all files." );
     gtr_widget_set_tooltip_text( entry, s );
     data->filter_entry = entry;
     g_signal_connect( G_OBJECT( entry ), "activate",
@@ -1135,11 +1146,20 @@ gtr_file_list_new( TrCore * core, int torrentId )
 
     toggle = gtk_toggle_button_new_with_label( "i" );
     s = _( "When this toggle button is set, the letter case will be "
-           "ignored when matching with the regular expression. " );
+           "ignored when matching with the regular expression." );
     gtr_widget_set_tooltip_text( toggle, s );
     g_object_set( G_OBJECT( toggle ), "can-focus", FALSE, NULL );
     g_signal_connect( G_OBJECT( toggle ), "toggled",
-                      G_CALLBACK( case_flag_toggled ), data );
+                      G_CALLBACK( caseless_toggled ), data );
+    gtk_box_pack_start( GTK_BOX( hbox2 ), toggle, FALSE, FALSE, 0 );
+
+    toggle = gtk_toggle_button_new_with_label( "!" );
+    s = _( "When this toggle button is set, only files that do not "
+           "match the regular expression will be displayed." );
+    gtr_widget_set_tooltip_text( toggle, s );
+    g_object_set( G_OBJECT( toggle ), "can-focus", FALSE, NULL );
+    g_signal_connect( G_OBJECT( toggle ), "toggled",
+                      G_CALLBACK( invert_toggled ), data );
     gtk_box_pack_start( GTK_BOX( hbox2 ), toggle, FALSE, FALSE, 0 );
 
     align = gtk_alignment_new( 1, 0.5, 0, 0 );
