@@ -359,6 +359,10 @@ desktopPage( GObject * core )
     w = new_check_button( s, PREF_KEY_INHIBIT_HIBERNATION, core );
     hig_workarea_add_wide_control( t, &row, w );
 
+    s = _( "Download tracker _favicons" );
+    w = new_check_button( s, PREF_KEY_DOWNLOAD_FAVICONS, core );
+    hig_workarea_add_wide_control( t, &row, w );
+
     s = _( "Show Transmission icon in the _notification area" );
     w = new_check_button( s, PREF_KEY_SHOW_TRAY_ICON, core );
     hig_workarea_add_wide_control( t, &row, w );

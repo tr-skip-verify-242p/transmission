@@ -2543,24 +2543,6 @@ tr_sessionSetTorrentFile( tr_session * session,
         tr_bencDictAddStr( session->metainfoLookup, hashString, filename );
 }
 
-tr_torrent*
-tr_torrentNext( tr_session * session,
-                tr_torrent * tor )
-{
-    tr_torrent * ret;
-
-    assert( !session || tr_isSession( session ) );
-
-    if( !session )
-        ret = NULL;
-    else if( !tor )
-        ret = session->torrentList;
-    else
-        ret = tor->next;
-
-    return ret;
-}
-
 /***
 ****
 ***/
@@ -3040,4 +3022,37 @@ void
 tr_sessionSetWebConfigFunc( tr_session * session, void (*func)(tr_session*, void*, const char* ) )
 {
     session->curl_easy_config_func = func;
+}
+
+/***
+****
+***/
+
+uint64_t
+tr_sessionGetTimeMsec( tr_session * session )
+{
+    struct timeval tv;
+
+    if( event_base_gettimeofday_cached( session->event_base, &tv ) )
+    {
+        return tr_time_msec( );
+    }
+    else
+    {
+        /* event_base_gettimeofday_cached() might be implemented using
+           clock_gettime(CLOCK_MONOTONIC), so calculate the offset to
+           real time... */
+        static uint64_t offset;
+        static tr_bool offset_calculated = FALSE;
+
+        const uint64_t val = (uint64_t) tv.tv_sec * 1000 + ( tv.tv_usec / 1000 );
+
+        if( !offset_calculated )
+        {
+            offset = tr_time_msec() - val;
+            offset_calculated = TRUE;
+        }
+
+        return val + offset;
+    }
 }

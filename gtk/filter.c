@@ -16,10 +16,12 @@
 #include <libtransmission/transmission.h>
 #include <libtransmission/utils.h>
 
+#include "conf.h"
 #include "favicon.h" /* gtr_get_favicon() */
 #include "filter.h"
 #include "hig.h" /* GUI_PAD */
 #include "tr-core.h" /* MC_TORRENT_RAW */
+#include "tr-prefs.h"
 #include "util.h" /* gtr_idle_add() */
 
 #define DIRTY_KEY          "tr-filter-dirty-key"
@@ -241,8 +243,6 @@ category_filter_model_update( GtkTreeStore * store )
             gtk_tree_store_remove( store, &iter );
         } else if( insert_row ) {
             GtkTreeIter add;
-            GtkTreePath * path;
-            GtkTreeRowReference * reference;
             tr_session * session = g_object_get_data( G_OBJECT( store ), SESSION_KEY );
             const char * host = hosts->pdata[i];
             char * name = get_name_from_host( host );
@@ -253,10 +253,15 @@ category_filter_model_update( GtkTreeStore * store )
                 CAT_FILTER_COL_COUNT, count,
                 CAT_FILTER_COL_TYPE, CAT_FILTER_TYPE_HOST,
                 -1 );
-            path = gtk_tree_model_get_path( model, &add );
-            reference = gtk_tree_row_reference_new( model, path );
-            gtr_get_favicon( session, host, favicon_ready_cb, reference );
-            gtk_tree_path_free( path );
+            if( gtr_pref_flag_get( PREF_KEY_DOWNLOAD_FAVICONS ) )
+            {
+                GtkTreePath * path;
+                GtkTreeRowReference * reference;
+                path = gtk_tree_model_get_path( model, &add );
+                reference = gtk_tree_row_reference_new( model, path );
+                gtr_get_favicon( session, host, favicon_ready_cb, reference );
+                gtk_tree_path_free( path );
+            }
             g_free( name );
             ++store_pos;
             ++i;
