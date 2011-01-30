@@ -538,29 +538,6 @@ find_child( GNode* parent, const char * name )
     return child;
 }
 
-static void
-filter_row_inserted( GtkTreeModel * model,
-                     GtkTreePath  * path UNUSED,
-                     GtkTreeIter  * iter UNUSED,
-                     gpointer       user_data )
-{
-    FileData * data = user_data;
-    g_assert( data != NULL );
-    g_assert( data->filter == model );
-    data->display_count++;
-}
-
-static void
-filter_row_deleted( GtkTreeModel * model,
-                    GtkTreePath  * path UNUSED,
-                    gpointer       user_data )
-{
-    FileData * data = user_data;
-    g_assert( data != NULL );
-    g_assert( data->filter == model );
-    data->display_count--;
-}
-
 void
 gtr_file_list_set_torrent( GtkWidget * w, int torrentId )
 {
@@ -653,10 +630,6 @@ gtr_file_list_set_torrent( GtkWidget * w, int torrentId )
     data->filter = gtk_tree_model_filter_new( data->model, NULL );
     filter = GTK_TREE_MODEL_FILTER( data->filter );
     gtk_tree_model_filter_set_visible_column( filter, FC_VISIBLE );
-    g_signal_connect( G_OBJECT( filter ), "row-inserted",
-                      G_CALLBACK( filter_row_inserted ), data );
-    g_signal_connect( G_OBJECT( filter ), "row-deleted",
-                      G_CALLBACK( filter_row_deleted ), data );
 
     gtk_tree_view_set_model( GTK_TREE_VIEW( data->view ), data->filter );
     gtk_tree_view_expand_all( GTK_TREE_VIEW( data->view ) );
@@ -983,23 +956,72 @@ filter_foreach( GtkTreeModel * model,
 {
     FileData * data = user_data;
     const gchar * pattern = data->filter_pattern;
-    gchar * name;
     gboolean visible, new_visible;
 
+    gtk_tree_model_get( model, iter, FC_VISIBLE, &visible, -1 );
     if( gtk_tree_model_iter_has_child( model, iter ) )
+    {
+        if( !visible )
+            gtk_tree_store_set( GTK_TREE_STORE( model ), iter,
+                                FC_VISIBLE, TRUE, -1 );
         return FALSE;
+    }
 
-    gtk_tree_model_get( model, iter, FC_LABEL, &name,
-                        FC_VISIBLE, &visible, -1 );
     if( !pattern || !pattern[0] )
+    {
         new_visible = TRUE;
+    }
     else
+    {
+        gchar * name;
+        gtk_tree_model_get( model, iter, FC_LABEL, &name, -1 );
         new_visible = ( tr_strcasestr( name, pattern ) != NULL );
-    g_free( name );
+        g_free( name );
+    }
     if( visible != new_visible )
+    {
+        data->display_count += new_visible ? 1 : -1;
         gtk_tree_store_set( GTK_TREE_STORE( model ), iter,
                             FC_VISIBLE, new_visible, -1 );
+    }
     return FALSE;
+}
+
+static gboolean
+subtree_update_visible( GtkTreeModel * model, GtkTreeIter * parent )
+{
+    GtkTreeIter child;
+    gboolean visible;
+
+    gtk_tree_model_get( model, parent, FC_VISIBLE, &visible, -1 );
+    if( visible && gtk_tree_model_iter_children( model, &child, parent ) )
+    {
+        gboolean empty = TRUE;
+        do {
+            if( subtree_update_visible( model, &child ) )
+                empty = FALSE;
+        } while( gtk_tree_model_iter_next( model, &child ) );
+
+        if( empty )
+        {
+            gtk_tree_store_set( GTK_TREE_STORE( model ), parent,
+                                FC_VISIBLE, FALSE, -1 );
+            visible = FALSE;
+        }
+    }
+    return visible;
+}
+
+static void
+filter_empty( FileData * data )
+{
+    GtkTreeIter iter;
+    if( gtk_tree_model_get_iter_first( data->model, &iter ) )
+    {
+        do {
+            subtree_update_visible( data->model, &iter );
+        } while( gtk_tree_model_iter_next( data->model, &iter ) );
+    }
 }
 
 static void
@@ -1010,7 +1032,8 @@ filter_entry_activated( GtkEditable * entry, gpointer user_data )
 
     pattern = gtk_entry_get_text( GTK_ENTRY( entry ) );
     data->filter_pattern = g_strdup( pattern );
-    gtk_tree_model_foreach( data->model, filter_foreach, data );
+    gtr_tree_model_foreach_postorder( data->model, filter_foreach, data );
+    filter_empty( data );
     g_free( data->filter_pattern );
     data->filter_pattern = NULL;
     gtk_tree_view_expand_all( GTK_TREE_VIEW( data->view ) );
