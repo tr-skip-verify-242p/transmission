@@ -27,6 +27,7 @@ GtkWidget * gtr_prefs_dialog_new( GtkWindow * parent, GObject * core );
 #define PREF_KEY_DIR_WATCH                         "watch-dir"
 #define PREF_KEY_DIR_WATCH_ENABLED                 "watch-dir-enabled"
 #define PREF_KEY_SHOW_TRAY_ICON                    "show-notification-area-icon"
+#define PREF_KEY_DOWNLOAD_FAVICONS                 "download-favicons"
 #define PREF_KEY_SHOW_DESKTOP_NOTIFICATION         "show-desktop-notification"
 #define PREF_KEY_PLAY_DOWNLOAD_COMPLETE_SOUND      "play-download-complete-sound"
 #define PREF_KEY_SHOW_MORE_TRACKER_INFO            "show-tracker-scrapes"

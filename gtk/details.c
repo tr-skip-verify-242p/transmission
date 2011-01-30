@@ -2011,8 +2011,12 @@ refreshTracker( struct DetailsImpl * di, tr_torrent ** torrents, int n )
                 p = gtk_tree_model_get_path( model, &iter );
                 ref = gtk_tree_row_reference_new( model, p );
                 g_hash_table_insert( hash, g_strdup( key ), ref );
-                ref = gtk_tree_row_reference_new( model, p );
-                gtr_get_favicon_from_url( session, st->announce, favicon_ready_cb, ref );
+                if( gtr_pref_flag_get( PREF_KEY_DOWNLOAD_FAVICONS ) )
+                {
+                    ref = gtk_tree_row_reference_new( model, p );
+                    gtr_get_favicon_from_url( session, st->announce,
+                                              favicon_ready_cb, ref );
+                }
                 gtk_tree_path_free( p );
             }
 
