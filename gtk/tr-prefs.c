@@ -939,13 +939,14 @@ proxy_combo_box_new( GObject * core, const char * key )
 }
 
 static GtkWidget*
-trackerPage( GObject * core )
+proxyPage( GObject * core )
 {
-    int                row = 0;
-    const char *       s;
-    GtkWidget *        t;
-    GtkWidget *        w;
-    struct ProxyPage * page = tr_new0( struct ProxyPage, 1 );
+    struct ProxyPage * page;
+    GtkWidget * t, * w;
+    const char * s;
+    int row = 0;
+
+    page = tr_new0( struct ProxyPage, 1 );
 
     t = hig_workarea_create( );
     hig_workarea_add_section_title ( t, &row, _( "Web (HTTP and HTTPS)" ) );
@@ -1388,7 +1389,7 @@ gtr_prefs_dialog_new( GtkWindow * parent, GObject * core )
                               webPage( core ),
                               gtk_label_new ( _( "Web" ) ) );
     gtk_notebook_append_page( GTK_NOTEBOOK( n ),
-                              trackerPage( core ),
+                              proxyPage( core ),
                               gtk_label_new ( _( "Proxy" ) ) );
 
     g_signal_connect( d, "response", G_CALLBACK( response_cb ), core );
