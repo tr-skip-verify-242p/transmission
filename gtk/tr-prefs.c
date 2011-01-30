@@ -1000,105 +1000,160 @@ proxy_combo_box_new( GObject * core, const char * key )
     return w;
 }
 
-static GtkWidget*
+static GtkWidget *
 proxyPage( GObject * core )
 {
-    int                row = 0;
-    const char *       s;
-    GtkWidget *        t;
-    GtkWidget *        w;
-    struct ProxyPage * page = tr_new0( struct ProxyPage, 1 );
+    struct ProxyPage * page;
+    GtkWidget * t, * t2, * w, * hbox;
+    const char * s;
+    int row = 0, row2;
+
+    page = tr_new0( struct ProxyPage, 1 );
 
     t = hig_workarea_create( );
-    hig_workarea_add_section_title ( t, &row, _( "Web (HTTP and HTTPS)" ) );
+    s = _( "Web Trackers and Downloads" );
+    hig_workarea_add_section_title( t, &row, s );
 
-    s = _( "Enable _web proxy" );
+    s = _( "Enable _web proxy for HTTP and HTTPS communications" );
     w = new_check_button( s, TR_PREFS_KEY_PROXY_ENABLED, core );
     s = _( "This proxy will be used for all HTTP and HTTPS tracker "
            "communication (announces and scrapes) as well as for "
-           "downloading torrent files from URLs." );
+           "all other web downloads such as torrent file URLs and "
+           "favicons." );
     gtr_widget_set_tooltip_text( w, s );
     g_signal_connect( w, "toggled", G_CALLBACK( onProxyToggled ), page );
     hig_workarea_add_wide_control( t, &row, w );
 
-    s = _( "Proxy _server:" );
+    hbox = gtk_hbox_new( FALSE, 0 );
+    t2 = hig_workarea_create( );
+    gtk_container_set_border_width( GTK_CONTAINER( t2 ), 0 );
+    row2 = 0;
+
+    s = _( "_Server:" );
     w = new_entry( TR_PREFS_KEY_PROXY, core );
+    gtk_entry_set_width_chars( GTK_ENTRY( w ), 20 );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
-    w = hig_workarea_add_row( t, &row, s, w, NULL );
+    w = hig_workarea_add_row_full( t2, &row2, s, w, NULL, FALSE );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
 
+    s = _( "_Port:" );
     w = new_spin_button( TR_PREFS_KEY_PROXY_PORT, core, 0, USHRT_MAX, 1 );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
-    w = hig_workarea_add_row( t, &row, _( "Proxy _port:" ), w, NULL );
+    w = hig_workarea_add_row_full( t2, &row2, s, w, NULL, FALSE );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
 
-    s = _( "Proxy _type:" );
+    s = _( "_Type:" );
     w = proxy_combo_box_new( core, TR_PREFS_KEY_PROXY_TYPE );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
-    w = hig_workarea_add_row( t, &row, s, w, NULL );
+    w = hig_workarea_add_row_full( t2, &row2, s, w, NULL, FALSE );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
+
+    hig_workarea_finish( t2, &row2 );
+    gtk_box_pack_start( GTK_BOX( hbox ), t2, FALSE, FALSE, 0 );
+
+    t2 = hig_workarea_create( );
+    gtk_container_set_border_width( GTK_CONTAINER( t2 ), 0 );
+    row2 = 0;
 
     s = _( "Use _authentication" );
     w = new_check_button( s, TR_PREFS_KEY_PROXY_AUTH_ENABLED, core );
     g_signal_connect( w, "toggled", G_CALLBACK( onProxyToggled ), page );
-    hig_workarea_add_wide_control( t, &row, w );
+    hig_workarea_add_wide_control( t2, &row2, w );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
 
     s = _( "_Username:" );
     w = new_entry( TR_PREFS_KEY_PROXY_USERNAME, core );
+    gtk_entry_set_width_chars( GTK_ENTRY( w ), 20 );
     page->proxy_auth_widgets = g_slist_append( page->proxy_auth_widgets, w );
-    w = hig_workarea_add_row( t, &row, s, w, NULL );
+    w = hig_workarea_add_row( t2, &row2, s, w, NULL );
     page->proxy_auth_widgets = g_slist_append( page->proxy_auth_widgets, w );
 
     s = _( "Pass_word:" );
     w = new_entry( TR_PREFS_KEY_PROXY_PASSWORD, core );
+    gtk_entry_set_width_chars( GTK_ENTRY( w ), 20 );
     gtk_entry_set_visibility( GTK_ENTRY( w ), FALSE );
     page->proxy_auth_widgets = g_slist_append( page->proxy_auth_widgets, w );
-    w = hig_workarea_add_row( t, &row, s, w, NULL );
+    w = hig_workarea_add_row( t2, &row2, s, w, NULL );
     page->proxy_auth_widgets = g_slist_append( page->proxy_auth_widgets, w );
+
+    hig_workarea_finish( t2, &row2 );
+    gtk_box_pack_start( GTK_BOX( hbox ), t2, FALSE, FALSE, 0 );
+    hig_workarea_add_wide_control( t, &row, hbox );
 
     hig_workarea_add_section_title ( t, &row, _( "Peers" ) );
 
-    s = _( "Connect to peers via a pro_xy" );
+    s = _( "Enable peer proxy for _outgoing peer connections" );
     w = new_check_button( s, TR_PREFS_KEY_PEER_PROXY_ENABLED, core );
+    s = _( "This proxy will be used for all outgoing connections "
+           "to other peers in the BitTorrent swarm. Please be "
+           "advised that peers will still be able to directly "
+           "connect to your client if your incoming peer port is "
+           "not blocked or otherwise disabled. Also note that "
+           "too many peer connections via the proxy could cause "
+           "it to fail due to the increased load, so consider "
+           "reducing the number of allowed global connections. "
+           "If you are unsure of how proxies and BitTorrent "
+           "works in general, you should probably not be using "
+           "this option." );
+    gtr_widget_set_tooltip_text( w, s );
     g_signal_connect( w, "toggled", G_CALLBACK( onProxyToggled ), page );
     hig_workarea_add_wide_control( t, &row, w );
 
-    s = _( "Proxy _server:" );
+    hbox = gtk_hbox_new( FALSE, 0 );
+    t2 = hig_workarea_create( );
+    gtk_container_set_border_width( GTK_CONTAINER( t2 ), 0 );
+    row2 = 0;
+
+    s = _( "_Server:" );
     w = new_entry( TR_PREFS_KEY_PEER_PROXY, core );
+    gtk_entry_set_width_chars( GTK_ENTRY( w ), 20 );
     page->peer_proxy_widgets = g_slist_append( page->peer_proxy_widgets, w );
-    w = hig_workarea_add_row( t, &row, s, w, NULL );
+    w = hig_workarea_add_row_full( t2, &row2, s, w, NULL, FALSE );
     page->peer_proxy_widgets = g_slist_append( page->peer_proxy_widgets, w );
 
+    s = _( "_Port:" );
     w = new_spin_button( TR_PREFS_KEY_PEER_PROXY_PORT, core, 0, USHRT_MAX, 1 );
     page->peer_proxy_widgets = g_slist_append( page->peer_proxy_widgets, w );
-    w = hig_workarea_add_row( t, &row, _( "Proxy _port:" ), w, NULL );
+    w = hig_workarea_add_row_full( t2, &row2, s, w, NULL, FALSE );
     page->peer_proxy_widgets = g_slist_append( page->peer_proxy_widgets, w );
 
-    s = _( "Proxy _type:" );
+    s = _( "_Type:" );
     w = proxy_combo_box_new( core, TR_PREFS_KEY_PEER_PROXY_TYPE );
     page->peer_proxy_widgets = g_slist_append( page->peer_proxy_widgets, w );
-    w = hig_workarea_add_row( t, &row, s, w, NULL );
+    w = hig_workarea_add_row_full( t2, &row2, s, w, NULL, FALSE );
     page->peer_proxy_widgets = g_slist_append( page->peer_proxy_widgets, w );
+
+    hig_workarea_finish( t2, &row2 );
+    gtk_box_pack_start( GTK_BOX( hbox ), t2, FALSE, FALSE, 0 );
+
+    t2 = hig_workarea_create( );
+    gtk_container_set_border_width( GTK_CONTAINER( t2 ), 0 );
+    row2 = 0;
 
     s = _( "Use _authentication" );
     w = new_check_button( s, TR_PREFS_KEY_PEER_PROXY_AUTH_ENABLED, core );
     g_signal_connect( w, "toggled", G_CALLBACK( onProxyToggled ), page );
-    hig_workarea_add_wide_control( t, &row, w );
+    hig_workarea_add_wide_control( t2, &row2, w );
     page->peer_proxy_widgets = g_slist_append( page->peer_proxy_widgets, w );
 
     s = _( "_Username:" );
     w = new_entry( TR_PREFS_KEY_PEER_PROXY_USERNAME, core );
+    gtk_entry_set_width_chars( GTK_ENTRY( w ), 20 );
     page->peer_proxy_auth_widgets = g_slist_append( page->peer_proxy_auth_widgets, w );
-    w = hig_workarea_add_row( t, &row, s, w, NULL );
+    w = hig_workarea_add_row( t2, &row2, s, w, NULL );
     page->peer_proxy_auth_widgets = g_slist_append( page->peer_proxy_auth_widgets, w );
 
     s = _( "Pass_word:" );
     w = new_entry( TR_PREFS_KEY_PEER_PROXY_PASSWORD, core );
+    gtk_entry_set_width_chars( GTK_ENTRY( w ), 20 );
     gtk_entry_set_visibility( GTK_ENTRY( w ), FALSE );
     page->peer_proxy_auth_widgets = g_slist_append( page->peer_proxy_auth_widgets, w );
-    w = hig_workarea_add_row( t, &row, s, w, NULL );
+    w = hig_workarea_add_row( t2, &row2, s, w, NULL );
     page->peer_proxy_auth_widgets = g_slist_append( page->peer_proxy_auth_widgets, w );
+
+    hig_workarea_finish( t2, &row2 );
+    gtk_box_pack_start( GTK_BOX( hbox ), t2, FALSE, FALSE, 0 );
+    hig_workarea_add_wide_control( t, &row, hbox );
 
     hig_workarea_finish( t, &row );
     g_object_set_data_full( G_OBJECT( t ), "page", page, proxyPageFree );
