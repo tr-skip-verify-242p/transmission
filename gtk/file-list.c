@@ -1148,7 +1148,6 @@ gtr_file_list_new( TrCore * core, int torrentId )
     s = _( "When this toggle button is set, the letter case will be "
            "ignored when matching with the regular expression." );
     gtr_widget_set_tooltip_text( toggle, s );
-    g_object_set( G_OBJECT( toggle ), "can-focus", FALSE, NULL );
     g_signal_connect( G_OBJECT( toggle ), "toggled",
                       G_CALLBACK( caseless_toggled ), data );
     gtk_box_pack_start( GTK_BOX( hbox2 ), toggle, FALSE, FALSE, 0 );
@@ -1157,7 +1156,6 @@ gtr_file_list_new( TrCore * core, int torrentId )
     s = _( "When this toggle button is set, only files that do not "
            "match the regular expression will be displayed." );
     gtr_widget_set_tooltip_text( toggle, s );
-    g_object_set( G_OBJECT( toggle ), "can-focus", FALSE, NULL );
     g_signal_connect( G_OBJECT( toggle ), "toggled",
                       G_CALLBACK( invert_toggled ), data );
     gtk_box_pack_start( GTK_BOX( hbox2 ), toggle, FALSE, FALSE, 0 );
