@@ -151,11 +151,22 @@ void  tr_core_remove_torrent( TrCore * self, TrTorrent * gtor, gboolean deleteFi
 void  tr_core_remove_torrent_from_id( TrCore * self, int id, gboolean deleteFiles );
 
 /**
- * Find the TrTorrent handle associated with the tr_torrent @tor.
+ * Find the TrTorrent handle associated with the tr_torrent @a tor.
+ *
+ * @return A TrTorrent object pointer or NULL if none exists for @a tor.
  *
  * @note The reference count of the returned gobject is not incremented.
  */
 TrTorrent * tr_core_get_handle( TrCore * self, const tr_torrent * tor );
+
+/**
+ * Find the TrTorrent handle for the torrent with id number @a id.
+ *
+ * @return A TrTorrent object pointer or NULL if @a id is invalid.
+ *
+ * @note The reference count of the returned gobject is not incremented.
+ */
+TrTorrent * tr_core_get_handle_by_id( TrCore * core, int id );
 
 /* update the model with current torrent status */
 void  tr_core_update( TrCore * self );

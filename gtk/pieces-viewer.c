@@ -41,7 +41,8 @@ G_DEFINE_TYPE( GtrPiecesViewer, gtr_pieces_viewer, GTK_TYPE_DRAWING_AREA );
 typedef struct _GtrPiecesViewerPrivate GtrPiecesViewerPrivate;
 struct _GtrPiecesViewerPrivate
 {
-    TrTorrent * gtor; /* shared */
+    TrTorrent * gtor; /* not owned */
+    TrCore    * core; /* not owned */
 };
 
 #define GTR_PIECES_VIEWER_GET_PRIVATE( obj ) \
@@ -149,9 +150,16 @@ gtr_pieces_viewer_init( GtrPiecesViewer * self )
 }
 
 GtkWidget *
-gtr_pieces_viewer_new( void )
+gtr_pieces_viewer_new( TrCore * core )
 {
-    return g_object_new( GTR_TYPE_PIECES_VIEWER, NULL );
+    GtrPiecesViewer * self;
+    GtrPiecesViewerPrivate * priv;
+
+    self = g_object_new( GTR_TYPE_PIECES_VIEWER, NULL );
+    priv = GTR_PIECES_VIEWER_GET_PRIVATE( self );
+    priv->core = core;
+
+    return GTK_WIDGET( self );
 }
 
 void
@@ -159,4 +167,11 @@ gtr_pieces_viewer_set_gtorrent( GtrPiecesViewer * self, TrTorrent * gtor )
 {
     GtrPiecesViewerPrivate * priv = GTR_PIECES_VIEWER_GET_PRIVATE( self );
     priv->gtor = gtor;
+}
+
+void
+gtr_pieces_viewer_set_torrent_by_id( GtrPiecesViewer * self, int id )
+{
+    GtrPiecesViewerPrivate * priv = GTR_PIECES_VIEWER_GET_PRIVATE( self );
+    priv->gtor = tr_core_get_handle_by_id( priv->core, id );
 }
