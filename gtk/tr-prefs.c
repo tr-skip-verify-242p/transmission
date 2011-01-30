@@ -962,13 +962,15 @@ proxyPage( GObject * core )
     page = tr_new0( struct ProxyPage, 1 );
 
     t = hig_workarea_create( );
-    hig_workarea_add_section_title ( t, &row, _( "Web (HTTP and HTTPS)" ) );
+    s = _( "Web Trackers and Downloads" );
+    hig_workarea_add_section_title( t, &row, s );
 
-    s = _( "Enable _web proxy" );
+    s = _( "Enable _web proxy for HTTP and HTTPS communications" );
     w = new_check_button( s, TR_PREFS_KEY_PROXY_ENABLED, core );
     s = _( "This proxy will be used for all HTTP and HTTPS tracker "
            "communication (announces and scrapes) as well as for "
-           "downloading torrent files from URLs." );
+           "all other web downloads such as torrent file URLs and "
+           "favicons." );
     gtr_widget_set_tooltip_text( w, s );
     g_signal_connect( w, "toggled", G_CALLBACK( onProxyToggled ), page );
     hig_workarea_add_wide_control( t, &row, w );
@@ -978,20 +980,20 @@ proxyPage( GObject * core )
     gtk_container_set_border_width( GTK_CONTAINER( t2 ), 0 );
     row2 = 0;
 
-    s = _( "Proxy _server:" );
+    s = _( "_Server:" );
     w = new_entry( TR_PREFS_KEY_PROXY, core );
     gtk_entry_set_width_chars( GTK_ENTRY( w ), 20 );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
     w = hig_workarea_add_row_full( t2, &row2, s, w, NULL, FALSE );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
 
-    s = _( "Proxy _port:" );
+    s = _( "_Port:" );
     w = new_spin_button( TR_PREFS_KEY_PROXY_PORT, core, 0, USHRT_MAX, 1 );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
     w = hig_workarea_add_row_full( t2, &row2, s, w, NULL, FALSE );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
 
-    s = _( "Proxy _type:" );
+    s = _( "_Type:" );
     w = proxy_combo_box_new( core, TR_PREFS_KEY_PROXY_TYPE );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
     w = hig_workarea_add_row_full( t2, &row2, s, w, NULL, FALSE );
