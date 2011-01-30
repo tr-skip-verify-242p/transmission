@@ -853,17 +853,18 @@ pieceListSort( Torrent * t, int mode )
 static tr_bool
 isInEndgame( Torrent * t )
 {
-    int64_t blocksMissing = 0;
-    tr_completion * cp = &t->tor->completion;
-    int i;
+    tr_bool endgame = FALSE;
 
-    if( ( t->pieces == NULL ) || ( t->pieceCount == 0 ) )
-        return FALSE;
+    if( ( t->pieces != NULL ) && ( t->pieceCount > 0 ) )
+    {
+        const struct weighted_piece * p = t->pieces;
+        const int pending = p->requestCount;
+        const int missing = tr_cpMissingBlocksInPiece( &t->tor->completion, p->index );
+        endgame = pending >= missing;
+    }
 
-    for( i = 0; i < t->pieceCount; ++i )
-        blocksMissing += tr_cpMissingBlocksInPiece( cp, t->pieces[i].index );
-
-    return t->requestCount >= blocksMissing;
+    /*if( endgame ) fprintf( stderr, "ENDGAME reached\n" );*/
+    return endgame;
 }
 
 /**
@@ -1094,6 +1095,11 @@ tr_peerMgrGetNextRequests( tr_torrent           * tor,
     for( i=0; i<t->pieceCount && got<numwant; ++i )
     {
         struct weighted_piece * p = pieces + i;
+        const int missing = tr_cpMissingBlocksInPiece( &tor->completion, p->index );
+        const int maxDuplicatesPerBlock = endgame ? 3 : 1;
+
+        if( p->requestCount > ( missing * maxDuplicatesPerBlock ) )
+            continue;
 
         /* if the peer has this piece that we want... */
         if( tr_bitsetHasFast( have, p->index ) )
@@ -1112,12 +1118,7 @@ tr_peerMgrGetNextRequests( tr_torrent           * tor,
                     continue;
 
                 /* don't send the same request to any peer too many times */
-                if( !endgame && countBlockRequests( t, b ) >= 1 )
-                    continue;
-
-                /* in the endgame allow an additional peer to download a block but
-                   only if the peer seems to be handling requests relatively fast */
-                if( endgame && ( peer->pendingReqsToPeer < 10 || countBlockRequests( t, b ) >= 2 ) )
+                if( countBlockRequests( t, b ) >= maxDuplicatesPerBlock )
                     continue;
 
                 /* update the caller's table */
