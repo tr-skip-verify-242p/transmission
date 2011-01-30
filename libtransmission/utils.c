@@ -901,17 +901,6 @@ tr_snprintf( char * buf, size_t buflen, const char * fmt, ... )
     return len;
 }
 
-char *
-tr_strcasestr( const char * haystack, const char * needle )
-{
-#ifdef HAVE_STRCASESTR
-    return strcasestr( haystack, needle );
-#else
-#error portme
-    return NULL;
-#endif
-}
-
 /*
  * Copy src to string dst of size siz. At most siz-1 characters
  * will be copied. Always NUL terminates (unless siz == 0).

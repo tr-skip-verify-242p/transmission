@@ -407,9 +407,6 @@ size_t tr_strlcpy( char * dst, const void * src, size_t siz );
 int tr_snprintf( char * buf, size_t buflen,
                  const char * fmt, ... ) TR_GNUC_PRINTF( 3, 4 ) TR_GNUC_NONNULL(1,3);
 
-/** @brief Portability wrapper for strcasestr() that uses the system implementation if available */
-char * tr_strcasestr( const char * haystack, const char * needle );
-
 /** @brief Convenience wrapper around strerorr() guaranteed to not return NULL
     @param errno */
 const char* tr_strerror( int );

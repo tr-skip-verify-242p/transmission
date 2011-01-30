@@ -48,6 +48,7 @@ enum
     FC_HAVE,
     FC_PRIORITY,
     FC_ENABLED,
+    FC_VISIBLE,
     N_FILE_COLS
 };
 
@@ -59,6 +60,9 @@ typedef struct
     GtkWidget     * filter_entry;
     GtkWidget     * status_label;
     GtkTreeModel  * filter;
+    GRegex        * filter_regex;
+    gboolean        filter_caseless;
+    gboolean        filter_invert;
     int             display_count;
     GtkTreeModel  * model; /* same object as store, but recast */
     GtkTreeStore  * store; /* same object as model, but recast */
@@ -494,6 +498,7 @@ buildTree( GNode * node, gpointer gdata )
                                        FC_ICON, icon,
                                        FC_PRIORITY, priority,
                                        FC_ENABLED, enabled,
+                                       FC_VISIBLE, TRUE,
                                        -1 );
 #else
     gtk_tree_store_append( build->store, &child_iter, build->iter );
@@ -505,6 +510,7 @@ buildTree( GNode * node, gpointer gdata )
                         FC_ICON, icon,
                         FC_PRIORITY, priority,
                         FC_ENABLED, enabled,
+                        FC_VISIBLE, TRUE,
                         -1 );
 #endif
 
@@ -535,55 +541,6 @@ find_child( GNode* parent, const char * name )
     return child;
 }
 
-static gboolean
-filter_func( GtkTreeModel * model, GtkTreeIter * iter, gpointer user_data )
-{
-    FileData * data = user_data;
-    const gchar * pattern;
-    gboolean show;
-
-    if( gtk_tree_model_iter_has_child( model, iter ) )
-        return TRUE;
-
-    pattern = gtk_entry_get_text( GTK_ENTRY( data->filter_entry ) );
-    if( !pattern || pattern[0] == '\0' )
-    {
-        show = TRUE;
-    }
-    else
-    {
-        gchar * name;
-        gtk_tree_model_get( model, iter, FC_LABEL, &name, -1 );
-        show = ( tr_strcasestr( name, pattern ) != NULL );
-        g_free( name );
-    }
-
-    return show;
-}
-
-static void
-filter_row_inserted( GtkTreeModel * model,
-                     GtkTreePath  * path UNUSED,
-                     GtkTreeIter  * iter UNUSED,
-                     gpointer       user_data )
-{
-    FileData * data = user_data;
-    g_assert( data != NULL );
-    g_assert( data->filter == model );
-    data->display_count++;
-}
-
-static void
-filter_row_deleted( GtkTreeModel * model,
-                    GtkTreePath  * path UNUSED,
-                    gpointer       user_data )
-{
-    FileData * data = user_data;
-    g_assert( data != NULL );
-    g_assert( data->filter == model );
-    data->display_count--;
-}
-
 void
 gtr_file_list_set_torrent( GtkWidget * w, int torrentId )
 {
@@ -606,7 +563,8 @@ gtr_file_list_set_torrent( GtkWidget * w, int torrentId )
                                  G_TYPE_STRING,    /* size str */
                                  G_TYPE_UINT64,    /* have */
                                  G_TYPE_INT,       /* priority */
-                                 G_TYPE_INT );     /* dl enabled */
+                                 G_TYPE_INT,       /* dl enabled */
+                                 G_TYPE_BOOLEAN ); /* visible */
 
     data->store = store;
     data->model = GTK_TREE_MODEL( store );
@@ -674,11 +632,7 @@ gtr_file_list_set_torrent( GtkWidget * w, int torrentId )
 
     data->filter = gtk_tree_model_filter_new( data->model, NULL );
     filter = GTK_TREE_MODEL_FILTER( data->filter );
-    gtk_tree_model_filter_set_visible_func( filter, filter_func, data, NULL );
-    g_signal_connect( G_OBJECT( filter ), "row-inserted",
-                      G_CALLBACK( filter_row_inserted ), data );
-    g_signal_connect( G_OBJECT( filter ), "row-deleted",
-                      G_CALLBACK( filter_row_deleted ), data );
+    gtk_tree_model_filter_set_visible_column( filter, FC_VISIBLE );
 
     gtk_tree_view_set_model( GTK_TREE_VIEW( data->view ), data->filter );
     gtk_tree_view_expand_all( GTK_TREE_VIEW( data->view ) );
@@ -1044,11 +998,128 @@ onViewKeyPressed( GtkWidget   * w UNUSED,
     return FALSE;
 }
 
-static void
-filter_entry_activated( GtkEditable * entry UNUSED, gpointer user_data )
+static gboolean
+filter_foreach( GtkTreeModel * model,
+                GtkTreePath  * path UNUSED,
+                GtkTreeIter  * iter,
+                gpointer       user_data )
 {
     FileData * data = user_data;
-    gtk_tree_model_filter_refilter( GTK_TREE_MODEL_FILTER( data->filter ) );
+    GRegex * regex = data->filter_regex;
+    gboolean visible, new_visible;
+
+    gtk_tree_model_get( model, iter, FC_VISIBLE, &visible, -1 );
+    if( gtk_tree_model_iter_has_child( model, iter ) )
+    {
+        if( !visible )
+            gtk_tree_store_set( GTK_TREE_STORE( model ), iter,
+                                FC_VISIBLE, TRUE, -1 );
+        return FALSE;
+    }
+
+    if( !regex )
+    {
+        new_visible = TRUE;
+    }
+    else
+    {
+        gchar * name;
+        gtk_tree_model_get( model, iter, FC_LABEL, &name, -1 );
+        new_visible = g_regex_match( regex, name, 0, NULL );
+        if( data->filter_invert )
+            new_visible = !new_visible;
+        g_free( name );
+    }
+    if( visible != new_visible )
+    {
+        data->display_count += new_visible ? 1 : -1;
+        gtk_tree_store_set( GTK_TREE_STORE( model ), iter,
+                            FC_VISIBLE, new_visible, -1 );
+    }
+    return FALSE;
+}
+
+static gboolean
+subtree_update_visible( GtkTreeModel * model, GtkTreeIter * parent )
+{
+    GtkTreeIter child;
+    gboolean visible;
+
+    gtk_tree_model_get( model, parent, FC_VISIBLE, &visible, -1 );
+    if( visible && gtk_tree_model_iter_children( model, &child, parent ) )
+    {
+        gboolean empty = TRUE;
+        do {
+            if( subtree_update_visible( model, &child ) )
+                empty = FALSE;
+        } while( gtk_tree_model_iter_next( model, &child ) );
+
+        if( empty )
+        {
+            gtk_tree_store_set( GTK_TREE_STORE( model ), parent,
+                                FC_VISIBLE, FALSE, -1 );
+            visible = FALSE;
+        }
+    }
+    return visible;
+}
+
+static void
+filter_empty( FileData * data )
+{
+    GtkTreeIter iter;
+    if( gtk_tree_model_get_iter_first( data->model, &iter ) )
+    {
+        do {
+            subtree_update_visible( data->model, &iter );
+        } while( gtk_tree_model_iter_next( data->model, &iter ) );
+    }
+}
+
+static void
+filter_entry_activated( GtkEditable * entry, gpointer user_data )
+{
+    FileData * data = user_data;
+    const gchar * pattern;
+
+    pattern = gtk_entry_get_text( GTK_ENTRY( entry ) );
+    if( pattern && pattern[0] )
+    {
+        GError * err = NULL;
+        GRegex * regex;
+        GRegexCompileFlags flags = G_REGEX_OPTIMIZE;
+
+        if( data->filter_caseless )
+            flags |= G_REGEX_CASELESS;
+
+        regex = g_regex_new( pattern, flags, 0, &err );
+        if( err )
+        {
+            GtkWidget * w;
+            w = gtk_message_dialog_new( NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR,
+                                        GTK_BUTTONS_CLOSE, "%s", err->message );
+            gtk_dialog_run( GTK_DIALOG( w ) );
+            gtk_widget_destroy( w );
+            g_error_free( err );
+            if( regex )
+                g_regex_unref( regex );
+            return;
+        }
+        data->filter_regex = regex;
+    }
+    else
+    {
+        data->filter_regex = NULL;
+    }
+
+    gtr_tree_model_foreach_postorder( data->model, filter_foreach, data );
+    filter_empty( data );
+    if( data->filter_regex )
+    {
+        g_regex_unref( data->filter_regex );
+        data->filter_regex = NULL;
+    }
+
     gtk_tree_view_expand_all( GTK_TREE_VIEW( data->view ) );
     refresh_status_label( data );
 }
@@ -1060,6 +1131,20 @@ view_selection_changed( GtkTreeSelection * sel UNUSED, gpointer user_data )
     refresh_status_label( data );
 }
 
+static void
+caseless_toggled( GtkToggleButton * toggle, gpointer user_data )
+{
+    FileData * data = user_data;
+    data->filter_caseless = gtk_toggle_button_get_active( toggle );
+}
+
+static void
+invert_toggled( GtkToggleButton * toggle, gpointer user_data )
+{
+    FileData * data = user_data;
+    data->filter_invert = gtk_toggle_button_get_active( toggle );
+}
+
 GtkWidget *
 gtr_file_list_new( TrCore * core, int torrentId )
 {
@@ -1068,7 +1153,7 @@ gtr_file_list_new( TrCore * core, int torrentId )
     GtkWidget * view;
     GtkWidget * scroll;
     GtkWidget * vbox, * hbox, * hbox2, * align;
-    GtkWidget * label, * entry;
+    GtkWidget * label, * entry, * toggle;
     GtkCellRenderer * rend;
     GtkTreeSelection * sel;
     GtkTreeViewColumn * col;
@@ -1087,19 +1172,39 @@ gtr_file_list_new( TrCore * core, int torrentId )
     gtk_box_pack_start( GTK_BOX( hbox ), label, FALSE, FALSE, 0 );
 
     hbox2 = gtk_hbox_new( FALSE, GUI_PAD_SMALL );
+
     label = gtk_label_new_with_mnemonic( _( "_File display filter:" ) );
     gtk_box_pack_start( GTK_BOX( hbox2 ), label, FALSE, FALSE, 0 );
+
     entry = gtk_entry_new( );
     gtk_widget_set_size_request( entry, 64, -1 );
     gtk_label_set_mnemonic_widget( GTK_LABEL( label ), entry );
-    s = _( "Type in some text and press return to control which files "
-           "are displayed. Only files whose names contain the string "
-           "(without regard to letter case) will be shown." );
+    s = _( "Enter a regular expression and press return to control "
+           "which files are displayed. Only files whose names match "
+           "the regex will be shown. Using an empty string will show "
+           "all files." );
     gtr_widget_set_tooltip_text( entry, s );
     data->filter_entry = entry;
     g_signal_connect( G_OBJECT( entry ), "activate",
                       G_CALLBACK( filter_entry_activated ), data );
     gtk_box_pack_start( GTK_BOX( hbox2 ), entry, FALSE, FALSE, 0 );
+
+    toggle = gtk_toggle_button_new_with_label( "i" );
+    s = _( "When this toggle button is set, the letter case will be "
+           "ignored when matching with the regular expression." );
+    gtr_widget_set_tooltip_text( toggle, s );
+    g_signal_connect( G_OBJECT( toggle ), "toggled",
+                      G_CALLBACK( caseless_toggled ), data );
+    gtk_box_pack_start( GTK_BOX( hbox2 ), toggle, FALSE, FALSE, 0 );
+
+    toggle = gtk_toggle_button_new_with_label( "!" );
+    s = _( "When this toggle button is set, only files that do not "
+           "match the regular expression will be displayed." );
+    gtr_widget_set_tooltip_text( toggle, s );
+    g_signal_connect( G_OBJECT( toggle ), "toggled",
+                      G_CALLBACK( invert_toggled ), data );
+    gtk_box_pack_start( GTK_BOX( hbox2 ), toggle, FALSE, FALSE, 0 );
+
     align = gtk_alignment_new( 1, 0.5, 0, 0 );
     gtk_container_add( GTK_CONTAINER( align ), hbox2 );
     gtk_box_pack_start( GTK_BOX( hbox ), align, TRUE, TRUE, 0 );
