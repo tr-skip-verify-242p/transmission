@@ -587,6 +587,7 @@ privacyPage( GObject * core )
     gtr_widget_set_tooltip_text( e, s );
     s = _( "Current User Agent:" );
     w = gtk_label_new( NULL );
+    gtk_label_set_selectable( GTK_LABEL( w ), TRUE );
     hig_workarea_add_row( t, &row, s, w, NULL );
     g_object_set_data( G_OBJECT( e ), "user-agent-label", w );
     g_signal_connect( e, "changed", G_CALLBACK( user_agent_changed_cb ), core );
