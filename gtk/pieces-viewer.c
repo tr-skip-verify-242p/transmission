@@ -54,7 +54,7 @@ struct _GtrPiecesViewerPrivate
 
 enum gtr_pieces_viewer_signals
 {
-    SIGNAL_FILE_SELECTED,
+    SIGNAL_FILE_CLICKED,
     NUM_SIGNALS
 };
 
@@ -135,7 +135,7 @@ compare_piece_index_to_file( const void * a, const void * b )
 }
 
 static void
-emit_file_select_signal( GtrPiecesViewer * self, int x, int y )
+emit_file_clicked_signal( GtrPiecesViewer * self, int x, int y )
 {
     GtrPiecesViewerPrivate * priv;
     const tr_info * info;
@@ -174,13 +174,13 @@ emit_file_select_signal( GtrPiecesViewer * self, int x, int y )
         return;
     fi = file - info->files;
 
-    g_signal_emit( self, signals[SIGNAL_FILE_SELECTED], 0, fi );
+    g_signal_emit( self, signals[SIGNAL_FILE_CLICKED], 0, fi );
 }
 
 static gboolean
 gtr_pieces_viewer_button_press( GtkWidget * w, GdkEventButton * ev )
 {
-    emit_file_select_signal( GTR_PIECES_VIEWER( w ), ev->x, ev->y );
+    emit_file_clicked_signal( GTR_PIECES_VIEWER( w ), ev->x, ev->y );
     return TRUE;
 }
 
@@ -210,11 +210,11 @@ gtr_pieces_viewer_class_init( GtrPiecesViewerClass * klass )
     widget_class->button_press_event = gtr_pieces_viewer_button_press;
     gobject_class->dispose = gtr_pieces_viewer_dispose;
 
-    signals[SIGNAL_FILE_SELECTED] = g_signal_new(
-        "file-selected",
+    signals[SIGNAL_FILE_CLICKED] = g_signal_new(
+        "file-clicked",
         G_OBJECT_CLASS_TYPE( gobject_class ),
         G_SIGNAL_RUN_FIRST,
-        G_STRUCT_OFFSET( GtrPiecesViewerClass, file_selected ),
+        G_STRUCT_OFFSET( GtrPiecesViewerClass, file_clicked ),
         NULL, NULL,
         g_cclosure_marshal_VOID__UINT,
         G_TYPE_NONE, 1, G_TYPE_UINT );
