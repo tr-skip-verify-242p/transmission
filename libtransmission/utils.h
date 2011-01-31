@@ -252,6 +252,12 @@ int tr_mkdirp( const char * path, int permissions ) TR_GNUC_NONNULL(1);
 uint8_t* tr_loadFile( const char * filename, size_t * size ) TR_GNUC_MALLOC
                                                              TR_GNUC_NONNULL(1);
 
+/**
+ * Returns the time of last modification of @a filename,
+ * or 0 if it does not exist (or an error occurs).
+ */
+time_t tr_fileMTime( const char * filename );
+
 
 /** @brief build a filename from a series of elements using the
            platform's correct directory separator. */
@@ -362,6 +368,7 @@ char* tr_strdup( const void * in );
  */
 int tr_strcmp0( const char * str1, const char * str2 );
 
+int vstrcmp( const void * a, const void * b );
 
 
 struct evbuffer;
