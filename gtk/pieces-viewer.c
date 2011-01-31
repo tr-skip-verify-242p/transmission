@@ -22,6 +22,8 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
+#include <stdlib.h>
+
 #include "pieces-common.h"
 #include "pieces-viewer.h"
 #include "tr-prefs.h"
@@ -29,6 +31,7 @@
 
 
 #define BAR_HEIGHT 20
+#define BORDER_WIDTH 1
 
 /*
  * Defines:
@@ -49,6 +52,14 @@ struct _GtrPiecesViewerPrivate
     ( G_TYPE_INSTANCE_GET_PRIVATE( ( obj ), GTR_TYPE_PIECES_VIEWER, \
                                    GtrPiecesViewerPrivate ) )
 
+enum gtr_pieces_viewer_signals
+{
+    SIGNAL_FILE_SELECTED,
+    NUM_SIGNALS
+};
+
+static guint signals[NUM_SIGNALS];
+
 static void
 paint( GtrPiecesViewer * self, cairo_t * cr )
 {
@@ -63,7 +74,9 @@ paint( GtrPiecesViewer * self, cairo_t * cr )
     cairo_paint( cr );
 
     gtr_widget_get_allocation( GTK_WIDGET( self ), &a );
-    gtr_draw_pieces( cr, priv->gtor, 1, 1, a.width - 2, a.height - 2 );
+    gtr_draw_pieces( cr, priv->gtor, BORDER_WIDTH, BORDER_WIDTH,
+                     a.width - 2 * BORDER_WIDTH,
+                     a.height - 2 * BORDER_WIDTH );
 }
 
 static gboolean
@@ -86,7 +99,17 @@ gtr_pieces_viewer_expose( GtkWidget * widget, GdkEventExpose * event)
 static gboolean
 timer_callback( gpointer user_data )
 {
-    gtk_widget_queue_draw( GTK_WIDGET( user_data ) );
+    GtrPiecesViewer * self;
+    GtrPiecesViewerPrivate * priv;
+
+    if( !GTR_IS_PIECES_VIEWER( user_data ) )
+        return FALSE;
+
+    self = GTR_PIECES_VIEWER( user_data );
+    priv = GTR_PIECES_VIEWER_GET_PRIVATE( self );
+
+    if( priv->gtor )
+        gtk_widget_queue_draw( GTK_WIDGET( user_data ) );
     return TRUE;
 }
 
@@ -97,6 +120,68 @@ gtr_pieces_viewer_size_request( GtkWidget * w, GtkRequisition * req )
     g_return_if_fail( GTR_IS_PIECES_VIEWER( w ) );
 
     req->height = BAR_HEIGHT;
+}
+
+static int
+compare_piece_index_to_file( const void * a, const void * b )
+{
+    const tr_piece_index_t pi = *(const tr_piece_index_t *) a;
+    const tr_file * file = b;
+    if( pi < file->firstPiece )
+        return -1;
+    if( pi > file->lastPiece )
+        return 1;
+    return 0;
+}
+
+static void
+emit_file_select_signal( GtrPiecesViewer * self, int x, int y )
+{
+    GtrPiecesViewerPrivate * priv;
+    const tr_info * info;
+    const tr_file * file;
+    tr_piece_index_t pi;
+    tr_file_index_t fi;
+    GtkAllocation a;
+    float interval;
+    int w, h;
+
+    priv = GTR_PIECES_VIEWER_GET_PRIVATE( self );
+    if( !( info = tr_torrent_info( priv->gtor ) ) )
+        return;
+
+    if( !info->fileCount )
+        return;
+
+    gtr_widget_get_allocation( GTK_WIDGET( self ), &a );
+    x -= BORDER_WIDTH;
+    y -= BORDER_WIDTH;
+    w = a.width - 2 * BORDER_WIDTH;
+    h = a.height - 2 * BORDER_WIDTH;
+
+    if( w < 1 || h < 1 || y > h )
+        return;
+
+    /* FIXME: Same problem as with tr_peerMgrTorrentAvailability(). */
+    interval = (float) info->pieceCount / (float) w;
+    pi = interval * x;
+    if( pi >= info->pieceCount )
+        return;
+
+    file = bsearch( &pi, info->files, info->fileCount, sizeof( tr_file ),
+                    compare_piece_index_to_file );
+    if( !file )
+        return;
+    fi = file - info->files;
+
+    g_signal_emit( self, signals[SIGNAL_FILE_SELECTED], 0, fi );
+}
+
+static gboolean
+gtr_pieces_viewer_button_press( GtkWidget * w, GdkEventButton * ev )
+{
+    emit_file_select_signal( GTR_PIECES_VIEWER( w ), ev->x, ev->y );
+    return TRUE;
 }
 
 static void
@@ -122,7 +207,17 @@ gtr_pieces_viewer_class_init( GtrPiecesViewerClass * klass )
 
     widget_class->expose_event = gtr_pieces_viewer_expose;
     widget_class->size_request = gtr_pieces_viewer_size_request;
+    widget_class->button_press_event = gtr_pieces_viewer_button_press;
     gobject_class->dispose = gtr_pieces_viewer_dispose;
+
+    signals[SIGNAL_FILE_SELECTED] = g_signal_new(
+        "file-selected",
+        G_OBJECT_CLASS_TYPE( gobject_class ),
+        G_SIGNAL_RUN_FIRST,
+        G_STRUCT_OFFSET( GtrPiecesViewerClass, file_selected ),
+        NULL, NULL,
+        g_cclosure_marshal_VOID__UINT,
+        G_TYPE_NONE, 1, G_TYPE_UINT );
 }
 
 static void
@@ -130,7 +225,11 @@ gtr_pieces_viewer_init( GtrPiecesViewer * self )
 {
     GtrPiecesViewerPrivate * priv = GTR_PIECES_VIEWER_GET_PRIVATE( self );
 
+    gtk_widget_add_events( GTK_WIDGET( self ),
+                           GDK_BUTTON_PRESS_MASK );
+
     priv->gtor = NULL;
+    priv->core = NULL;
 }
 
 GtkWidget *

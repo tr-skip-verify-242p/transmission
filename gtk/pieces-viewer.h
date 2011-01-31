@@ -53,6 +53,9 @@ struct _GtrPiecesViewer
 struct _GtrPiecesViewerClass
 {
     GtkDrawingAreaClass parent_class;
+
+    /* Signals */
+    void ( * file_selected )( GtrPiecesViewer * pv, guint file_index );
 };
 
 GtkWidget * gtr_pieces_viewer_new( TrCore * core );
