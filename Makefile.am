@@ -44,3 +44,8 @@ DISTCLEANFILES = \
   intltool-extract \
   intltool-merge \
   intltool-update 
+
+test:
+	cd libtransmission && $(MAKE) $(AM_MAKEFLAGS) test
+.PHONY: test
+

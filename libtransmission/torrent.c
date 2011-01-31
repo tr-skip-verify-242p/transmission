@@ -12,7 +12,12 @@
 
 #include <sys/types.h> /* stat */
 #include <sys/stat.h> /* stat */
-#include <sys/wait.h> /* wait() */
+#ifndef WIN32
+ #include <sys/wait.h> /* wait() */
+#else
+ #include <process.h>
+ #define waitpid(pid, status, options)	_cwait(status, pid, WAIT_CHILD)
+#endif
 #include <unistd.h> /* stat */
 #include <dirent.h>
 
@@ -1945,7 +1950,7 @@ tr_torrentClearIdleLimitHitCallback( tr_torrent * torrent )
 static void
 onSigCHLD( int i UNUSED )
 {
-    waitpid( -1, 0, WNOHANG );
+    waitpid( -1, NULL, WNOHANG );
 }
 
 static void
@@ -1973,6 +1978,10 @@ torrentCallScript( const tr_torrent * tor, const char * script )
             NULL };
 
         tr_torinf( tor, "Calling script \"%s\"", script ); 
+
+#ifdef WIN32
+        _spawnvpe( _P_NOWAIT, script, (const char*)cmd, env );
+#else
         signal( SIGCHLD, onSigCHLD );
 
         if( !fork( ) )
@@ -1980,6 +1989,7 @@ torrentCallScript( const tr_torrent * tor, const char * script )
             execve( script, cmd, env );
             _exit( 0 );
         }
+#endif
 
         for( i=0; cmd[i]; ++i ) tr_free( cmd[i] );
         for( i=0; env[i]; ++i ) tr_free( env[i] );
@@ -2859,7 +2869,7 @@ setLocation( void * vdata )
 
                 tr_dbg( "Found file #%d: %s", (int)i, oldpath );
 
-                if( do_move )
+                if( do_move && !tr_is_same_file( oldpath, newpath ) )
                 {
                     tr_bool renamed = FALSE;
                     errno = 0;
