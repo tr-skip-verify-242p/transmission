@@ -24,10 +24,11 @@
 
 #include "pieces-common.h"
 #include "pieces-viewer.h"
+#include "tr-prefs.h"
 #include "util.h"
 
 
-#define BAR_HEIGHT 16
+#define BAR_HEIGHT 20
 
 /*
  * Defines:
@@ -41,6 +42,7 @@ struct _GtrPiecesViewerPrivate
 {
     TrTorrent * gtor; /* not owned */
     TrCore    * core; /* not owned */
+    guint       timer;
 };
 
 #define GTR_PIECES_VIEWER_GET_PRIVATE( obj ) \
@@ -81,6 +83,13 @@ gtr_pieces_viewer_expose( GtkWidget * widget, GdkEventExpose * event)
     return FALSE;
 }
 
+static gboolean
+timer_callback( gpointer user_data )
+{
+    gtk_widget_queue_draw( GTK_WIDGET( user_data ) );
+    return TRUE;
+}
+
 static void
 gtr_pieces_viewer_size_request( GtkWidget * w, GtkRequisition * req )
 {
@@ -98,6 +107,8 @@ gtr_pieces_viewer_dispose( GObject * object )
 
     if( priv->gtor )
         priv->gtor = NULL;
+    g_source_remove( priv->timer );
+
     G_OBJECT_CLASS( gtr_pieces_viewer_parent_class )->dispose( object );
 }
 
@@ -131,6 +142,8 @@ gtr_pieces_viewer_new( TrCore * core )
     self = g_object_new( GTR_TYPE_PIECES_VIEWER, NULL );
     priv = GTR_PIECES_VIEWER_GET_PRIVATE( self );
     priv->core = core;
+    priv->timer = gtr_timeout_add_seconds( SECONDARY_WINDOW_REFRESH_INTERVAL_SECONDS,
+                                           timer_callback, self );
 
     return GTK_WIDGET( self );
 }
