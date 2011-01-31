@@ -97,6 +97,7 @@ struct DetailsImpl
 
     GtkWidget * file_list;
     GtkWidget * file_pieces;
+    GtkWidget * file_pieces_area;
     GtkWidget * file_label;
 
     GSList * ids;
@@ -2537,8 +2538,12 @@ gtr_torrent_details_dialog_new( GtkWindow * parent, TrCore * core )
     di->file_list = gtr_file_list_new( core, 0 );
     di->file_label = gtk_label_new( _( "File listing not available for combined torrent properties" ) );
     gtk_box_pack_start( GTK_BOX( v ), di->file_list, TRUE, TRUE, 0 );
+    w = gtk_expander_new_with_mnemonic( _( "_Piece Map" ) );
+    gtk_expander_set_expanded( GTK_EXPANDER( w ), FALSE );
     di->file_pieces = gtr_pieces_viewer_new( core );
-    gtk_box_pack_start( GTK_BOX( v ), di->file_pieces, FALSE, FALSE, GUI_PAD );
+    gtk_container_add( GTK_CONTAINER( w ), di->file_pieces );
+    di->file_pieces_area = w;
+    gtk_box_pack_start( GTK_BOX( v ), w, FALSE, FALSE, GUI_PAD );
     gtk_box_pack_start( GTK_BOX( v ), di->file_label, TRUE, TRUE, 0 );
     gtk_container_set_border_width( GTK_CONTAINER( v ), GUI_PAD_BIG );
     l = gtk_label_new( _( "Files" ) );
@@ -2576,7 +2581,7 @@ gtr_torrent_details_dialog_set_torrents( GtkWidget * w, GSList * ids )
         gtk_widget_show( di->file_list );
         gtr_pieces_viewer_set_torrent_by_id(
             GTR_PIECES_VIEWER( di->file_pieces ), id );
-        gtk_widget_show( di->file_pieces );
+        gtk_widget_show( di->file_pieces_area );
         gtk_widget_hide( di->file_label );
     }
    else
@@ -2585,7 +2590,7 @@ gtr_torrent_details_dialog_set_torrents( GtkWidget * w, GSList * ids )
         gtk_widget_hide( di->file_list );
         gtr_pieces_viewer_set_torrent_by_id(
             GTR_PIECES_VIEWER( di->file_pieces ), -1 );
-        gtk_widget_hide( di->file_pieces );
+        gtk_widget_hide( di->file_pieces_area );
         gtk_widget_show( di->file_label );
         g_snprintf( title, sizeof( title ), _( "%'d Torrent Properties" ), len );
     }
