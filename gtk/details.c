@@ -2490,6 +2490,13 @@ periodic_refresh( gpointer data )
 }
 
 static void
+piece_map_clicked( GtrPiecesViewer * pv UNUSED, guint fi, gpointer user_data )
+{
+    struct DetailsImpl * di = user_data;
+    gtr_file_list_select( di->file_list, fi );
+}
+
+static void
 details_free( gpointer gdata )
 {
     struct DetailsImpl * data = gdata;
@@ -2541,6 +2548,8 @@ gtr_torrent_details_dialog_new( GtkWindow * parent, TrCore * core )
     w = gtk_expander_new_with_mnemonic( _( "_Piece Map" ) );
     gtk_expander_set_expanded( GTK_EXPANDER( w ), FALSE );
     di->file_pieces = gtr_pieces_viewer_new( core );
+    g_signal_connect( G_OBJECT( di->file_pieces ), "file-clicked",
+                      G_CALLBACK( piece_map_clicked ), di );
     gtk_container_add( GTK_CONTAINER( w ), di->file_pieces );
     di->file_pieces_area = w;
     gtk_box_pack_start( GTK_BOX( v ), w, FALSE, FALSE, GUI_PAD );
