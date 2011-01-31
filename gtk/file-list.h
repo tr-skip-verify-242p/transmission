@@ -20,5 +20,6 @@ GtkWidget * gtr_file_list_new( TrCore *, int torrent_id );
 void gtr_file_list_clear( GtkWidget * );
 void gtr_file_list_set_torrent( GtkWidget *, int torrent_id );
 void gtr_file_list_set_allow_delete( GtkWidget *, gboolean );
+void gtr_file_list_select( GtkWidget *, guint file_index );
 
 #endif

@@ -69,6 +69,7 @@ typedef struct
     int             torrentId;
     guint           timeout_tag;
     gboolean        allow_delete;
+    guint           select_file_index;
 }
 FileData;
 
@@ -636,6 +637,58 @@ gtr_file_list_set_torrent( GtkWidget * w, int torrentId )
 
     gtk_tree_view_set_model( GTK_TREE_VIEW( data->view ), data->filter );
     gtk_tree_view_expand_all( GTK_TREE_VIEW( data->view ) );
+}
+
+static gboolean
+find_and_select_file( GtkTreeModel * model,
+                      GtkTreePath  * path,
+                      GtkTreeIter  * iter,
+                      gpointer       user_data )
+{
+    FileData * data = user_data;
+    guint index;
+
+    if( gtk_tree_model_iter_has_child( model, iter ) )
+        return FALSE;
+
+    gtk_tree_model_get( model, iter, FC_INDEX, &index, -1 );
+
+    if( data->select_file_index < index )
+        return TRUE;
+
+    if( data->select_file_index == index )
+    {
+        GtkTreeSelection * sel;
+        GtkTreeView * view = GTK_TREE_VIEW( data->view );
+        sel = gtk_tree_view_get_selection( view );
+        gtk_tree_selection_select_iter( sel, iter );
+        gtk_tree_view_scroll_to_cell( view, path, NULL, FALSE, 0, 0 );
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+void
+gtr_file_list_select( GtkWidget * w, guint file_index )
+{
+    GtkTreeSelection * sel;
+    GtkTreeView * view;
+    FileData * data;
+    
+    data = g_object_get_data( G_OBJECT( w ), "file-data" );
+    g_assert( data != NULL );
+
+    if( data->torrentId < 0 )
+        return;
+
+    view = GTK_TREE_VIEW( data->view );
+    gtk_tree_view_expand_all( view );
+    sel = gtk_tree_view_get_selection( view );
+    gtk_tree_selection_unselect_all( sel );
+
+    data->select_file_index = file_index;
+    gtk_tree_model_foreach( data->model, find_and_select_file, data );
 }
 
 /***

@@ -70,7 +70,6 @@ struct DetailsImpl
     GtkWidget * date_started_lb;
     GtkWidget * eta_lb;
     GtkWidget * last_activity_lb;
-    GtkWidget * pieces_viewer;
 
     GtkWidget * hash_lb;
     GtkWidget * peerid_lb;
@@ -98,6 +97,8 @@ struct DetailsImpl
     GtkWidget     * all_check;
 
     GtkWidget * file_list;
+    GtkWidget * file_pieces;
+    GtkWidget * file_pieces_area;
     GtkWidget * file_label;
 
     GSList * ids;
@@ -939,19 +940,6 @@ refreshInfo( struct DetailsImpl * di, tr_torrent ** torrents, int n )
     }
     gtr_label_set_text( GTK_LABEL( di->last_activity_lb ), str );
 
-    /* pieces viewer */
-    if( n == 1 )
-    {
-        TrTorrent * gtor = tr_core_get_handle( di->core, torrents[0] );
-        GtrPiecesViewer * pv = GTR_PIECES_VIEWER( di->pieces_viewer );
-        gtr_pieces_viewer_set_gtorrent( pv, gtor );
-    }
-    else
-    {
-        GtrPiecesViewer * pv = GTR_PIECES_VIEWER( di->pieces_viewer );
-        gtr_pieces_viewer_set_gtorrent( pv, NULL );
-    }
-
     g_free( stats );
     g_free( infos );
 }
@@ -961,10 +949,8 @@ info_page_new( struct DetailsImpl * di )
 {
     int row = 0;
     GtkTextBuffer * b;
-    GtkWidget *l, *w, *fr, *sw, *hbox;
+    GtkWidget *l, *w, *fr, *sw;
     GtkWidget *t = hig_workarea_create( );
-
-    gtk_container_set_border_width( GTK_CONTAINER( t ), 0 );
 
     hig_workarea_add_section_title( t, &row, _( "Activity" ) );
 
@@ -1015,17 +1001,6 @@ info_page_new( struct DetailsImpl * di )
         hig_workarea_add_row( t, &row, _( "Error:" ), l, NULL );
         di->error_lb = l;
 
-    hbox = gtk_hbox_new( FALSE, GUI_PAD_BIG );
-    gtk_box_pack_start( GTK_BOX( hbox ), t, TRUE, TRUE, 0 );
-
-    di->pieces_viewer = gtr_pieces_viewer_new( );
-    w = gtk_alignment_new( 1, 1, 0, 0 );
-    gtk_container_add( GTK_CONTAINER( w ), di->pieces_viewer );
-    gtk_box_pack_start( GTK_BOX( hbox ), w, FALSE, FALSE, 0 );
-
-    t = hig_workarea_create( );
-    gtk_table_attach( GTK_TABLE( t ), hbox, 0, 2, 0, 1, GTK_FILL, 0, 0, 0 );
-    row = 1;
 
     hig_workarea_add_section_divider( t, &row );
     hig_workarea_add_section_title( t, &row, _( "Details" ) );
@@ -2542,6 +2517,13 @@ periodic_refresh( gpointer data )
 }
 
 static void
+piece_map_clicked( GtrPiecesViewer * pv UNUSED, guint fi, gpointer user_data )
+{
+    struct DetailsImpl * di = user_data;
+    gtr_file_list_select( di->file_list, fi );
+}
+
+static void
 details_free( gpointer gdata )
 {
     struct DetailsImpl * data = gdata;
@@ -2591,6 +2573,14 @@ gtr_torrent_details_dialog_new( GtkWindow * parent, TrCore * core )
     gtr_file_list_set_allow_delete( di->file_list, TRUE );
     di->file_label = gtk_label_new( _( "File listing not available for combined torrent properties" ) );
     gtk_box_pack_start( GTK_BOX( v ), di->file_list, TRUE, TRUE, 0 );
+    w = gtk_expander_new_with_mnemonic( _( "_Piece Map" ) );
+    gtk_expander_set_expanded( GTK_EXPANDER( w ), FALSE );
+    di->file_pieces = gtr_pieces_viewer_new( core );
+    g_signal_connect( G_OBJECT( di->file_pieces ), "file-clicked",
+                      G_CALLBACK( piece_map_clicked ), di );
+    gtk_container_add( GTK_CONTAINER( w ), di->file_pieces );
+    di->file_pieces_area = w;
+    gtk_box_pack_start( GTK_BOX( v ), w, FALSE, FALSE, GUI_PAD );
     gtk_box_pack_start( GTK_BOX( v ), di->file_label, TRUE, TRUE, 0 );
     gtk_container_set_border_width( GTK_CONTAINER( v ), GUI_PAD_BIG );
     l = gtk_label_new( _( "Files" ) );
@@ -2626,12 +2616,18 @@ gtr_torrent_details_dialog_set_torrents( GtkWidget * w, GSList * ids )
 
         gtr_file_list_set_torrent( di->file_list, id );
         gtk_widget_show( di->file_list );
+        gtr_pieces_viewer_set_torrent_by_id(
+            GTR_PIECES_VIEWER( di->file_pieces ), id );
+        gtk_widget_show( di->file_pieces_area );
         gtk_widget_hide( di->file_label );
     }
    else
    {
         gtr_file_list_clear( di->file_list );
         gtk_widget_hide( di->file_list );
+        gtr_pieces_viewer_set_torrent_by_id(
+            GTR_PIECES_VIEWER( di->file_pieces ), -1 );
+        gtk_widget_hide( di->file_pieces_area );
         gtk_widget_show( di->file_label );
         g_snprintf( title, sizeof( title ), _( "%'d Torrent Properties" ), len );
     }

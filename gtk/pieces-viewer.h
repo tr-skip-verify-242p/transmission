@@ -26,6 +26,7 @@
 #define GTR_PIECES_VIEWER_H
 
 #include <gtk/gtkdrawingarea.h>
+#include "tr-core.h"
 #include "tr-torrent.h"
 
 #define GTR_TYPE_PIECES_VIEWER ( gtr_pieces_viewer_get_type( ) )
@@ -52,11 +53,16 @@ struct _GtrPiecesViewer
 struct _GtrPiecesViewerClass
 {
     GtkDrawingAreaClass parent_class;
+
+    /* Signals */
+    void ( * file_clicked )( GtrPiecesViewer * pv, guint file_index );
 };
 
-GtkWidget * gtr_pieces_viewer_new( void );
+GtkWidget * gtr_pieces_viewer_new( TrCore * core );
 
 /** @note Does not increase the reference count of @a gtor. */
 void gtr_pieces_viewer_set_gtorrent( GtrPiecesViewer * pv, TrTorrent * gtor );
+
+void gtr_pieces_viewer_set_torrent_by_id( GtrPiecesViewer * pv, int id );
 
 #endif /* GTR_PIECES_VIEWER_H */

@@ -22,14 +22,16 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
+#include <stdlib.h>
+
+#include "pieces-common.h"
 #include "pieces-viewer.h"
+#include "tr-prefs.h"
+#include "util.h"
 
 
-#define NUM_SQUARES_X 18
-#define NUM_SQUARES_Y 18
-#define NUM_SQUARES   ( NUM_SQUARES_X * NUM_SQUARES_Y )
-#define SQUARE_SIZE   4
-#define GRID_WIDTH    1
+#define BAR_HEIGHT 20
+#define BORDER_WIDTH 1
 
 /*
  * Defines:
@@ -41,52 +43,40 @@ G_DEFINE_TYPE( GtrPiecesViewer, gtr_pieces_viewer, GTK_TYPE_DRAWING_AREA );
 typedef struct _GtrPiecesViewerPrivate GtrPiecesViewerPrivate;
 struct _GtrPiecesViewerPrivate
 {
-    TrTorrent * gtor; /* shared */
+    TrTorrent * gtor; /* not owned */
+    TrCore    * core; /* not owned */
+    guint       timer;
 };
 
 #define GTR_PIECES_VIEWER_GET_PRIVATE( obj ) \
     ( G_TYPE_INSTANCE_GET_PRIVATE( ( obj ), GTR_TYPE_PIECES_VIEWER, \
                                    GtrPiecesViewerPrivate ) )
 
+enum gtr_pieces_viewer_signals
+{
+    SIGNAL_FILE_CLICKED,
+    NUM_SIGNALS
+};
+
+static guint signals[NUM_SIGNALS];
+
 static void
 paint( GtrPiecesViewer * self, cairo_t * cr )
 {
     GtrPiecesViewerPrivate * priv = GTR_PIECES_VIEWER_GET_PRIVATE( self );
-    GdkColor bg_color, grid_color, piece_color;
-    const tr_info * info;
-    const int8_t * avtab;
-    int i, j, n, piece;
+    const GtrPieceStyle * pstyle = gtr_get_piece_style( );
+    GtkAllocation a;
 
     if( !priv->gtor )
         return;
 
-    gdk_color_parse( "#ffffff", &bg_color );
-    gdk_color_parse( "#bababa", &grid_color );
-    gdk_color_parse( "#2975d6", &piece_color );
-
-    gdk_cairo_set_source_color( cr, &grid_color );
+    gdk_cairo_set_source_color( cr, &pstyle->border_color );
     cairo_paint( cr );
 
-    info = tr_torrent_info( priv->gtor );
-    n = MIN( info->pieceCount, NUM_SQUARES );
-    avtab = tr_torrent_availability( priv->gtor, n );
-    piece = 0;
-
-    for( j = 0; j < NUM_SQUARES_Y && piece < n; ++j )
-    {
-        int y = 1 + ( SQUARE_SIZE + GRID_WIDTH ) * j;
-        for( i = 0; i < NUM_SQUARES_X && piece < n; ++i )
-        {
-            int x = 1 + ( SQUARE_SIZE + GRID_WIDTH ) * i;
-            if( avtab[piece] == -1 )
-                gdk_cairo_set_source_color( cr, &piece_color );
-            else
-                gdk_cairo_set_source_color( cr, &bg_color );
-            cairo_rectangle( cr, x, y, SQUARE_SIZE, SQUARE_SIZE );
-            cairo_fill( cr );
-            ++piece;
-        }
-    }
+    gtr_widget_get_allocation( GTK_WIDGET( self ), &a );
+    gtr_draw_pieces( cr, priv->gtor, BORDER_WIDTH, BORDER_WIDTH,
+                     a.width - 2 * BORDER_WIDTH,
+                     a.height - 2 * BORDER_WIDTH );
 }
 
 static gboolean
@@ -106,14 +96,92 @@ gtr_pieces_viewer_expose( GtkWidget * widget, GdkEventExpose * event)
     return FALSE;
 }
 
+static gboolean
+timer_callback( gpointer user_data )
+{
+    GtrPiecesViewer * self;
+    GtrPiecesViewerPrivate * priv;
+
+    if( !GTR_IS_PIECES_VIEWER( user_data ) )
+        return FALSE;
+
+    self = GTR_PIECES_VIEWER( user_data );
+    priv = GTR_PIECES_VIEWER_GET_PRIVATE( self );
+
+    if( priv->gtor )
+        gtk_widget_queue_draw( GTK_WIDGET( user_data ) );
+    return TRUE;
+}
+
 static void
 gtr_pieces_viewer_size_request( GtkWidget * w, GtkRequisition * req )
 {
     g_return_if_fail( w != NULL );
     g_return_if_fail( GTR_IS_PIECES_VIEWER( w ) );
 
-    req->width  = SQUARE_SIZE * NUM_SQUARES_X + GRID_WIDTH * ( NUM_SQUARES_X + 1 );
-    req->height = SQUARE_SIZE * NUM_SQUARES_Y + GRID_WIDTH * ( NUM_SQUARES_Y + 1 );
+    req->height = BAR_HEIGHT;
+}
+
+static int
+compare_piece_index_to_file( const void * a, const void * b )
+{
+    const tr_piece_index_t pi = *(const tr_piece_index_t *) a;
+    const tr_file * file = b;
+    if( pi < file->firstPiece )
+        return -1;
+    if( pi > file->lastPiece )
+        return 1;
+    return 0;
+}
+
+static void
+emit_file_clicked_signal( GtrPiecesViewer * self, int x, int y )
+{
+    GtrPiecesViewerPrivate * priv;
+    const tr_info * info;
+    const tr_file * file;
+    tr_piece_index_t pi;
+    tr_file_index_t fi;
+    GtkAllocation a;
+    float interval;
+    int w, h;
+
+    priv = GTR_PIECES_VIEWER_GET_PRIVATE( self );
+    if( !( info = tr_torrent_info( priv->gtor ) ) )
+        return;
+
+    if( !info->fileCount )
+        return;
+
+    gtr_widget_get_allocation( GTK_WIDGET( self ), &a );
+    x -= BORDER_WIDTH;
+    y -= BORDER_WIDTH;
+    w = a.width - 2 * BORDER_WIDTH;
+    h = a.height - 2 * BORDER_WIDTH;
+
+    if( w < 1 || h < 1 || y > h )
+        return;
+
+    /* FIXME: Same problem as with tr_peerMgrTorrentAvailability(). */
+    interval = (float) info->pieceCount / (float) w;
+    pi = interval * x;
+    if( pi >= info->pieceCount )
+        return;
+
+    file = bsearch( &pi, info->files, info->fileCount, sizeof( tr_file ),
+                    compare_piece_index_to_file );
+    if( !file )
+        return;
+    fi = file - info->files;
+
+    g_signal_emit( self, signals[SIGNAL_FILE_CLICKED], 0, fi );
+}
+
+static gboolean
+gtr_pieces_viewer_button_press( GtkWidget * w, GdkEventButton * ev )
+{
+    emit_file_clicked_signal( GTR_PIECES_VIEWER( w ), ev->x, ev->y );
+    return TRUE;
 }
 
 static void
@@ -124,6 +192,8 @@ gtr_pieces_viewer_dispose( GObject * object )
 
     if( priv->gtor )
         priv->gtor = NULL;
+    g_source_remove( priv->timer );
+
     G_OBJECT_CLASS( gtr_pieces_viewer_parent_class )->dispose( object );
 }
 
@@ -137,7 +207,17 @@ gtr_pieces_viewer_class_init( GtrPiecesViewerClass * klass )
 
     widget_class->expose_event = gtr_pieces_viewer_expose;
     widget_class->size_request = gtr_pieces_viewer_size_request;
+    widget_class->button_press_event = gtr_pieces_viewer_button_press;
     gobject_class->dispose = gtr_pieces_viewer_dispose;
+
+    signals[SIGNAL_FILE_CLICKED] = g_signal_new(
+        "file-clicked",
+        G_OBJECT_CLASS_TYPE( gobject_class ),
+        G_SIGNAL_RUN_FIRST,
+        G_STRUCT_OFFSET( GtrPiecesViewerClass, file_clicked ),
+        NULL, NULL,
+        g_cclosure_marshal_VOID__UINT,
+        G_TYPE_NONE, 1, G_TYPE_UINT );
 }
 
 static void
@@ -145,13 +225,26 @@ gtr_pieces_viewer_init( GtrPiecesViewer * self )
 {
     GtrPiecesViewerPrivate * priv = GTR_PIECES_VIEWER_GET_PRIVATE( self );
 
+    gtk_widget_add_events( GTK_WIDGET( self ),
+                           GDK_BUTTON_PRESS_MASK );
+
     priv->gtor = NULL;
+    priv->core = NULL;
 }
 
 GtkWidget *
-gtr_pieces_viewer_new( void )
+gtr_pieces_viewer_new( TrCore * core )
 {
-    return g_object_new( GTR_TYPE_PIECES_VIEWER, NULL );
+    GtrPiecesViewer * self;
+    GtrPiecesViewerPrivate * priv;
+
+    self = g_object_new( GTR_TYPE_PIECES_VIEWER, NULL );
+    priv = GTR_PIECES_VIEWER_GET_PRIVATE( self );
+    priv->core = core;
+    priv->timer = gtr_timeout_add_seconds( SECONDARY_WINDOW_REFRESH_INTERVAL_SECONDS,
+                                           timer_callback, self );
+
+    return GTK_WIDGET( self );
 }
 
 void
@@ -159,4 +252,11 @@ gtr_pieces_viewer_set_gtorrent( GtrPiecesViewer * self, TrTorrent * gtor )
 {
     GtrPiecesViewerPrivate * priv = GTR_PIECES_VIEWER_GET_PRIVATE( self );
     priv->gtor = gtor;
+}
+
+void
+gtr_pieces_viewer_set_torrent_by_id( GtrPiecesViewer * self, int id )
+{
+    GtrPiecesViewerPrivate * priv = GTR_PIECES_VIEWER_GET_PRIVATE( self );
+    priv->gtor = tr_core_get_handle_by_id( priv->core, id );
 }
