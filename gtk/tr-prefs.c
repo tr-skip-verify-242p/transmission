@@ -574,7 +574,6 @@ privacyPage( GObject * core )
 
     s = _( "_User Agent:" );
     e = new_entry( TR_PREFS_KEY_USER_AGENT, core );
-    gtk_entry_set_max_length( GTK_ENTRY( e ), 8 );
     hig_workarea_add_row( t, &row, s, e, NULL );
     s = _( "Do not change this value, unless you know what you are doing. "
            "Some peers may rely on this to find out what capabilities "
