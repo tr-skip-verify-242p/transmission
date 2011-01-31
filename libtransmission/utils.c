@@ -545,6 +545,22 @@ tr_loadFile( const char * path,
     return buf;
 }
 
+time_t
+tr_fileMTime( const char * path )
+{
+    struct stat sb;
+    time_t mtime = 0;
+    if( ( path != NULL ) && !stat( path, &sb ) && S_ISREG( sb.st_mode ) )
+    {
+#ifdef SYS_DARWIN
+        mtime = sb.st_mtimespec.tv_sec;
+#else
+        mtime = sb.st_mtime;
+#endif
+    }
+    return mtime;
+}
+
 char*
 tr_basename( const char * path )
 {
@@ -781,6 +797,12 @@ tr_strcmp0( const char * str1, const char * str2 )
     if( str1 ) return 1;
     if( str2 ) return -1;
     return 0;
+}
+
+int
+vstrcmp( const void * a, const void * b )
+{
+    return strcmp( a, b );
 }
 
 /****

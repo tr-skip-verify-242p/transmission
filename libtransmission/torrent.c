@@ -2391,19 +2391,9 @@ tr_torrentCheckPiece( tr_torrent * tor, tr_piece_index_t pieceIndex )
 static time_t
 getFileMTime( const tr_torrent * tor, tr_file_index_t i )
 {
-    struct stat sb;
     time_t mtime = 0;
     char * path = tr_torrentFindFile( tor, i );
-
-    if( ( path != NULL ) && !stat( path, &sb ) && S_ISREG( sb.st_mode ) )
-    {
-#ifdef SYS_DARWIN
-        mtime = sb.st_mtimespec.tv_sec;
-#else
-        mtime = sb.st_mtime;
-#endif
-    }
-
+    mtime = tr_fileMTime( path );
     tr_free( path );
     return mtime;
 }
@@ -2621,12 +2611,6 @@ tr_torrentGetBytesLeftToAllocate( const tr_torrent * tor )
 /****
 *****  Removing the torrent's local data
 ****/
-
-static int
-vstrcmp( const void * a, const void * b )
-{
-    return strcmp( a, b );
-}
 
 static int
 compareLongestFirst( const void * a, const void * b )

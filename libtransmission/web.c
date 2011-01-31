@@ -10,6 +10,8 @@
  * $Id$
  */
 
+#include <ctype.h>
+
 #ifdef WIN32
   #include <ws2tcpip.h>
 #else
@@ -24,6 +26,7 @@
 #include "list.h"
 #include "net.h" /* tr_address */
 #include "platform.h" /* mutex */
+#include "ptrarray.h"
 #include "session.h"
 #include "trevent.h" /* tr_runInEventThread() */
 #include "utils.h"
@@ -160,6 +163,87 @@ getTimeoutFromURL( const struct tr_web_task * task )
     return timeout;
 }
 
+static tr_ptrArray proxy_acl;
+
+static void
+clear_proxy_acl( )
+{
+    if( tr_ptrArraySize( &proxy_acl ) )
+    {
+        tr_ptrArrayDestruct( &proxy_acl, tr_free );
+        proxy_acl = TR_PTR_ARRAY_INIT;
+    }
+}
+
+static void
+load_proxy_acl( tr_session * s )
+{
+    char * path = NULL, * p, * host;
+    static time_t last_mtime;
+    time_t cur_mtime;
+    FILE * f = NULL;
+    char line[512];
+
+    path = tr_buildPath( s->configDir, "proxy-bypass.txt", NULL );
+    cur_mtime = tr_fileMTime( path );
+    if( cur_mtime == 0 )
+    {
+        clear_proxy_acl( );
+        goto OUT;
+    }
+
+    if( cur_mtime <= last_mtime )
+        goto OUT;
+    last_mtime = cur_mtime;
+
+    clear_proxy_acl( );
+
+    if( !(f = fopen( path, "r" ) ) )
+        goto OUT;
+
+    while( ( host = fgets( line, sizeof( line ), f ) ) )
+    {
+        while( *host && isspace( *host ) )
+            ++host;
+        if( ( p = strchr( host, '#' ) ) )
+            *p = '\0';
+        p = host + strlen( host ) - 1;
+        while( p >= host && isspace( *p ) )
+            *p-- = '\0';
+        if( !*host )
+            continue;
+        tr_ptrArrayInsertSorted( &proxy_acl, tr_strdup( host ), vstrcmp );
+    }
+
+OUT:
+    tr_free( path );
+    if( f )
+        fclose( f );
+}
+
+static tr_bool
+use_proxy_for_task( struct tr_web_task * task )
+{
+    char * host;
+    tr_bool use_proxy = TRUE;
+
+    if( !task || task->range || !task->url )
+        return FALSE;
+
+    if( !tr_sessionIsProxyEnabled( task->session ) )
+        return FALSE;
+
+    if( tr_urlParse( task->url, -1, NULL, &host, NULL, NULL ) )
+        return TRUE; /* Does not really matter for bad urls. */
+
+    load_proxy_acl( task->session );
+    if( tr_ptrArrayFindSorted( &proxy_acl, host, vstrcmp ) )
+        use_proxy = FALSE;
+
+    tr_free( host );
+    return use_proxy;
+}
+
 static CURL *
 createEasy( tr_session * s, struct tr_web_task * task )
 {
@@ -169,7 +253,7 @@ createEasy( tr_session * s, struct tr_web_task * task )
     const long verbose = getenv( "TR_CURL_VERBOSE" ) != NULL;
     char * cookie_filename = tr_buildPath( s->configDir, "cookies.txt", NULL );
 
-    if( !task->range && tr_sessionIsProxyEnabled( s ) )
+    if( use_proxy_for_task( task ) )
     {
         const tr_proxy_type type = tr_sessionGetProxyType( s );
         const long proxyType = getCurlProxyType( type );
