@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2011 Transmission authors and contributors
+ * Copyright (c) 2011 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,20 +23,10 @@
  *****************************************************************************/
 
 #import <Cocoa/Cocoa.h>
-#import <transmission.h>
 
-@interface Badger : NSObject
+@interface InfoTabButtonBack : NSView
 {
-    tr_session * fLib;
-    
-    NSUInteger fCompleted;
+    NSGradient * fGradient;
 }
-
-- (id) initWithLib: (tr_session *) lib;
-
-- (void) updateBadgeWithDownload: (CGFloat) downloadRate upload: (CGFloat) uploadRate;
-- (void) incrementCompleted;
-- (void) clearCompleted;
-- (void) setQuitting;
 
 @end

@@ -24,12 +24,6 @@ export LIBTOOLIZE
 
 ./update-version-h.sh
 
-autoreconf -fi
-if [[ $? -ne 0 ]]; then
-  exit 1
-fi
-
-
 if test "$GETTEXTIZE"; then
   echo "Creating aclocal.m4 ..."
   test -r aclocal.m4 || touch aclocal.m4
@@ -40,6 +34,9 @@ if test "$GETTEXTIZE"; then
   echo "Running intltoolize..."
   intltoolize --copy --force --automake
 fi
+
+autoreconf --force --install --verbose || exit 1;
+
 
 cd "$ORIGDIR" || exit $?
 

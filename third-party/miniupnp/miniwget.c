@@ -159,7 +159,7 @@ getHTTPResponse(int s, int * size)
 #endif
 									goto end_of_stream;	
 								}
-								bytestocopy = ((int)chunksize < header_buf_used - i)?chunksize:(header_buf_used - i);
+								bytestocopy = ((int)chunksize < header_buf_used - i)?(int)chunksize:(header_buf_used - i);
 #ifdef DEBUG
 								printf("chunksize=%u bytestocopy=%u (i=%d header_buf_used=%d)\n",
 								       chunksize, bytestocopy, i, header_buf_used);
@@ -226,7 +226,7 @@ getHTTPResponse(int s, int * size)
 							goto end_of_stream;
 						}
 					}
-					bytestocopy = ((int)chunksize < n - i)?chunksize:(n - i);
+					bytestocopy = ((int)chunksize < n - i)?(int)chunksize:(n - i);
 					if((int)(content_buf_used + bytestocopy) > content_buf_len)
 					{
 						content_buf = (char *)realloc((void *)content_buf, 
@@ -284,6 +284,7 @@ miniwget3(const char * url, const char * host,
 	int len;
 	int sent;
 
+	url = NULL; /* FIXME: unused parameter */
 	*size = 0;
 	s = connecthostport(host, port);
 	if(s < 0)

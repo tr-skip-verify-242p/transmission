@@ -55,7 +55,11 @@ enum
 {
     SAVE_INTERVAL_SECS = 360,
 
+#ifdef TR_LIGHTWEIGHT
+    DEFAULT_CACHE_SIZE_MB = 2
+#else
     DEFAULT_CACHE_SIZE_MB = 4
+#endif
 };
 
 
@@ -274,7 +278,7 @@ tr_sessionGetPublicAddress( const tr_session * session, int tr_af_type, tr_bool 
 ****
 ***/
 
-#ifdef TR_EMBEDDED
+#ifdef TR_LIGHTWEIGHT
  #define TR_DEFAULT_ENCRYPTION   TR_CLEAR_PREFERRED
 #else
  #define TR_DEFAULT_ENCRYPTION   TR_ENCRYPTION_PREFERRED
@@ -746,7 +750,7 @@ tr_sessionInitImpl( void * vdata )
 
     tr_sessionSet( session, &settings );
 
-    tr_udpInit( session, &session->public_ipv4->addr );
+    tr_udpInit( session );
 
     if( session->isLPDEnabled )
         tr_lpdInit( session, &session->public_ipv4->addr );
@@ -1767,11 +1771,6 @@ tr_sessionGetPieceSpeed_Bps( const tr_session * session, tr_direction dir )
 {
     return tr_isSession( session ) ? tr_bandwidthGetPieceSpeed_Bps( session->bandwidth, 0, dir ) : 0;
 }
-double
-tr_sessionGetPieceSpeed_KBps( const tr_session * session, tr_direction dir )
-{
-    return toSpeedKBps( tr_sessionGetPieceSpeed_Bps( session, dir ) );
-}
 
 int
 tr_sessionGetRawSpeed_Bps( const tr_session * session, tr_direction dir )
@@ -2042,7 +2041,7 @@ toggleDHTImpl(  void * data )
 
     tr_udpUninit( session );
     session->isDHTEnabled = !session->isDHTEnabled;
-    tr_udpInit( session, &session->public_ipv4->addr );
+    tr_udpInit( session );
 }
 
 void
@@ -2445,24 +2444,6 @@ tr_sessionSetTorrentFile( tr_session * session,
         tr_bencDictAddStr( session->metainfoLookup, hashString, filename );
 }
 
-tr_torrent*
-tr_torrentNext( tr_session * session,
-                tr_torrent * tor )
-{
-    tr_torrent * ret;
-
-    assert( !session || tr_isSession( session ) );
-
-    if( !session )
-        ret = NULL;
-    else if( !tor )
-        ret = session->torrentList;
-    else
-        ret = tor->next;
-
-    return ret;
-}
-
 /***
 ****
 ***/
@@ -2809,4 +2790,37 @@ void
 tr_sessionSetWebConfigFunc( tr_session * session, void (*func)(tr_session*, void*, const char* ) )
 {
     session->curl_easy_config_func = func;
+}
+
+/***
+****
+***/
+
+uint64_t
+tr_sessionGetTimeMsec( tr_session * session )
+{
+    struct timeval tv;
+
+    if( event_base_gettimeofday_cached( session->event_base, &tv ) )
+    {
+        return tr_time_msec( );
+    }
+    else
+    {
+        /* event_base_gettimeofday_cached() might be implemented using
+           clock_gettime(CLOCK_MONOTONIC), so calculate the offset to
+           real time... */
+        static uint64_t offset;
+        static tr_bool offset_calculated = FALSE;
+
+        const uint64_t val = (uint64_t) tv.tv_sec * 1000 + ( tv.tv_usec / 1000 );
+
+        if( !offset_calculated )
+        {
+            offset = tr_time_msec() - val;
+            offset_calculated = TRUE;
+        }
+
+        return val + offset;
+    }
 }
