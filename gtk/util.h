@@ -145,6 +145,9 @@ gboolean gtr_widget_get_realized( GtkWidget * w );
 /* backwards-compatible wrapper around gtk_widget_set_visible() */
 void gtr_widget_set_visible( GtkWidget *, gboolean );
 
+/* backwards-compatible wrapper around gtk_widget_get_allocation() */
+void gtr_widget_get_allocation( GtkWidget *, GtkAllocation * );
+
 /* backwards-compatible wrapper around gtk_cell_renderer_get_padding() */
 void gtr_cell_renderer_get_padding( GtkCellRenderer *, gint * xpad, gint * ypad );
 

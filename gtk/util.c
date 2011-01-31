@@ -762,6 +762,16 @@ gtr_widget_set_visible( GtkWidget * w, gboolean b )
 }
 
 void
+gtr_widget_get_allocation( GtkWidget * w, GtkAllocation * a )
+{
+#if GTK_CHECK_VERSION( 2,18,0 )
+    gtk_widget_get_allocation( w, a );
+#else
+    *a = w->allocation;
+#endif
+}
+
+void
 gtr_cell_renderer_get_padding( GtkCellRenderer * cell, gint * xpad, gint * ypad )
 {
 #if GTK_CHECK_VERSION( 2,18,0 )

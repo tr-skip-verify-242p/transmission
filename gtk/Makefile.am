@@ -50,6 +50,7 @@ noinst_HEADERS = \
     notify.h \
     open-dialog.h \
     pieces-cell-renderer.h \
+    pieces-common.h \
     pieces-viewer.h \
     relocate.h \
     stats.h \
@@ -83,6 +84,7 @@ transmission_gtk_SOURCES = \
     notify.c \
     open-dialog.c \
     pieces-cell-renderer.c \
+    pieces-common.c \
     pieces-viewer.c \
     relocate.c \
     stats.c \

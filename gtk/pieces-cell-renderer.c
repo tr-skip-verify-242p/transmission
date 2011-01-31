@@ -25,6 +25,7 @@
 #include <libtransmission/transmission.h>
 #include <libtransmission/utils.h>
 #include "pieces-cell-renderer.h"
+#include "pieces-common.h"
 #include "tr-torrent.h"
 #include "util.h"
 
@@ -41,26 +42,6 @@ static const gint BORDER_WIDTH    = 1;
  */
 G_DEFINE_TYPE( GtrPiecesCellRenderer, gtr_pieces_cell_renderer,
                GTK_TYPE_CELL_RENDERER );
-
-typedef struct _GtrPiecesCellRendererClassPrivate
-{
-    /* See gtr_pieces_cell_renderer_class_init() for color values. */
-    GdkColor piece_bg_color;
-    GdkColor piece_have_color;
-    GdkColor piece_missing_color;
-    GdkColor piece_seeding_color;
-    GdkColor piece_stopped_color;
-    GdkColor progress_bg_color;
-    GdkColor progress_bar_color;
-    GdkColor ratio_bg_color;
-    GdkColor ratio_bar_color;
-    GdkColor border_color;
-    GdkColor progress_stopped_color;
-    GdkColor magnet_color;
-} GtrPiecesCellRendererClassPrivate;
-
-static GtrPiecesCellRendererClassPrivate cpriv_data;
-static GtrPiecesCellRendererClassPrivate * cpriv = &cpriv_data;
 
 struct _GtrPiecesCellRendererPrivate
 {
@@ -134,13 +115,14 @@ static void
 render_progress( GtrPiecesCellRendererPrivate * priv,
                  cairo_t * cr, int x, int y, int w, int h )
 {
+    const GtrPieceStyle * pstyle = gtr_get_piece_style( );
     const tr_stat * st = tr_torrent_stat( priv->gtor );
-    GdkColor * bg_color, * bar_color;
+    const GdkColor * bg_color, * bar_color;
     double progress;
 
     if( !st )
     {
-        gdk_cairo_set_source_color( cr, &cpriv->progress_bg_color );
+        gdk_cairo_set_source_color( cr, &pstyle->progress_bg_color );
         cairo_rectangle( cr, x, y, w, h );
         cairo_fill( cr );
         return;
@@ -149,20 +131,20 @@ render_progress( GtrPiecesCellRendererPrivate * priv,
     if( st->percentDone >= 1.0 )
     {
         progress = MIN( 1.0, MAX( 0.0, st->seedRatioPercentDone ) );
-        bg_color = &cpriv->ratio_bg_color;
-        bar_color = &cpriv->ratio_bar_color;
+        bg_color = &pstyle->ratio_bg_color;
+        bar_color = &pstyle->ratio_bar_color;
     }
     else
     {
         progress = MIN( 1.0, MAX( 0.0, st->percentDone ) );
-        bg_color = &cpriv->progress_bg_color;
-        bar_color = &cpriv->progress_bar_color;
+        bg_color = &pstyle->progress_bg_color;
+        bar_color = &pstyle->progress_bar_color;
     }
 
     if( st->activity == TR_STATUS_STOPPED )
     {
-        bg_color = &cpriv->progress_bg_color;
-        bar_color = &cpriv->progress_stopped_color;
+        bg_color = &pstyle->progress_bg_color;
+        bar_color = &pstyle->progress_stopped_color;
     }
 
     if( progress < 1.0 )
@@ -181,75 +163,6 @@ render_progress( GtrPiecesCellRendererPrivate * priv,
 }
 
 static void
-render_pieces( GtrPiecesCellRendererPrivate * priv,
-               cairo_t * cr, int x, int y, int w, int h )
-{
-    const tr_stat * st;
-    const int8_t * avtab;
-
-    if (w < 1 || h < 1)
-        return;
-
-    gdk_cairo_set_source_color( cr, &cpriv->piece_bg_color );
-    cairo_rectangle( cr, x, y, w, h );
-    cairo_fill( cr );
-
-    st = tr_torrent_stat( priv->gtor );
-    avtab = tr_torrent_availability( priv->gtor, w );
-    if( st && avtab )
-    {
-        const tr_torrent * tor = tr_torrent_handle( priv->gtor );
-        const tr_bool magnet = !tr_torrentHasMetadata( tor );
-        const tr_bool stopped = ( st->activity == TR_STATUS_STOPPED );
-        const tr_bool connected = ( st->peersConnected > 0 );
-        const tr_bool seeding = ( st->percentDone >= 1.0 );
-        GdkColor * piece_have_color;
-        GdkColor * piece_missing_color;
-        int i, j;
-        int8_t avail;
-
-        if( stopped )
-            piece_have_color = &cpriv->piece_stopped_color;
-        else if( seeding )
-            piece_have_color = &cpriv->piece_seeding_color;
-        else
-            piece_have_color = &cpriv->piece_have_color;
-
-        if( connected )
-        {
-            if( magnet )
-                piece_missing_color = &cpriv->magnet_color;
-            else
-                piece_missing_color = &cpriv->piece_missing_color;
-        }
-        else
-        {
-            piece_missing_color = &cpriv->piece_bg_color;
-        }
-
-        for( i = 0; i < w; )
-        {
-            if( avtab[i] > 0 )
-            {
-                ++i;
-                continue;
-            }
-            avail = avtab[i];
-            for( j = i + 1; j < w; ++j )
-                if( avtab[j] != avail )
-                    break;
-            if( avail == 0 )
-                gdk_cairo_set_source_color( cr, piece_missing_color );
-            else
-                gdk_cairo_set_source_color( cr, piece_have_color );
-            cairo_rectangle( cr, x + i, y, j - i, h );
-            cairo_fill( cr );
-            i = j;
-        }
-    }
-}
-
-static void
 gtr_pieces_cell_renderer_render( GtkCellRenderer      * cell,
                                  GdkDrawable          * window,
                                  GtkWidget            * widget UNUSED,
@@ -260,6 +173,7 @@ gtr_pieces_cell_renderer_render( GtkCellRenderer      * cell,
 {
     GtrPiecesCellRenderer * self;
     GtrPiecesCellRendererPrivate * priv;
+    const GtrPieceStyle * pstyle = gtr_get_piece_style( );
     gint x, y, w, h, xo, yo, wo, ho, hp;
     cairo_t * cr, * cro;
 
@@ -282,7 +196,7 @@ gtr_pieces_cell_renderer_render( GtkCellRenderer      * cell,
     wo = w;
     ho = h;
 
-    gdk_cairo_set_source_color( cro, &cpriv->border_color );
+    gdk_cairo_set_source_color( cro, &pstyle->border_color );
     cairo_paint( cro );
     xo += BORDER_WIDTH;
     yo += BORDER_WIDTH;
@@ -291,7 +205,7 @@ gtr_pieces_cell_renderer_render( GtkCellRenderer      * cell,
     hp = PROGRESS_HEIGHT;
 
     render_progress( priv, cro, xo, yo, wo, hp );
-    render_pieces( priv, cro, xo, yo + hp, wo, ho - hp );
+    gtr_draw_pieces( cro, priv->gtor, xo, yo + hp, wo, ho - hp );
     cairo_destroy( cro );
 
     cairo_set_source_surface( cr, priv->offscreen, x, y );
@@ -382,19 +296,6 @@ gtr_pieces_cell_renderer_class_init( GtrPiecesCellRendererClass * klass )
                                                           "TrTorrent*",
                                                           TR_TORRENT_TYPE,
                                                           G_PARAM_READWRITE ) );
-
-    gdk_color_parse( "#efefff", &cpriv->piece_bg_color );
-    gdk_color_parse( "#2975d6", &cpriv->piece_have_color );
-    gdk_color_parse( "#d90000", &cpriv->piece_missing_color );
-    gdk_color_parse( "#30b027", &cpriv->piece_seeding_color );
-    gdk_color_parse( "#aaaaaa", &cpriv->piece_stopped_color );
-    gdk_color_parse( "#dadada", &cpriv->progress_bg_color );
-    gdk_color_parse( "#314e6c", &cpriv->progress_bar_color );
-    gdk_color_parse( "#777777", &cpriv->progress_stopped_color );
-    gdk_color_parse( "#a6e3b4", &cpriv->ratio_bg_color );
-    gdk_color_parse( "#448632", &cpriv->ratio_bar_color );
-    gdk_color_parse( "#888888", &cpriv->border_color );
-    gdk_color_parse( "#a33dac", &cpriv->magnet_color );
 }
 
 static void

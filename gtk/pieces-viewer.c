@@ -22,14 +22,12 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
+#include "pieces-common.h"
 #include "pieces-viewer.h"
+#include "util.h"
 
 
-#define NUM_SQUARES_X 18
-#define NUM_SQUARES_Y 18
-#define NUM_SQUARES   ( NUM_SQUARES_X * NUM_SQUARES_Y )
-#define SQUARE_SIZE   4
-#define GRID_WIDTH    1
+#define BAR_HEIGHT 16
 
 /*
  * Defines:
@@ -53,41 +51,17 @@ static void
 paint( GtrPiecesViewer * self, cairo_t * cr )
 {
     GtrPiecesViewerPrivate * priv = GTR_PIECES_VIEWER_GET_PRIVATE( self );
-    GdkColor bg_color, grid_color, piece_color;
-    const tr_info * info;
-    const int8_t * avtab;
-    int i, j, n, piece;
+    const GtrPieceStyle * pstyle = gtr_get_piece_style( );
+    GtkAllocation a;
 
     if( !priv->gtor )
         return;
 
-    gdk_color_parse( "#ffffff", &bg_color );
-    gdk_color_parse( "#bababa", &grid_color );
-    gdk_color_parse( "#2975d6", &piece_color );
-
-    gdk_cairo_set_source_color( cr, &grid_color );
+    gdk_cairo_set_source_color( cr, &pstyle->border_color );
     cairo_paint( cr );
 
-    info = tr_torrent_info( priv->gtor );
-    n = MIN( info->pieceCount, NUM_SQUARES );
-    avtab = tr_torrent_availability( priv->gtor, n );
-    piece = 0;
-
-    for( j = 0; j < NUM_SQUARES_Y && piece < n; ++j )
-    {
-        int y = 1 + ( SQUARE_SIZE + GRID_WIDTH ) * j;
-        for( i = 0; i < NUM_SQUARES_X && piece < n; ++i )
-        {
-            int x = 1 + ( SQUARE_SIZE + GRID_WIDTH ) * i;
-            if( avtab[piece] == -1 )
-                gdk_cairo_set_source_color( cr, &piece_color );
-            else
-                gdk_cairo_set_source_color( cr, &bg_color );
-            cairo_rectangle( cr, x, y, SQUARE_SIZE, SQUARE_SIZE );
-            cairo_fill( cr );
-            ++piece;
-        }
-    }
+    gtr_widget_get_allocation( GTK_WIDGET( self ), &a );
+    gtr_draw_pieces( cr, priv->gtor, 1, 1, a.width - 2, a.height - 2 );
 }
 
 static gboolean
@@ -113,8 +87,7 @@ gtr_pieces_viewer_size_request( GtkWidget * w, GtkRequisition * req )
     g_return_if_fail( w != NULL );
     g_return_if_fail( GTR_IS_PIECES_VIEWER( w ) );
 
-    req->width  = SQUARE_SIZE * NUM_SQUARES_X + GRID_WIDTH * ( NUM_SQUARES_X + 1 );
-    req->height = SQUARE_SIZE * NUM_SQUARES_Y + GRID_WIDTH * ( NUM_SQUARES_Y + 1 );
+    req->height = BAR_HEIGHT;
 }
 
 static void
