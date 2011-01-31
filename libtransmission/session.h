@@ -118,6 +118,7 @@ struct tr_session
 
     char                         peer_id_prefix[PEER_ID_PREFIX_LEN + 1];
     uint8_t                      peer_id[PEER_ID_LEN + 1];
+    char                       * user_agent;
 
     int                          speedLimit_Bps[2];
     tr_bool                      speedLimitEnabled[2];

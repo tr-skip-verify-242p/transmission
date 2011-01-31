@@ -369,6 +369,7 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_OPEN_FILE_LIMIT,          atoi( TR_DEFAULT_OPEN_FILE_LIMIT_STR ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_MAX_CONNECTIONS_PER_SEC,  atoi( TR_DEFAULT_MAX_CONNECTIONS_PER_SEC_STR ) );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_ID_PREFIX,           "" );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_USER_AGENT,               "" );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_LIMIT_GLOBAL,        atoi( TR_DEFAULT_PEER_LIMIT_GLOBAL_STR ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_LIMIT_TORRENT,       atoi( TR_DEFAULT_PEER_LIMIT_TORRENT_STR ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PORT,                atoi( TR_DEFAULT_PEER_PORT_STR ) );
@@ -450,6 +451,7 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_OPEN_FILE_LIMIT,          tr_fdGetFileLimit( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_MAX_CONNECTIONS_PER_SEC,  tr_sessionGetMaxConnectionsPerSec( s ) );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_ID_PREFIX,           tr_sessionGetPeerIdPrefix( s ) );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_USER_AGENT,               tr_sessionGetUserAgent( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_LIMIT_GLOBAL,        tr_sessionGetPeerLimit( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_LIMIT_TORRENT,       s->peerLimitPerTorrent );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PORT,                tr_sessionGetPeerPort( s ) );
@@ -835,6 +837,8 @@ sessionSetImpl( void * vdata )
         tr_sessionSetLazyBitfieldEnabled( session, boolVal );
     if( tr_bencDictFindStr( settings, TR_PREFS_KEY_PEER_ID_PREFIX, &str ) )
         tr_sessionSetPeerIdPrefix( session, str );
+    if( tr_bencDictFindStr( settings, TR_PREFS_KEY_USER_AGENT, &str ) )
+        tr_sessionSetUserAgent( session, str );
     if( tr_bencDictFindInt( settings, TR_PREFS_KEY_PEER_LIMIT_TORRENT, &i ) )
         tr_sessionSetPeerLimitPerTorrent( session, i );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_PEX_ENABLED, &boolVal ) )
@@ -1755,6 +1759,35 @@ const char * tr_sessionGetCurrentPeerId ( const tr_session * session )
 }
 
 void
+tr_sessionSetUserAgent( tr_session * session, const char * ua )
+{
+    assert( tr_isSession( session ) );
+    tr_sessionLock( session );
+
+    tr_free( session->user_agent );
+    session->user_agent = tr_strdup( ua );
+
+    tr_sessionUnlock( session );
+}
+
+const char *
+tr_sessionGetUserAgent( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+    return session->user_agent;
+}
+
+const char *
+tr_sessionGetCurrentUserAgent( const tr_session * session )
+{
+    static const char * def = TR_NAME " " USERAGENT_PREFIX;
+    assert( tr_isSession( session ) );
+    if( !session->user_agent || !session->user_agent[0] )
+        return def;
+    return session->user_agent;
+}
+
+void
 tr_sessionSetPeerLimit( tr_session * session, uint16_t maxGlobalPeers )
 {
     assert( tr_isSession( session ) );
@@ -1893,6 +1926,8 @@ sessionCloseImpl( void * vsession )
     assert( tr_isSession( session ) );
 
     free_incoming_peer_port( session );
+
+    tr_free( session->user_agent );
 
     if( session->isLPDEnabled )
         tr_lpdUninit( session );

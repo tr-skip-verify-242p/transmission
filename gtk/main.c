@@ -1408,6 +1408,10 @@ on_prefs_changed( TrCore * core UNUSED, const char * key, gpointer data )
     {
         tr_sessionSetPeerIdPrefix( tr, gtr_pref_string_get( key ) );
     }
+    else if( !strcmp( key, TR_PREFS_KEY_USER_AGENT ) )
+    {
+        tr_sessionSetUserAgent( tr, gtr_pref_string_get( key ) );
+    }
     else if( !strcmp( key, TR_PREFS_KEY_PORT_FORWARDING ) )
     {
         tr_sessionSetPortForwardingEnabled( tr, gtr_pref_flag_get( key ) );

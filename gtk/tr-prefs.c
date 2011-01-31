@@ -511,6 +511,20 @@ peer_id_prefix_changed_cb( GtkEntry * e, gpointer vcore )
     gtk_label_set_text( label, tr_sessionGetCurrentPeerId( session ) );
 }
 
+static void
+user_agent_changed_cb( GtkEntry * e, gpointer vcore )
+{
+    TrCore * core = vcore;
+    GtkLabel * label;
+    const tr_session * session;
+
+    label = GTK_LABEL( g_object_get_data( G_OBJECT( e ), "user-agent-label" ) );
+    g_assert( label != NULL );
+
+    session = tr_core_session( core );
+    gtk_label_set_text( label, tr_sessionGetCurrentUserAgent( session ) );
+}
+
 static GtkWidget*
 privacyPage( GObject * core )
 {
@@ -578,6 +592,26 @@ privacyPage( GObject * core )
     g_object_set_data( G_OBJECT( e ), "peer-id-label", w );
     g_signal_connect( e, "changed", G_CALLBACK( peer_id_prefix_changed_cb ), core );
     peer_id_prefix_changed_cb( GTK_ENTRY( e ), core );
+
+    s = _( "_User Agent:" );
+    e = new_entry( TR_PREFS_KEY_USER_AGENT, core );
+    hig_workarea_add_row( t, &row, s, e, NULL );
+    s = _( "Do not change this value, unless you know what you are doing. "
+           "Some peers may rely on this to find out what capabilities "
+           "this program supports (among other things), and may disconnect "
+           "you if your custom user agent confuses them. Note that if this "
+           "does not correspond to the expected user agent for the peer ID "
+           "setting, it will be obvious to other clients that one or the "
+           "other has been changed.\n\n"
+           "If unsure, leave it blank." );
+    gtr_widget_set_tooltip_text( e, s );
+    s = _( "Current User Agent:" );
+    w = gtk_label_new( NULL );
+    gtk_label_set_selectable( GTK_LABEL( w ), TRUE );
+    hig_workarea_add_row( t, &row, s, w, NULL );
+    g_object_set_data( G_OBJECT( e ), "user-agent-label", w );
+    g_signal_connect( e, "changed", G_CALLBACK( user_agent_changed_cb ), core );
+    user_agent_changed_cb( GTK_ENTRY( e ), core );
 
     s = _( "_Encryption mode:" );
     w = new_encryption_combo( core, "encryption" );
