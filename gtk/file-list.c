@@ -688,7 +688,7 @@ gtr_file_list_select( GtkWidget * w, guint file_index )
     gtk_tree_selection_unselect_all( sel );
 
     data->select_file_index = file_index;
-    gtk_tree_model_foreach( data->model, find_and_select_file, data );
+    gtk_tree_model_foreach( data->filter, find_and_select_file, data );
 }
 
 /***
