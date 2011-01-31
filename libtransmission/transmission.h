@@ -180,6 +180,7 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_MSGLEVEL                      "message-level"
 #define TR_PREFS_KEY_OPEN_FILE_LIMIT               "open-file-limit"
 #define TR_PREFS_KEY_PEER_ID_PREFIX                "peer-id-prefix"
+#define TR_PREFS_KEY_USER_AGENT                    "user-agent"
 #define TR_PREFS_KEY_PEER_LIMIT_GLOBAL             "peer-limit-global"
 #define TR_PREFS_KEY_PEER_LIMIT_TORRENT            "peer-limit-per-torrent"
 #define TR_PREFS_KEY_PEER_PORT                     "peer-port"
@@ -761,6 +762,10 @@ uint16_t   tr_sessionGetIdleLimit ( const tr_session * );
 void         tr_sessionSetPeerIdPrefix ( tr_session *, const char * );
 const char * tr_sessionGetPeerIdPrefix ( const tr_session * );
 const char * tr_sessionGetCurrentPeerId ( const tr_session * );
+
+void         tr_sessionSetUserAgent( tr_session *, const char * );
+const char * tr_sessionGetUserAgent( const tr_session * );
+const char * tr_sessionGetCurrentUserAgent( const tr_session * );
 
 void       tr_sessionSetPeerLimit( tr_session *, uint16_t maxGlobalPeers );
 uint16_t   tr_sessionGetPeerLimit( const tr_session * );
