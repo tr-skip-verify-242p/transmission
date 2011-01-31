@@ -761,9 +761,10 @@ updateTitle( TrWindow * self )
         || !( session = tr_core_session( p->core ) ) )
         return;
 
-    g_snprintf( title, sizeof( title ), "%s %s [ %s ]",
+    g_snprintf( title, sizeof( title ), "%s %s [ %s / %s ]",
                 g_get_application_name( ),
                 LONG_VERSION_STRING,
+                tr_sessionGetCurrentUserAgent( session ),
                 tr_sessionGetCurrentPeerId( session ) );
     gtk_window_set_title( GTK_WINDOW( self ), title );
 }
