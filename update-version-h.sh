@@ -26,7 +26,10 @@ if [ -d ".svn" ] && type svnversion >/dev/null 2>&1; then
     svn_revision=`svnversion -n . | cut -d: -f1 | cut -dM -f1 | cut -dS -f1`
     source_version="svn:${svn_revision}"
 elif head=`git rev-parse --verify --short HEAD 2>/dev/null`; then
-    svn_revision=`git log --grep=git-svn-id -n1 --pretty=format:"%b" | tail -n1 | awk '{print$2}' | cut -d@ -f2`
+    svn_revision=`git log --grep=git-svn-id -n1 --pretty=format:"%b" | tail -n1 | awk '{print $2}' | cut -d@ -f2`
+    if test "x$svn_revision" = "x" ; then
+      svn_revision=0
+    fi
     source_version="git:${head}"
 else
     # Give up and check the source files
