@@ -1804,9 +1804,9 @@ tr_core_get_handle_by_id( TrCore * core, int id )
     if( id < 0 )
         return NULL;
 
-    if( findTorrentInModel( core, id, &iter ) )
+    if( findTorrentInRawModel( core, id, &iter ) )
     {
-        GtkTreeModel * model = tr_core_model( core );
+        GtkTreeModel * model = tr_core_raw_model( core );
         gtk_tree_model_get( model, &iter, MC_TORRENT, &gtor, -1 );
         g_object_unref( G_OBJECT( gtor ) );
     }
