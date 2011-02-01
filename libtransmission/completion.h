@@ -39,7 +39,7 @@ typedef struct tr_completion
     uint16_t *  completeBlocks;
 
     /* total number of completed blocks */
-    tr_block_index_t    completeBlocksTotal;
+    tr_block_index_t completeBlocksTotal;
 
     /* number of bytes we'll have when done downloading. [0..info.totalSize]
        DON'T access this directly; it's a lazy field.

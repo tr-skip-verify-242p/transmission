@@ -204,11 +204,13 @@ typedef struct tr_torrent_peers
     int                        interestedCount;
     int                        maxPeers;
     time_t                     lastCancel;
-    /* Before the endgame this should be 0. In the endgame it is >0 and contains
-       the average number of pending request per peer. Only peers that have more
-       pending requests are considered 'fast' and are allowed download a block
-       that is already being downloaded by another (possibly slow) peer */
-    uint16_t                   endgame;
+
+    /* Before the endgame this should be 0. In the endgame it is >0
+     * and contains the average number of pending request per peer.
+     * Only peers that have more pending requests are considered
+     * 'fast' and are allowed to download a block that is already
+     * being downloaded by another (possibly slow) peer. */
+    int                        endgame;
 }
 Torrent;
 
@@ -853,33 +855,28 @@ pieceListSort( Torrent * t, int mode )
         qsort( t->pieces, t->pieceCount, sizeof( struct weighted_piece ), comparePieceByIndex );
 }
 
-static uint16_t
-isInEndgame( Torrent * t )
+static int
+isInEndgame( const Torrent * t )
 {
-    const tr_torrent  * tor = t->tor;
-    const tr_block_index_t    blocksMissing = tor->blockCount - (&tor->completion)->completeBlocksTotal;
-    uint16_t            numDownloading = 0;
-    uint16_t            size;
-    tr_peer          ** peers;
-    int                 i;
+    const tr_torrent * tor = t->tor;
+    tr_block_index_t missing;
+    int downloading = 0, size, i;
+    tr_peer ** peers;
 
-    /* return if endgame not reached */
-    if( (uint16_t) t->requestCount < blocksMissing )
+    /* return 0 if endgame not reached */
+    missing = tor->blockCount - tor->completion.completeBlocksTotal;
+    assert( t->requestCount >= 0 );
+    if( (tr_block_index_t) t->requestCount < missing )
         return 0;
 
     /* count number of downloading peers */
     peers = (tr_peer **) tr_ptrArrayBase( &t->peers );
-    size = tr_ptrArraySize(&t->peers);
-
+    size = tr_ptrArraySize( &t->peers );
     for( i = 0; i < size; ++i )
-    {
-        const tr_peer * pr = peers[i];
-        numDownloading += clientIsDownloadingFrom( tor, pr );
-    }
+        downloading += clientIsDownloadingFrom( tor, peers[i] );
 
-    /* fprintf ( stderr, "ENDGAME: avgPending: %d \n", (t->requestCount / numDownloading) ); */
     /* average number of pending requests per downloading peer */
-    return (t->requestCount / numDownloading);
+    return t->requestCount / downloading;
 }
 
 /**
@@ -1104,7 +1101,7 @@ tr_peerMgrGetNextRequests( tr_torrent           * tor,
         pieceListRebuild( t );
 
     if( !t->endgame )
-        t->endgame = isInEndgame ( t );
+        t->endgame = isInEndgame( t );
 
     pieces = t->pieces;
     for( i=0; i<t->pieceCount && got<numwant; ++i )
@@ -1133,7 +1130,8 @@ tr_peerMgrGetNextRequests( tr_torrent           * tor,
 
                 /* in the endgame allow an additional peer to download a block but
                    only if the peer seems to be handling requests relatively fast */
-                if( peer->pendingReqsToPeer < t->endgame || countBlockRequests( t, b ) >= 2 )
+                if( peer->pendingReqsToPeer < t->endgame
+                    || countBlockRequests( t, b ) >= 2 )
                     continue;
 
                 /* update the caller's table */
