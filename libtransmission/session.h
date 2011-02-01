@@ -101,6 +101,7 @@ struct tr_session
     tr_bool                      isProxyAuthEnabled;
     tr_bool                      isPeerProxyEnabled;
     tr_bool                      isPeerProxyAuthEnabled;
+    tr_bool                      isPrefetchEnabled;
     tr_bool                      isTorrentDoneScriptEnabled;
     tr_bool                      isClosed;
     tr_bool                      useLazyBitfield;

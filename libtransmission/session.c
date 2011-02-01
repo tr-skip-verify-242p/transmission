@@ -53,13 +53,14 @@
 
 enum
 {
-    SAVE_INTERVAL_SECS = 360,
-
 #ifdef TR_LIGHTWEIGHT
-    DEFAULT_CACHE_SIZE_MB = 2
+    DEFAULT_CACHE_SIZE_MB = 2,
+    DEFAULT_PREFETCH_ENABLED = FALSE,
 #else
-    DEFAULT_CACHE_SIZE_MB = 4
+    DEFAULT_CACHE_SIZE_MB = 4,
+    DEFAULT_PREFETCH_ENABLED = TRUE,
 #endif
+    SAVE_INTERVAL_SECS = 360
 };
 
 
@@ -395,6 +396,7 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PROXY_PORT,          80 );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PROXY_TYPE,          TR_PROXY_HTTP );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_PROXY_USERNAME,      "" );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_PREFETCH_ENABLED,         DEFAULT_PREFETCH_ENABLED );
     tr_bencDictAddReal( d, TR_PREFS_KEY_RATIO,                    2.0 );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RATIO_ENABLED,            FALSE );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RENAME_PARTIAL_FILES,     TRUE );
@@ -478,6 +480,7 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PROXY_PORT,          s->peerProxyPort );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PROXY_TYPE,          s->peerProxyType );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_PROXY_USERNAME,      s->peerProxyUsername );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_PREFETCH_ENABLED,         s->isPrefetchEnabled );
     tr_bencDictAddReal( d, TR_PREFS_KEY_RATIO,                    s->desiredRatio );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RATIO_ENABLED,            s->isRatioLimited );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RENAME_PARTIAL_FILES,     tr_sessionIsIncompleteFileNamingEnabled( s ) );
@@ -869,6 +872,8 @@ sessionSetImpl( void * vdata )
         tr_sessionSetDeleteSource( session, boolVal );
 
     /* files and directories */
+    if( tr_bencDictFindBool( settings, TR_PREFS_KEY_PREFETCH_ENABLED, &boolVal ) )
+        session->isPrefetchEnabled = boolVal;
     if( tr_bencDictFindInt( settings, TR_PREFS_KEY_PREALLOCATION, &i ) )
         session->preallocationMode = i;
     if( tr_bencDictFindStr( settings, TR_PREFS_KEY_DOWNLOAD_DIR, &str ) )
