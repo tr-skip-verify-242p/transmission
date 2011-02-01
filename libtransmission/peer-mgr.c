@@ -204,6 +204,11 @@ typedef struct tr_torrent_peers
     int                        interestedCount;
     int                        maxPeers;
     time_t                     lastCancel;
+    /* Before the endgame this should be 0. In the endgame it is >0 and contains
+       the average number of pending request per peer. Only peers that have more
+       pending requests are considered 'fast' and are allowed download a block
+       that is already being downloaded by another (possibly slow) peer */
+    uint16_t                   endgame;
 }
 Torrent;
 
@@ -848,21 +853,33 @@ pieceListSort( Torrent * t, int mode )
         qsort( t->pieces, t->pieceCount, sizeof( struct weighted_piece ), comparePieceByIndex );
 }
 
-static tr_bool
+static uint16_t
 isInEndgame( Torrent * t )
 {
-    tr_bool endgame = FALSE;
+    const tr_torrent  * tor = t->tor;
+    const tr_block_index_t    blocksMissing = tor->blockCount - (&tor->completion)->completeBlocksTotal;
+    uint16_t            numDownloading = 0;
+    uint16_t            size;
+    tr_peer          ** peers;
+    int                 i;
 
-    if( ( t->pieces != NULL ) && ( t->pieceCount > 0 ) )
+    /* return if endgame not reached */
+    if( (uint16_t) t->requestCount < blocksMissing )
+        return 0;
+
+    /* count number of downloading peers */
+    peers = (tr_peer **) tr_ptrArrayBase( &t->peers );
+    size = tr_ptrArraySize(&t->peers);
+
+    for( i = 0; i < size; ++i )
     {
-        const struct weighted_piece * p = t->pieces;
-        const int pending = p->requestCount;
-        const int missing = tr_cpMissingBlocksInPiece( &t->tor->completion, p->index );
-        endgame = pending >= missing;
+        const tr_peer * pr = peers[i];
+        numDownloading += clientIsDownloadingFrom( tor, pr );
     }
 
-    /*if( endgame ) fprintf( stderr, "ENDGAME reached\n" );*/
-    return endgame;
+    /* fprintf ( stderr, "ENDGAME: avgPending: %d \n", (t->requestCount / numDownloading) ); */
+    /* average number of pending requests per downloading peer */
+    return (t->requestCount / numDownloading);
 }
 
 /**
@@ -874,7 +891,7 @@ isInEndgame( Torrent * t )
 static void
 assertWeightedPiecesAreSorted( Torrent * t )
 {
-    if( !isInEndgame( t ) )
+    if( !t->endgame )
     {
         int i;
         weightTorrent = t->tor;
@@ -1068,7 +1085,6 @@ tr_peerMgrGetNextRequests( tr_torrent           * tor,
     int i;
     int got;
     Torrent * t;
-    tr_bool endgame;
     struct weighted_piece * pieces;
     const tr_bitset * have = &peer->have;
 
@@ -1087,17 +1103,13 @@ tr_peerMgrGetNextRequests( tr_torrent           * tor,
     if( t->pieces == NULL )
         pieceListRebuild( t );
 
-    endgame = isInEndgame( t );
+    if( !t->endgame )
+        t->endgame = isInEndgame ( t );
 
     pieces = t->pieces;
     for( i=0; i<t->pieceCount && got<numwant; ++i )
     {
         struct weighted_piece * p = pieces + i;
-        const int missing = tr_cpMissingBlocksInPiece( &tor->completion, p->index );
-        const int maxDuplicatesPerBlock = endgame ? 3 : 1;
-
-        if( p->requestCount > ( missing * maxDuplicatesPerBlock ) )
-            continue;
 
         /* if the peer has this piece that we want... */
         if( tr_bitsetHasFast( have, p->index ) )
@@ -1116,7 +1128,12 @@ tr_peerMgrGetNextRequests( tr_torrent           * tor,
                     continue;
 
                 /* don't send the same request to any peer too many times */
-                if( countBlockRequests( t, b ) >= maxDuplicatesPerBlock )
+                if( !t->endgame && countBlockRequests( t, b ) >= 1 )
+                    continue;
+
+                /* in the endgame allow an additional peer to download a block but
+                   only if the peer seems to be handling requests relatively fast */
+                if( peer->pendingReqsToPeer < t->endgame || countBlockRequests( t, b ) >= 2 )
                     continue;
 
                 /* update the caller's table */

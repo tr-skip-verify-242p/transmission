@@ -25,6 +25,7 @@ tr_cpReset( tr_completion * cp )
     tr_bitfieldClear( &cp->pieceBitfield );
     tr_bitfieldClear( &cp->blockBitfield );
     memset( cp->completeBlocks, 0, sizeof( uint16_t ) * cp->tor->info.pieceCount );
+    cp->completeBlocksTotal = 0;
     cp->sizeNow = 0;
     cp->sizeWhenDoneIsDirty = 1;
     cp->haveValidIsDirty = 1;
@@ -34,7 +35,8 @@ tr_completion *
 tr_cpConstruct( tr_completion * cp, tr_torrent * tor )
 {
     cp->tor = tor;
-    cp->completeBlocks  = tr_new( uint16_t, tor->info.pieceCount );
+    cp->completeBlocks = tr_new( uint16_t, tor->info.pieceCount );
+    cp->completeBlocksTotal = 0;
     tr_bitfieldConstruct( &cp->blockBitfield, tor->blockCount );
     tr_bitfieldConstruct( &cp->pieceBitfield, tor->info.pieceCount );
     tr_cpReset( cp );
@@ -134,6 +136,7 @@ tr_cpPieceRem( tr_completion *  cp,
 
     cp->sizeWhenDoneIsDirty = 1;
     cp->haveValidIsDirty = 1;
+    cp->completeBlocksTotal -= cp->completeBlocks[piece];
     cp->completeBlocks[piece] = 0;
     tr_bitfieldRemRange ( &cp->blockBitfield, start, end );
     tr_bitfieldRem( &cp->pieceBitfield, piece );
@@ -151,6 +154,7 @@ tr_cpBlockAdd( tr_completion * cp, tr_block_index_t block )
                                                                   block );
 
         ++cp->completeBlocks[piece];
+        ++cp->completeBlocksTotal;
 
         if( tr_cpPieceIsComplete( cp, piece ) )
             tr_bitfieldAdd( &cp->pieceBitfield, piece );
@@ -177,7 +181,10 @@ tr_cpSetHaveAll( tr_completion * cp )
     tr_bitfieldAddRange( &cp->blockBitfield, 0, tor->blockCount );
     tr_bitfieldAddRange( &cp->pieceBitfield, 0, tor->info.pieceCount );
     for( i=0; i<tor->info.pieceCount; ++i )
+    {
         cp->completeBlocks[i] = tr_torPieceCountBlocks( tor, i );
+        cp->completeBlocksTotal += cp->completeBlocks[i];
+    }
     cp->sizeWhenDoneIsDirty = 1;
     cp->haveValidIsDirty = 1;
 }
@@ -238,6 +245,7 @@ tr_cpBlockBitfieldSet( tr_completion * cp, tr_bitfield * blockBitfield )
             }
         }
 
+        cp->completeBlocksTotal = completeBlocksInTorrent;
         /* update sizeNow */
         cp->sizeNow = completeBlocksInTorrent;
         cp->sizeNow *= tr_torBlockCountBytes( cp->tor, 0 );
