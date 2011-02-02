@@ -113,11 +113,13 @@ readOrWriteBytes( tr_session       * session,
             preallocationMode = tor->session->preallocationMode;
 
         filename = tr_buildPath( base, subpath, NULL );
-        if( ioMode == TR_IO_READ && !fileExists )
+        if( ioMode < TR_IO_WRITE && !fileExists )
         {
-            tr_torrentSetLocalError( tor,
-                _( "Expected file not found: %s" ), filename );
             err = ENOENT;
+            /* Allow prefetch to fail silently. */
+            if( ioMode == TR_IO_READ )
+                tr_torrentSetLocalError( tor,
+                    _( "Expected file not found: %s" ), filename );
         }
         else
         {
