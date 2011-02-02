@@ -749,24 +749,24 @@ tr_torrentGotNewInfoDict( tr_torrent * tor )
     tr_torrentFireMetadataCompleted( tor );
 }
 
-/** @return TRUE if file state matches piece progress. */
+/** @return TRUE if files exist for all completed pieces. */
 static tr_bool
 checkExistingFiles( tr_torrent * tor )
 {
-    tr_piece_index_t pi = 0;
-    tr_file_index_t fi;
     const tr_completion * cp = &tor->completion;
+    tr_piece_index_t pi;
+    tr_file_index_t fi;
 
     if( !tr_torrentHasMetadata( tor ) )
         return TRUE;
 
     for( fi = 0; fi < tor->info.fileCount; ++fi )
     {
-        const tr_file * file = &tor->info.files[fi];
         const tr_bool exists = tr_torrentFindFile2( tor, fi, NULL, NULL );
-        for( pi = file->firstPiece; pi <= file->lastPiece ; ++pi )
+        const tr_file * file = &tor->info.files[fi];
+        for( pi = file->firstPiece; pi <= file->lastPiece; ++pi )
         {
-            if( tr_cpPieceIsComplete( cp, pi ) && !exists )
+            if( !exists && tr_cpPieceIsComplete( cp, pi ) )
             {
                 tr_torrentSetLocalError( tor,
                     _( "Expected file not found: %s" ), file->name );
