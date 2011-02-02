@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -156,8 +156,9 @@ readOrWriteBytes( tr_session       * session,
         } else if( ioMode == TR_IO_PREFETCH ) {
             const int rc = tr_prefetch( fd, fileOffset, buflen );
             if( rc < 0 ) {
+                /* (don't set "err" here... it's okay for prefetch to fail) */
                 tr_tordbg( tor, "prefetch failed for \"%s\": %s",
-                           file->name, tr_strerror( err ) );
+                           file->name, tr_strerror( errno ) );
             }
         } else if( ioMode == TR_IO_WRITE ) {
             const int rc = tr_pwrite( fd, buf, buflen, fileOffset );

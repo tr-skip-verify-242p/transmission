@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -86,6 +86,7 @@ struct tr_datatype
     size_t   length;
 };
 
+
 /***
 ****
 ***/
@@ -99,7 +100,7 @@ didWriteWrapper( tr_peerIo * io, unsigned int bytes_transferred )
 
         const unsigned int payload = MIN( next->length, bytes_transferred );
         const unsigned int overhead = guessPacketOverhead( payload );
-        const uint64_t now = tr_time_msec( );
+        const uint64_t now = tr_sessionGetTimeMsec( io->session );
 
         tr_bandwidthUsed( &io->bandwidth, TR_UP, payload, next->isPieceData, now );
 
@@ -139,6 +140,8 @@ canReadWrapper( tr_peerIo * io )
     /* try to consume the input buffer */
     if( io->canRead )
     {
+        const uint64_t now = tr_sessionGetTimeMsec( io->session );
+
         tr_sessionLock( session );
 
         while( !done && !err )
@@ -146,21 +149,22 @@ canReadWrapper( tr_peerIo * io )
             size_t piece = 0;
             const size_t oldLen = evbuffer_get_length( io->inbuf );
             const int ret = io->canRead( io, io->userData, &piece );
-
             const size_t used = oldLen - evbuffer_get_length( io->inbuf );
+            const unsigned int overhead = guessPacketOverhead( used );
 
             assert( tr_isPeerIo( io ) );
 
             if( piece || (piece!=used) )
             {
-                const uint64_t now = tr_time_msec( );
-
                 if( piece )
                     tr_bandwidthUsed( &io->bandwidth, TR_DOWN, piece, TRUE, now );
 
                 if( used != piece )
                     tr_bandwidthUsed( &io->bandwidth, TR_DOWN, used - piece, FALSE, now );
             }
+
+            if( overhead > 0 )
+                tr_bandwidthUsed( &io->bandwidth, TR_UP, overhead, FALSE, now );
 
             switch( ret )
             {
@@ -214,7 +218,6 @@ event_read_cb( int fd, short event UNUSED, void * vio )
 
     assert( tr_isPeerIo( io ) );
 
-    io->hasFinishedConnecting = TRUE;
     io->pendingEvents &= ~EV_READ;
 
     curlen = evbuffer_get_length( io->inbuf );
@@ -290,7 +293,6 @@ event_write_cb( int fd, short event UNUSED, void * vio )
 
     assert( tr_isPeerIo( io ) );
 
-    io->hasFinishedConnecting = TRUE;
     io->pendingEvents &= ~EV_WRITE;
 
     dbgmsg( io, "libevent says this peer is ready to write" );
@@ -390,7 +392,6 @@ tr_peerIoNew( tr_session       * session,
     io->port = port;
     io->socket = socket;
     io->isIncoming = isIncoming != 0;
-    io->hasFinishedConnecting = FALSE;
     io->timeCreated = tr_time( );
     io->inbuf = evbuffer_new( );
     io->outbuf = evbuffer_new( );
@@ -641,8 +642,8 @@ tr_peerIoReconnect( tr_peerIo * io )
     if( io->socket >= 0 )
         tr_netClose( session, io->socket );
 
-    event_del( io->event_read );
-    event_del( io->event_write );
+    event_free( io->event_read );
+    event_free( io->event_write );
     io->socket = tr_netOpenPeerSocket( session, &io->addr, io->port, io->isSeed );
     io->event_read = event_new( session->event_base, io->socket, EV_READ, event_read_cb, io );
     io->event_write = event_new( session->event_base, io->socket, EV_WRITE, event_write_cb, io );
@@ -967,15 +968,12 @@ tr_peerIoFlush( tr_peerIo  * io, tr_direction dir, size_t limit )
     assert( tr_isPeerIo( io ) );
     assert( tr_isDirection( dir ) );
 
-    if( io->hasFinishedConnecting )
-    {
-        if( dir == TR_DOWN )
-            bytesUsed = tr_peerIoTryRead( io, limit );
-        else
-            bytesUsed = tr_peerIoTryWrite( io, limit );
-    }
+    if( dir == TR_DOWN )
+        bytesUsed = tr_peerIoTryRead( io, limit );
+    else
+        bytesUsed = tr_peerIoTryWrite( io, limit );
 
-    dbgmsg( io, "flushing peer-io, hasFinishedConnecting %d, direction %d, limit %zu, bytesUsed %d", (int)io->hasFinishedConnecting, (int)dir, limit, bytesUsed );
+    dbgmsg( io, "flushing peer-io, direction %d, limit %zu, bytesUsed %d", (int)dir, limit, bytesUsed );
     return bytesUsed;
 }
 

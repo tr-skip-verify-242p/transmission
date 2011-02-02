@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2009-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -90,9 +90,6 @@ void             tr_torrentSetPieceChecked( tr_torrent       * tor,
                                             tr_piece_index_t   piece );
 
 void             tr_torrentSetChecked( tr_torrent * tor, time_t when );
-
-tr_torrent*      tr_torrentNext( tr_session  * session,
-                                 tr_torrent  * current );
 
 void             tr_torrentCheckSeedLimit( tr_torrent * tor );
 
@@ -252,6 +249,12 @@ struct tr_torrent
     tr_bool                    finishedSeedingByIdle;
 };
 
+static inline tr_torrent*
+tr_torrentNext( tr_session * session, tr_torrent * current )
+{
+    return current ? current->next : session->torrentList;
+}
+
 /* get the index of this piece's first block */
 static inline tr_block_index_t
 tr_torPieceFirstBlock( const tr_torrent * tor, const tr_piece_index_t piece )
@@ -295,6 +298,11 @@ tr_torBlockCountBytes( const tr_torrent * tor, const tr_block_index_t block )
 static inline void tr_torrentLock( const tr_torrent * tor )
 {
     tr_sessionLock( tor->session );
+}
+
+static inline tr_bool tr_torrentIsLocked( const tr_torrent * tor )
+{
+    return tr_sessionIsLocked( tor->session );
 }
 
 static inline void tr_torrentUnlock( const tr_torrent * tor )

@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2009-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -12,7 +12,12 @@
 
 #include <sys/types.h> /* stat */
 #include <sys/stat.h> /* stat */
-#include <sys/wait.h> /* wait() */
+#ifndef WIN32
+ #include <sys/wait.h> /* wait() */
+#else
+ #include <process.h>
+ #define waitpid(pid, status, options)	_cwait(status, pid, WAIT_CHILD)
+#endif
 #include <unistd.h> /* stat */
 #include <dirent.h>
 
@@ -48,6 +53,16 @@
 #include "utils.h"
 #include "verify.h"
 #include "version.h"
+
+/***
+****
+***/
+
+#define tr_deeplog_tor( tor, ... ) \
+    do { \
+        if( tr_deepLoggingIsActive( ) ) \
+            tr_deepLog( __FILE__, __LINE__, tr_torrentName( tor ), __VA_ARGS__ ); \
+    } while( 0 )
 
 /***
 ****
@@ -483,23 +498,21 @@ onTrackerResponse( tr_torrent * tor, const tr_tracker_event * event, void * unus
     {
         case TR_TRACKER_PEERS:
         {
-            size_t i, n;
+            size_t i;
             const int8_t seedProbability = event->seedProbability;
             const tr_bool allAreSeeds = seedProbability == 100;
-            tr_pex * pex = tr_peerMgrArrayToPex( event->compact,
-                                                 event->compactLen, &n );
-             if( allAreSeeds )
-                tr_tordbg( tor, "Got %d seeds from tracker", (int)n );
-            else
-                tr_tordbg( tor, "Got %d peers from tracker", (int)n );
 
-            for( i = 0; i < n; ++i )
-                tr_peerMgrAddPex( tor, TR_PEER_FROM_TRACKER, pex+i, seedProbability );
+             if( allAreSeeds )
+                tr_tordbg( tor, "Got %zu seeds from tracker", event->pexCount );
+            else
+                tr_tordbg( tor, "Got %zu peers from tracker", event->pexCount );
+
+            for( i = 0; i < event->pexCount; ++i )
+                tr_peerMgrAddPex( tor, TR_PEER_FROM_TRACKER, &event->pex[i], seedProbability );
 
             if( allAreSeeds && tr_torrentIsPrivate( tor ) )
                 tr_peerMgrMarkAllAsSeeds( tor );
 
-            tr_free( pex );
             break;
         }
 
@@ -764,7 +777,7 @@ setLocalErrorIfFilesDisappeared( tr_torrent * tor )
 
     if( disappeared )
     {
-        tr_tordbg( tor, "%s", "[LAZY] uh oh, the files disappeared" );
+        tr_deeplog_tor( tor, "%s", "[LAZY] uh oh, the files disappeared" );
         tr_torrentSetLocalError( tor, "%s", _( "No data found! Ensure your drives are connected or use \"Set Location\". To re-download, remove the torrent and re-add it." ) );
     }
 
@@ -1388,50 +1401,69 @@ tr_torrentFilesFree( tr_file_stat *            files,
 double*
 tr_torrentWebSpeeds_KBps( const tr_torrent * tor )
 {
-    return tr_isTorrent( tor ) ? tr_peerMgrWebSpeeds_KBps( tor ) : NULL;
+    double * ret = NULL;
+
+    if( tr_isTorrent( tor ) )
+    {
+        tr_torrentLock( tor );
+        ret = tr_peerMgrWebSpeeds_KBps( tor );
+        tr_torrentUnlock( tor );
+    }
+
+    return ret;
 }
 
 tr_peer_stat *
-tr_torrentPeers( const tr_torrent * tor,
-                 int *              peerCount )
+tr_torrentPeers( const tr_torrent * tor, int * peerCount )
 {
     tr_peer_stat * ret = NULL;
 
     if( tr_isTorrent( tor ) )
+    {
+        tr_torrentLock( tor );
         ret = tr_peerMgrPeerStats( tor, peerCount );
+        tr_torrentUnlock( tor );
+    }
 
     return ret;
 }
 
 void
-tr_torrentPeersFree( tr_peer_stat * peers,
-                     int peerCount  UNUSED )
+tr_torrentPeersFree( tr_peer_stat * peers, int peerCount UNUSED )
 {
     tr_free( peers );
 }
 
 tr_tracker_stat *
-tr_torrentTrackers( const tr_torrent * torrent,
-                    int              * setmeTrackerCount )
+tr_torrentTrackers( const tr_torrent * torrent, int * setmeTrackerCount )
 {
-    assert( tr_isTorrent( torrent ) );
+    tr_tracker_stat * ret = NULL;
 
-    return tr_announcerStats( torrent, setmeTrackerCount );
+    if( tr_isTorrent( torrent ) )
+    {
+        tr_torrentLock( torrent );
+        ret = tr_announcerStats( torrent, setmeTrackerCount );
+        tr_torrentUnlock( torrent );
+    }
+
+    return ret;
 }
 
 void
-tr_torrentTrackersFree( tr_tracker_stat * trackers,
-                        int trackerCount )
+tr_torrentTrackersFree( tr_tracker_stat * trackers, int trackerCount )
 {
     tr_announcerStatsFree( trackers, trackerCount );
 }
 
 void
-tr_torrentAvailability( const tr_torrent * tor,
-                        int8_t *           tab,
-                        int                size )
+tr_torrentAvailability( const tr_torrent * tor, int8_t * tab, int size )
 {
-    tr_peerMgrTorrentAvailability( tor, tab, size );
+    if( tr_isTorrent( tor ) && ( tab != NULL ) && ( size > 0 ) )
+    {
+        tr_torrentLock( tor );
+        tr_peerMgrTorrentAvailability( tor, tab, size );
+        tr_torrentUnlock( tor );
+    }
 }
 
 void
@@ -1706,6 +1738,8 @@ stopTorrent( void * vtor )
 
     assert( tr_isTorrent( tor ) );
 
+    tr_torrentLock( tor );
+
     tr_verifyRemove( tor );
     tr_peerMgrStopTorrent( tor );
     tr_announcerTorrentStopped( tor );
@@ -1715,6 +1749,8 @@ stopTorrent( void * vtor )
 
     if( !tor->isDeleting )
         tr_torrentSave( tor );
+
+    tr_torrentUnlock( tor );
 }
 
 void
@@ -1910,7 +1946,7 @@ tr_torrentClearIdleLimitHitCallback( tr_torrent * torrent )
 static void
 onSigCHLD( int i UNUSED )
 {
-    waitpid( -1, 0, WNOHANG );
+    waitpid( -1, NULL, WNOHANG );
 }
 
 static void
@@ -1938,6 +1974,10 @@ torrentCallScript( const tr_torrent * tor, const char * script )
             NULL };
 
         tr_torinf( tor, "Calling script \"%s\"", script ); 
+
+#ifdef WIN32
+        _spawnvpe( _P_NOWAIT, script, (const char*)cmd, env );
+#else
         signal( SIGCHLD, onSigCHLD );
 
         if( !fork( ) )
@@ -1945,6 +1985,7 @@ torrentCallScript( const tr_torrent * tor, const char * script )
             execve( script, cmd, env );
             _exit( 0 );
         }
+#endif
 
         for( i=0; cmd[i]; ++i ) tr_free( cmd[i] );
         for( i=0; env[i]; ++i ) tr_free( env[i] );
@@ -2338,7 +2379,7 @@ tr_torrentCheckPiece( tr_torrent * tor, tr_piece_index_t pieceIndex )
 {
     const tr_bool pass = tr_ioTestPiece( tor, pieceIndex );
 
-    tr_tordbg( tor, "[LAZY] tr_torrentCheckPiece tested piece %zu, pass==%d", (size_t)pieceIndex, (int)pass );
+    tr_deeplog_tor( tor, "[LAZY] tr_torrentCheckPiece tested piece %zu, pass==%d", (size_t)pieceIndex, (int)pass );
     tr_torrentSetHasPiece( tor, pieceIndex, pass );
     tr_torrentSetPieceChecked( tor, pieceIndex );
     tor->anyDate = tr_time( );
@@ -2824,7 +2865,7 @@ setLocation( void * vdata )
 
                 tr_dbg( "Found file #%d: %s", (int)i, oldpath );
 
-                if( do_move )
+                if( do_move && !tr_is_same_file( oldpath, newpath ) )
                 {
                     tr_bool renamed = FALSE;
                     errno = 0;

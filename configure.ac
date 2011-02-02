@@ -3,8 +3,8 @@ dnl STATUS: "X" for prerelease beta builds,
 dnl         "Z" for unsupported trunk builds,
 dnl         "0" for stable, supported releases
 dnl these should be the only two lines you need to change
-m4_define([user_agent_prefix],[2.13+])
-m4_define([peer_id_prefix],[-TR213Z-])
+m4_define([user_agent_prefix],[2.20b3])
+m4_define([peer_id_prefix],[-TR213X-])
 
 AC_INIT([transmission],
         [user_agent_prefix],
@@ -36,6 +36,8 @@ AM_CONDITIONAL(TR_UNSTABLE, test "x$supported_build" = "xno")
 ##
 CURL_MINIMUM=7.15.4
 AC_SUBST(CURL_MINIMUM)
+LIBEVENT_MINIMUM=2.0.10
+AC_SUBST(LIBEVENT_MINIUM)
 OPENSSL_MINIMUM=0.9.4
 AC_SUBST(OPENSSL_MINIMUM)
 
@@ -95,6 +97,7 @@ AC_SEARCH_LIBS([socket], [socket net])
 AC_SEARCH_LIBS([gethostbyname], [nsl bind])
 PKG_CHECK_MODULES(OPENSSL, [openssl >= $OPENSSL_MINIMUM], , [CHECK_SSL()])
 PKG_CHECK_MODULES(LIBCURL, [libcurl >= $CURL_MINIMUM])
+PKG_CHECK_MODULES(LIBEVENT, [libevent >= $LIBEVENT_MINIMUM])
 AC_PATH_ZLIB
 
 AC_SYS_LARGEFILE
@@ -175,16 +178,6 @@ AC_CHECK_LIB([rt],
              [clock_gettime],
              [libevent_extra_libs="-lrt"],
              [libevent_extra_libs=""])
-
-
-dnl ----------------------------------------------------------------------------
-dnl
-dnl  libevent
-
-LIBEVENT_CFLAGS="-I\$(top_srcdir)/third-party/libevent/include"
-LIBEVENT_LIBS="\$(top_builddir)/third-party/libevent/.libs/libevent.a"
-AC_SUBST(LIBEVENT_CFLAGS)
-AC_SUBST(LIBEVENT_LIBS)
 
 
 dnl ----------------------------------------------------------------------------
@@ -388,6 +381,14 @@ case $host_os in
 
 esac
 
+AC_ARG_ENABLE([lightweight],
+              AS_HELP_STRING([--enable-lightweight],[optimize libtransmission for low-resource systems: smaller cache size, prefer unencrypted peer connections, etc.]),
+              [enable_lightweight=${enableval}],
+              [enable_lightweight="no"])
+if test "x$enable_lightweight" = "xyes" ; then 
+  AC_DEFINE([TR_LIGHTWEIGHT],[1],[optimize libtransmission for low-resource systems])
+fi 
+
 AC_ARG_ENABLE([cli],
               [AS_HELP_STRING([--enable-cli],[build command-line client])],
               [build_cli=${enableval}],
@@ -432,7 +433,7 @@ AM_CONDITIONAL(WIN32, test "x$have_msw" = "xyes")
 
 dnl  Setup CFLAGS after all compilation tests
 if test "x$GCC" = "xyes" ; then
-    CFLAGS="$CFLAGS -std=gnu99 -ggdb3 -Wall -Werror"
+    CFLAGS="$CFLAGS -std=gnu99 -ggdb3 -Wall -Werror -Wextra"
 fi
 
 dnl ----------------------------------------------------------------------------
@@ -462,9 +463,7 @@ AC_CONFIG_FILES([Makefile
                  web/javascript/jquery/Makefile
                  web/stylesheets/Makefile
                  po/Makefile.in])
-AC_CONFIG_SUBDIRS([third-party/libevent])
 
-ac_configure_args="$ac_configure_args --enable-static --disable-shared -q"
 AC_OUTPUT
 
 echo "
@@ -473,6 +472,10 @@ Configuration:
 
    Source code location:                              ${srcdir}
    Compiler:                                          ${CXX}
+
+   Build libtransmission:                             yes
+
+      * optimized for low-resource systems:           ${enable_lightweight}
 
    Build Command-Line client:                         ${build_cli}
 

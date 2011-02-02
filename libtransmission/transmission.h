@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -152,7 +152,7 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_DEFAULT_RPC_PORT_STR                "9091"
 #define TR_DEFAULT_RPC_URL_STR       "/transmission/"
 #define TR_DEFAULT_PEER_PORT_STR              "51413"
-#define TR_DEFAULT_PEER_SOCKET_TOS_STR            "0"
+#define TR_DEFAULT_PEER_SOCKET_TOS_STR      "default"
 #define TR_DEFAULT_PEER_LIMIT_GLOBAL_STR        "240"
 #define TR_DEFAULT_PEER_LIMIT_TORRENT_STR        "60"
 
@@ -170,6 +170,7 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_MAX_CACHE_SIZE_MB             "cache-size-mb"
 #define TR_PREFS_KEY_DHT_ENABLED                   "dht-enabled"
 #define TR_PREFS_KEY_LPD_ENABLED                   "lpd-enabled"
+#define TR_PREFS_KEY_PREFETCH_ENABLED              "prefetch-enabled"
 #define TR_PREFS_KEY_DOWNLOAD_DIR                  "download-dir"
 #define TR_PREFS_KEY_ENCRYPTION                    "encryption"
 #define TR_PREFS_KEY_IDLE_LIMIT                    "idle-seeding-limit"
@@ -514,7 +515,8 @@ typedef enum
     TR_RPC_TORRENT_REMOVING,
     TR_RPC_TORRENT_CHANGED, /* catch-all for the "torrent-set" rpc method */
     TR_RPC_TORRENT_MOVED,
-    TR_RPC_SESSION_CHANGED
+    TR_RPC_SESSION_CHANGED,
+    TR_RPC_SESSION_CLOSE
 }
 tr_rpc_callback_type;
 
@@ -747,7 +749,6 @@ tr_bool  tr_sessionGetActiveSpeedLimit_KBps( const tr_session  * session,
 ***/
 
 double     tr_sessionGetRawSpeed_KBps  ( const tr_session *, tr_direction );
-double     tr_sessionGetPieceSpeed_KBps( const tr_session *, tr_direction );
 
 void       tr_sessionSetRatioLimited  ( tr_session *, tr_bool isLimited );
 tr_bool    tr_sessionIsRatioLimited   ( const tr_session * );

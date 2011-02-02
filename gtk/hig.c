@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -60,15 +60,17 @@ hig_workarea_add_section_title( GtkWidget *  t,
 }
 
 static GtkWidget*
-rowNew( GtkWidget * w )
+rowNew( GtkWidget * w, gboolean indent )
 {
-    GtkWidget * a;
     GtkWidget * h = gtk_hbox_new( FALSE, 0 );
 
     /* spacer */
-    a = gtk_alignment_new( 0.0f, 0.0f, 0.0f, 0.0f );
-    gtk_widget_set_size_request( a, 18u, 0u );
-    gtk_box_pack_start( GTK_BOX( h ), a, FALSE, FALSE, 0 );
+    if( indent )
+    {
+        GtkWidget * a = gtk_alignment_new( 0.0f, 0.0f, 0.0f, 0.0f );
+        gtk_widget_set_size_request( a, 18u, 0u );
+        gtk_box_pack_start( GTK_BOX( h ), a, FALSE, FALSE, 0 );
+    }
 
     /* lhs widget */
     if( GTK_IS_MISC( w ) )
@@ -85,7 +87,7 @@ hig_workarea_add_wide_control( GtkWidget * t,
                                int *       row,
                                GtkWidget * w )
 {
-    GtkWidget * r = rowNew( w );
+    GtkWidget * r = rowNew( w, TRUE );
 
     gtk_table_attach( GTK_TABLE( t ), r, 0, 2, *row, *row + 1, GTK_FILL, 0, 0, 0 );
     ++ * row;
@@ -96,7 +98,7 @@ hig_workarea_add_wide_tall_control( GtkWidget * t,
                                     int *       row,
                                     GtkWidget * w )
 {
-    GtkWidget * r = rowNew( w );
+    GtkWidget * r = rowNew( w, TRUE );
 
     gtk_table_attach( GTK_TABLE( t ), r, 0, 2, *row, *row + 1,
                       GTK_EXPAND | GTK_SHRINK | GTK_FILL,
@@ -119,14 +121,23 @@ hig_workarea_add_wide_checkbutton( GtkWidget *  t,
     return w;
 }
 
-void
-hig_workarea_add_label_w( GtkWidget * t,
-                          int         row,
-                          GtkWidget * l )
+static void
+hig_workarea_add_label_full( GtkWidget * t,
+                             int         row,
+                             GtkWidget * l,
+                             gboolean    indent )
 {
-    GtkWidget * w = rowNew( l );
+    GtkWidget * w = rowNew( l, indent );
 
     gtk_table_attach( GTK_TABLE( t ), w, 0, 1, row, row + 1, GTK_FILL, GTK_FILL, 0, 0 );
+}
+
+void
+hig_workarea_add_label_w( GtkWidget * table,
+                          int         row,
+                          GtkWidget * label_widget )
+{
+    hig_workarea_add_label_full( table, row, label_widget, TRUE );
 }
 
 GtkWidget*
@@ -168,6 +179,22 @@ hig_workarea_add_control( GtkWidget * t,
                       GTK_EXPAND | GTK_SHRINK | GTK_FILL, 0, 0, 0 );
 }
 
+static void
+hig_workarea_add_row_w_full( GtkWidget * t,
+                             int       * row,
+                             GtkWidget * label,
+                             GtkWidget * control,
+                             GtkWidget * mnemonic,
+                             gboolean    indent )
+{
+    hig_workarea_add_label_full( t, *row, label, indent );
+    hig_workarea_add_control( t, *row, control );
+    if( GTK_IS_LABEL( label ) )
+        gtk_label_set_mnemonic_widget( GTK_LABEL( label ),
+                                       mnemonic ? mnemonic : control );
+    ++ * row;
+}
+
 void
 hig_workarea_add_row_w( GtkWidget * t,
                         int *       row,
@@ -175,12 +202,21 @@ hig_workarea_add_row_w( GtkWidget * t,
                         GtkWidget * control,
                         GtkWidget * mnemonic )
 {
-    hig_workarea_add_label_w( t, *row, label );
-    hig_workarea_add_control( t, *row, control );
-    if( GTK_IS_LABEL( label ) )
-        gtk_label_set_mnemonic_widget( GTK_LABEL( label ),
-                                       mnemonic ? mnemonic : control );
-    ++ * row;
+    hig_workarea_add_row_w_full( t, row, label, control, mnemonic, TRUE );
+}
+
+GtkWidget *
+hig_workarea_add_row_full( GtkWidget  * t,
+                           int        * row,
+                           const char * mnemonic_string,
+                           GtkWidget  * control,
+                           GtkWidget  * mnemonic,
+                           gboolean     indent )
+{
+    GtkWidget * l = gtk_label_new_with_mnemonic( mnemonic_string );
+
+    hig_workarea_add_row_w_full( t, row, l, control, mnemonic, indent );
+    return l;
 }
 
 GtkWidget*

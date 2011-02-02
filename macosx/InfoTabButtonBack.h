@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) Transmission authors and contributors
+ * Copyright (c) 2011 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,34 +22,11 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-#ifndef GTR_CONFIG_H
-#define GTR_CONFIG_H
+#import <Cocoa/Cocoa.h>
 
-#include <inttypes.h>
-#include <libtransmission/transmission.h>
-#include "util.h" /* gtr_lockfile */
+@interface InfoTabButtonBack : NSView
+{
+    NSGradient * fGradient;
+}
 
-int64_t          gtr_pref_int_get           ( const char * key );
-void             gtr_pref_int_set           ( const char * key, int64_t value );
-
-double           gtr_pref_double_get        ( const char * key );
-void             gtr_pref_double_set        ( const char * key, double value );
-
-gboolean         gtr_pref_flag_get          ( const char * key );
-void             gtr_pref_flag_set          ( const char * key, gboolean value );
-
-const char*      gtr_pref_string_get        ( const char * key );
-void             gtr_pref_string_set        ( const char * key, const char * value );
-
-void             gtr_pref_save              ( tr_session * );
-struct tr_benc*  gtr_pref_get_all           ( void );
-
-/**
-***
-**/
-
-gboolean cf_init( const char *confdir, char ** errstr );
-
-gboolean cf_lock( gtr_lockfile_state_t * tr_state, char ** errstr );
-
-#endif /* GTR_CONFIG_H */
+@end

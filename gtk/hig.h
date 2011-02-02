@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -65,6 +65,13 @@ GtkWidget* hig_workarea_add_row( GtkWidget *  table,
                                  const char * mnemonic_string,
                                  GtkWidget *  control,
                                  GtkWidget *  mnemonic_or_null_for_control );
+
+GtkWidget * hig_workarea_add_row_full( GtkWidget  * t,
+                                       int        * row,
+                                       const char * mnemonic_string,
+                                       GtkWidget  * control,
+                                       GtkWidget  * mnemonic,
+                                       gboolean     indent );
 
 void       hig_workarea_add_row_w( GtkWidget * table,
                                    int *       row,

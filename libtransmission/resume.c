@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -63,6 +63,7 @@
 #define KEY_IDLELIMIT_MODE         "idle-mode"
 
 #define KEY_PROGRESS_CHECKTIME "time-checked"
+#define KEY_PROGRESS_MTIMES    "mtimes"
 #define KEY_PROGRESS_BITFIELD  "bitfield"
 #define KEY_PROGRESS_HAVE      "have"
 
@@ -101,13 +102,6 @@ savePeers( tr_benc * dict, const tr_torrent * tor )
         tr_bencDictAddRaw( dict, KEY_PEERS6, pex, sizeof( tr_pex ) * count );
 
     tr_free( pex );
-}
-
-static tr_bool
-tr_isPex( const tr_pex * pex )
-{
-    return tr_isAddress( &pex->addr )
-        && ( pex->flags & 3 ) == pex->flags;
 }
 
 static int
@@ -458,11 +452,43 @@ loadProgress( tr_benc *    dict,
         tr_benc *       m;
         int64_t  timeChecked;
 
-        /* load in the timestamp of when we last checked each piece */
         if( tr_bencDictFindList( p, KEY_PROGRESS_CHECKTIME, &m ) )
+        {
+            /* This key was added in 2.20.
+               Load in the timestamp of when we last checked each piece */
             for( i=0, n=tor->info.pieceCount; i<n; ++i )
                 if( tr_bencGetInt( tr_bencListChild( m, i ), &timeChecked ) )
                     tor->info.pieces[i].timeChecked = (time_t)timeChecked;
+        }
+        else if( tr_bencDictFindList( p, KEY_PROGRESS_MTIMES, &m ) )
+        {
+            /* This is how it was done pre-2.20... per file. */
+            for( i=0, n=tr_bencListSize(m); i<n; ++i )
+            {
+                /* get the timestamp of file #i */
+                if( tr_bencGetInt( tr_bencListChild( m, i ), &timeChecked ) )
+                {
+                    /* walk through all the pieces that are in that file... */
+                    tr_piece_index_t j;
+                    tr_file * file = &tor->info.files[i];
+                    for( j=file->firstPiece; j<=file->lastPiece; ++j )
+                    {
+                        tr_piece * piece = &tor->info.pieces[j];
+
+                        /* If the piece's timestamp is unset from earlier,
+                         * set it here. */
+                        if( piece->timeChecked == 0 ) 
+                            piece->timeChecked = timeChecked;
+
+                        /* If the piece's timestamp is *newer* timeChecked,
+                         * the piece probably spans more than one file.
+                         * To be safe, let's use the older timestamp. */
+                        if( piece->timeChecked > timeChecked )
+                            piece->timeChecked = timeChecked;
+                    }
+                }
+            }
+        }
 
         err = NULL;
         if( tr_bencDictFindStr( p, KEY_PROGRESS_HAVE, &str ) )
