@@ -775,7 +775,7 @@ checkFilePieces( tr_torrent * tor )
         const tr_file * file = &tor->info.files[fi];
         for( pi = file->firstPiece; pi <= file->lastPiece; ++pi )
         {
-            if( !exists && tr_cpPieceIsComplete( cp, pi ) )
+            if( !file->usept && !exists && tr_cpPieceIsComplete( cp, pi ) )
             {
                 tr_torrentSetLocalError( tor,
                     _( "Expected file not found: %s" ), file->name );
