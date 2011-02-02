@@ -751,7 +751,7 @@ tr_torrentGotNewInfoDict( tr_torrent * tor )
 
 /** @return TRUE if files exist for all completed pieces. */
 static tr_bool
-checkExistingFiles( tr_torrent * tor )
+checkFilePieces( tr_torrent * tor )
 {
     const tr_completion * cp = &tor->completion;
     tr_piece_index_t pi;
@@ -828,7 +828,7 @@ torrentInit( tr_torrent * tor, const tr_ctor * ctor )
     torrentInitFromInfo( tor );
     loaded = tr_torrentLoadResume( tor, ~0, ctor );
     tor->completeness = tr_cpGetStatus( &tor->completion );
-    checkExistingFiles( tor );
+    checkFilePieces( tor );
 
     tr_ctorInitTorrentPriorities( ctor, tor );
     tr_ctorInitTorrentWanted( ctor, tor );
@@ -1615,7 +1615,7 @@ torrentStart( tr_torrent * tor )
     if( tor->isRunning )
         return;
 
-    if( !checkExistingFiles( tor ) )
+    if( !checkFilePieces( tor ) )
         return;
 
     /* verifying right now... wait until that's done so
