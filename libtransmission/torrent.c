@@ -1696,6 +1696,7 @@ verifyTorrent( void * vtor )
         tor->startAfterVerify = startAfter;
     }
 
+    tr_torrentClearError( tor );
     tr_verifyAdd( tor, torrentRecheckDoneCB );
 
     tr_sessionUnlock( tor->session );
