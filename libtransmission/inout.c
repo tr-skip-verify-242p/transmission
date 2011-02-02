@@ -123,14 +123,12 @@ readOrWriteBytes( tr_session       * session,
         }
         else
         {
-
             if( ( fd = tr_fdFileCheckout( session, tor->uniqueId, fileIndex, filename,
                                           doWrite, preallocationMode, file->length ) ) < 0 )
             {
                 err = errno;
                 tr_torerr( tor, "tr_fdFileCheckout failed for \"%s\": %s", filename, tr_strerror( err ) );
             }
-
         }
 
         if( doWrite && !err )
