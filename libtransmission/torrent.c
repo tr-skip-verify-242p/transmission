@@ -1768,10 +1768,7 @@ setExistingFilesVerified( tr_torrent * tor )
     }
 
     for( pi = 0; pi < info->pieceCount; ++pi )
-    {
         tr_torrentSetHasPiece( tor, pi, !missing[pi] );
-        tr_torrentSetPieceChecked( tor, pi );
-    }
     tr_free( missing );
 }
 
