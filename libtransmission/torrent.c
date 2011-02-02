@@ -758,39 +758,32 @@ tr_torrentGotNewInfoDict( tr_torrent * tor )
     tr_torrentFireMetadataCompleted( tor );
 }
 
+/** @return TRUE if files exist for all completed pieces. */
 static tr_bool
-hasAnyLocalData( const tr_torrent * tor )
+checkFilePieces( tr_torrent * tor )
 {
-    tr_file_index_t i;
-    tr_bool has_local_data = FALSE;
-    const tr_file_index_t n = tor->info.fileCount;
+    const tr_completion * cp = &tor->completion;
+    tr_piece_index_t pi;
+    tr_file_index_t fi;
 
-    for( i=0; i<n && !has_local_data; ++i )
+    if( !tr_torrentHasMetadata( tor ) )
+        return TRUE;
+
+    for( fi = 0; fi < tor->info.fileCount; ++fi )
     {
-        struct stat sb;
-        char * filename = tr_torrentFindFile( tor, i );
-
-        if( filename && !stat( filename, &sb ) )
-            has_local_data = TRUE;
-
-        tr_free( filename );
+        const tr_bool exists = tr_torrentFindFile2( tor, fi, NULL, NULL );
+        const tr_file * file = &tor->info.files[fi];
+        for( pi = file->firstPiece; pi <= file->lastPiece; ++pi )
+        {
+            if( !exists && tr_cpPieceIsComplete( cp, pi ) )
+            {
+                tr_torrentSetLocalError( tor,
+                    _( "Expected file not found: %s" ), file->name );
+                return FALSE;
+            }
+        }
     }
-
-    return has_local_data;
-}
-
-static tr_bool
-setLocalErrorIfFilesDisappeared( tr_torrent * tor )
-{
-    const tr_bool disappeared = ( tr_cpHaveTotal( &tor->completion ) > 0 ) && !hasAnyLocalData( tor );
-
-    if( disappeared )
-    {
-        tr_deeplog_tor( tor, "%s", "[LAZY] uh oh, the files disappeared" );
-        tr_torrentSetLocalError( tor, "%s", _( "No data found! Ensure your drives are connected or use \"Set Location\". To re-download, remove the torrent and re-add it." ) );
-    }
-
-    return disappeared;
+    return TRUE;
 }
 
 static void
@@ -849,7 +842,7 @@ torrentInit( tr_torrent * tor, const tr_ctor * ctor )
     torrentInitFromInfo( tor );
     loaded = tr_torrentLoadResume( tor, ~0, ctor );
     tor->completeness = tr_cpGetStatus( &tor->completion );
-    setLocalErrorIfFilesDisappeared( tor );
+    checkFilePieces( tor );
 
     tr_ctorInitTorrentPriorities( ctor, tor );
     tr_ctorInitTorrentWanted( ctor, tor );
@@ -1122,19 +1115,13 @@ tr_torrentGetActivity( tr_torrent * tor )
     return TR_STATUS_SEED;
 }
 
-static double
-getVerifyProgress( const tr_torrent * tor )
+void
+tr_torrentSetVerifyProgress( tr_torrent * tor, double d )
 {
-    tr_piece_index_t i, n;
-    tr_piece_index_t checked = 0;
-
     assert( tr_isTorrent( tor ) );
-
-    for( i=0, n=tor->info.pieceCount; i!=n; ++i )
-        if( tor->info.pieces[i].timeChecked )
-            ++checked;
-
-    return checked / (double)tor->info.pieceCount;
+    tr_torrentLock( tor );
+    tor->verifyProgress = d;
+    tr_torrentUnlock( tor );
 }
 
 const tr_stat *
@@ -1211,7 +1198,7 @@ tr_torrentStat( tr_torrent * tor )
     s->percentDone         = tr_cpPercentDone  ( &tor->completion );
     s->leftUntilDone       = tr_cpLeftUntilDone( &tor->completion );
     s->sizeWhenDone        = tr_cpSizeWhenDone ( &tor->completion );
-    s->recheckProgress     = s->activity == TR_STATUS_CHECK ? getVerifyProgress( tor ) : 0;
+    s->recheckProgress     = s->activity == TR_STATUS_CHECK ? tor->verifyProgress : 0;
     s->activityDate        = tor->activityDate;
     s->addedDate           = tor->addedDate;
     s->doneDate            = tor->doneDate;
@@ -1660,8 +1647,7 @@ torrentStart( tr_torrent * tor )
     if( tor->isRunning )
         return;
 
-    /* don't allow the torrent to be started if the files disappeared */
-    if( setLocalErrorIfFilesDisappeared( tor ) )
+    if( !checkFilePieces( tor ) )
         return;
 
     /* verifying right now... wait until that's done so
@@ -1749,10 +1735,8 @@ verifyTorrent( void * vtor )
         tor->startAfterVerify = startAfter;
     }
 
-    if( setLocalErrorIfFilesDisappeared( tor ) )
-        tor->startAfterVerify = FALSE;
-    else
-        tr_verifyAdd( tor, torrentRecheckDoneCB );
+    tr_torrentClearError( tor );
+    tr_verifyAdd( tor, torrentRecheckDoneCB );
 
     tr_sessionUnlock( tor->session );
 }
@@ -2939,71 +2923,16 @@ tr_pieceOffset( const tr_torrent * tor,
 ****
 ***/
 
-void
-tr_torrentSetPieceChecked( tr_torrent * tor, tr_piece_index_t pieceIndex )
-{
-    assert( tr_isTorrent( tor ) );
-    assert( pieceIndex < tor->info.pieceCount );
-
-    tor->info.pieces[pieceIndex].timeChecked = tr_time( );
-}
-
-void
-tr_torrentSetChecked( tr_torrent * tor, time_t when )
-{
-    tr_piece_index_t i, n;
-
-    assert( tr_isTorrent( tor ) );
-
-    for( i=0, n=tor->info.pieceCount; i!=n; ++i )
-        tor->info.pieces[i].timeChecked = when;
-}
-
 tr_bool
 tr_torrentCheckPiece( tr_torrent * tor, tr_piece_index_t pieceIndex )
 {
     const tr_bool pass = tr_ioTestPiece( tor, pieceIndex );
 
-    tr_deeplog_tor( tor, "[LAZY] tr_torrentCheckPiece tested piece %zu, pass==%d", (size_t)pieceIndex, (int)pass );
     tr_torrentSetHasPiece( tor, pieceIndex, pass );
-    tr_torrentSetPieceChecked( tor, pieceIndex );
     tor->anyDate = tr_time( );
     tr_torrentSetDirty( tor );
 
     return pass;
-}
-
-static time_t
-getFileMTime( const tr_torrent * tor, tr_file_index_t i )
-{
-    time_t mtime = 0;
-    char * path = tr_torrentFindFile( tor, i );
-    mtime = tr_fileMTime( path );
-    tr_free( path );
-    return mtime;
-}
-
-tr_bool
-tr_torrentPieceNeedsCheck( const tr_torrent * tor, tr_piece_index_t p )
-{
-    uint64_t unused;
-    tr_file_index_t f;
-    const tr_info * inf = tr_torrentInfo( tor );
-
-    /* if we've never checked this piece, then it needs to be checked */
-    if( !inf->pieces[p].timeChecked )
-        return TRUE;
-
-    /* If we think we've completed one of the files in this piece,
-     * but it's been modified since we last checked it,
-     * then it needs to be rechecked */
-    tr_ioFindFileLocation( tor, p, 0, &f, &unused );
-    for( ; f < inf->fileCount && pieceHasFile( p, &inf->files[f] ); ++f )
-        if( tr_cpFileIsComplete( &tor->completion, f ) )
-            if( getFileMTime( tor, f ) > inf->pieces[p].timeChecked )
-                return TRUE;
-
-    return FALSE;
 }
 
 /***

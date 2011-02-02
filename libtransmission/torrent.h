@@ -90,11 +90,6 @@ void             tr_torrentInitFileName( tr_torrent *    tor,
                                          tr_file_index_t fileIndex,
                                          const char *    name );
 
-void             tr_torrentSetPieceChecked( tr_torrent       * tor,
-                                            tr_piece_index_t   piece );
-
-void             tr_torrentSetChecked( tr_torrent * tor, time_t when );
-
 void             tr_torrentCheckSeedLimit( tr_torrent * tor );
 
 /** save a torrent's .resume file if it's changed since the last time it was saved */
@@ -114,6 +109,8 @@ tr_verify_state;
 
 void             tr_torrentSetVerifyState( tr_torrent      * tor,
                                            tr_verify_state   state );
+void             tr_torrentSetVerifyProgress( tr_torrent * tor,
+                                              double d );
 
 tr_torrent_activity tr_torrentGetActivity( tr_torrent * tor );
 
@@ -236,6 +233,7 @@ struct tr_torrent
     uint16_t                   maxConnectedPeers;
 
     tr_verify_state            verifyState;
+    double                     verifyProgress;
 
     time_t                     lastStatTime;
     tr_stat                    stats;
