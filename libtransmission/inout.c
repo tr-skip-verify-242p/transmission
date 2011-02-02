@@ -113,7 +113,7 @@ readOrWriteBytes( tr_session       * session,
             preallocationMode = tor->session->preallocationMode;
 
         filename = tr_buildPath( base, subpath, NULL );
-        if( ioMode < TR_IO_WRITE && !fileExists )
+        if( ioMode == TR_IO_READ && !fileExists )
         {
             tr_torrentSetLocalError( tor,
                 _( "Expected file not found: %s" ), filename );
@@ -253,7 +253,7 @@ readOrWritePiece( tr_torrent       * tor,
         ++fileIndex;
         fileOffset = 0;
 
-        if( err != 0 && tor->error != TR_STAT_LOCAL_ERROR )
+        if( err != 0 && ioMode != TR_IO_PREFETCH && tor->error != TR_STAT_LOCAL_ERROR )
         {
             char * path = tr_buildPath( tor->downloadDir, file->name, NULL );
             tr_torrentSetLocalError( tor, "%s (%s)", tr_strerror( err ), path );
