@@ -170,6 +170,7 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_MAX_CACHE_SIZE_MB             "cache-size-mb"
 #define TR_PREFS_KEY_DHT_ENABLED                   "dht-enabled"
 #define TR_PREFS_KEY_LPD_ENABLED                   "lpd-enabled"
+#define TR_PREFS_KEY_PREFETCH_ENABLED              "prefetch-enabled"
 #define TR_PREFS_KEY_DOWNLOAD_DIR                  "download-dir"
 #define TR_PREFS_KEY_ENCRYPTION                    "encryption"
 #define TR_PREFS_KEY_IDLE_LIMIT                    "idle-seeding-limit"
@@ -744,7 +745,6 @@ tr_bool  tr_sessionGetActiveSpeedLimit_KBps( const tr_session  * session,
 ***/
 
 double     tr_sessionGetRawSpeed_KBps  ( const tr_session *, tr_direction );
-double     tr_sessionGetPieceSpeed_KBps( const tr_session *, tr_direction );
 
 void       tr_sessionSetRatioLimited  ( tr_session *, tr_bool isLimited );
 tr_bool    tr_sessionIsRatioLimited   ( const tr_session * );
