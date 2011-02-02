@@ -90,7 +90,7 @@ readOrWriteBytes( tr_session       * session,
     {
         /* the fd cache doesn't have this file...
          * we'll need to open it and maybe create it */
-        char * subpath;
+        char * subpath, * filename = NULL;
         const char * base;
         tr_bool fileExists;
         tr_preallocation_mode preallocationMode;
@@ -112,13 +112,15 @@ readOrWriteBytes( tr_session       * session,
         else
             preallocationMode = tor->session->preallocationMode;
 
-        if( ( ioMode < TR_IO_WRITE ) && !fileExists ) /* does file exist? */
+        filename = tr_buildPath( base, subpath, NULL );
+        if( ioMode < TR_IO_WRITE && !fileExists )
         {
+            tr_torrentSetLocalError( tor,
+                _( "Expected file not found: %s" ), filename );
             err = ENOENT;
         }
         else
         {
-            char * filename = tr_buildPath( base, subpath, NULL );
 
             if( ( fd = tr_fdFileCheckout( session, tor->uniqueId, fileIndex, filename,
                                           doWrite, preallocationMode, file->length ) ) < 0 )
@@ -127,25 +129,29 @@ readOrWriteBytes( tr_session       * session,
                 tr_torerr( tor, "tr_fdFileCheckout failed for \"%s\": %s", filename, tr_strerror( err ) );
             }
 
-            tr_free( filename );
         }
 
         if( doWrite && !err )
             tr_statsFileCreated( tor->session );
 
+        tr_free( filename );
         tr_free( subpath );
+    }
+    else
+    {
+        struct stat sb;
+        /* Check that the file corresponding to 'fd' still exists. */
+        if( !fstat( fd, &sb ) && sb.st_nlink < 1 )
+        {
+            tr_torrentSetLocalError( tor,
+                _( "File deleted while still in cache: %s" ),
+                tor->info.files[fileIndex].name );
+            err = ENOENT;
+        }
     }
 
     if( !err )
     {
-        /* check & see if someone deleted the file while it was in our cache */
-        struct stat sb;
-        const tr_bool file_disappeared = fstat( fd, &sb ) || sb.st_nlink < 1;
-        if( file_disappeared ) {
-            tr_torrentSetLocalError( tor, "Please Verify Local Data! A file disappeared: \"%s\"", tor->info.files[fileIndex].name );
-            err = ENOENT;
-        }
-
         if( ioMode == TR_IO_READ ) {
             const int rc = tr_pread( fd, buf, buflen, fileOffset );
             if( rc < 0 ) {
@@ -247,7 +253,7 @@ readOrWritePiece( tr_torrent       * tor,
         ++fileIndex;
         fileOffset = 0;
 
-        if( ( err != 0 ) && (ioMode == TR_IO_WRITE ) && ( tor->error != TR_STAT_LOCAL_ERROR ) )
+        if( err != 0 && tor->error != TR_STAT_LOCAL_ERROR )
         {
             char * path = tr_buildPath( tor->downloadDir, file->name, NULL );
             tr_torrentSetLocalError( tor, "%s (%s)", tr_strerror( err ), path );

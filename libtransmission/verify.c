@@ -54,9 +54,9 @@ verifyTorrent( tr_torrent * tor, tr_bool * stopFlag )
     uint8_t * buffer = tr_valloc( buflen );
 
     SHA1_Init( &sha );
+    tr_torrentSetVerifyProgress( tor, 0 );
 
     tr_tordbg( tor, "%s", "verifying torrent..." );
-    tr_torrentSetChecked( tor, 0 );
     while( !*stopFlag && ( pieceIndex < tor->info.pieceCount ) )
     {
         uint32_t leftInPiece;
@@ -115,9 +115,10 @@ verifyTorrent( tr_torrent * tor, tr_bool * stopFlag )
                 tr_torrentSetHasPiece( tor, pieceIndex, hasPiece );
                 changed |= hasPiece != hadPiece;
             }
-            tr_torrentSetPieceChecked( tor, pieceIndex );
             now = tr_time( );
             tor->anyDate = now;
+            tr_torrentSetVerifyProgress( tor,
+                (double) ( pieceIndex + 1 ) / (double) tor->info.pieceCount );
 
             /* sleeping even just a few msec per second goes a long
              * way towards reducing IO load... */

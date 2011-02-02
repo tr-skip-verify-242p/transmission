@@ -62,9 +62,7 @@
 #define KEY_IDLELIMIT_MINS         "idle-limit"
 #define KEY_IDLELIMIT_MODE         "idle-mode"
 
-#define KEY_PROGRESS_CHECKTIME "time-checked"
-#define KEY_PROGRESS_MTIMES    "mtimes"
-#define KEY_PROGRESS_BITFIELD  "bitfield"
+#define KEY_PROGRESS_BITFIELD  "bitfield" /* i.e. blocks */
 #define KEY_PROGRESS_HAVE      "have"
 
 enum
@@ -410,85 +408,36 @@ static void
 saveProgress( tr_benc *          dict,
               const tr_torrent * tor )
 {
-    size_t              i, n;
-    tr_benc *           p;
-    tr_benc *           m;
-    const tr_bitfield * bitfield;
-
-    p = tr_bencDictAdd( dict, KEY_PROGRESS );
-    tr_bencInitDict( p, 2 );
-
-    /* add each piece's timeChecked */
-    n = tor->info.pieceCount;
-    m = tr_bencDictAddList( p, KEY_PROGRESS_CHECKTIME, n );
-    for( i=0; i<n; ++i )
-        tr_bencListAddInt( m, tor->info.pieces[i].timeChecked );
+    tr_benc * p = tr_bencDictAdd( dict, KEY_PROGRESS );
+    tr_bencInitDict( p, 1 );
 
     /* add the progress */
     if( tor->completeness == TR_SEED )
+    {
         tr_bencDictAddStr( p, KEY_PROGRESS_HAVE, "all" );
-    bitfield = tr_cpBlockBitfield( &tor->completion );
-    tr_bencDictAddRaw( p, KEY_PROGRESS_BITFIELD,
-                       bitfield->bits, bitfield->byteCount );
+    }
+    else
+    {
+        const tr_bitfield * bitfield;
+        bitfield = tr_cpBlockBitfield( &tor->completion );
+        tr_bencDictAddRaw( p, KEY_PROGRESS_BITFIELD,
+                           bitfield->bits, bitfield->byteCount );
+    }
 }
 
 static uint64_t
 loadProgress( tr_benc *    dict,
               tr_torrent * tor )
 {
-    size_t    i, n;
-    uint64_t  ret = 0;
+    uint64_t ret = 0;
     tr_benc * p;
-
-    for( i=0, n=tor->info.pieceCount; i<n; ++i )
-        tor->info.pieces[i].timeChecked = 0;
 
     if( tr_bencDictFindDict( dict, KEY_PROGRESS, &p ) )
     {
         const char * err;
         const char * str;
         const uint8_t * raw;
-        size_t          rawlen;
-        tr_benc *       m;
-        int64_t  timeChecked;
-
-        if( tr_bencDictFindList( p, KEY_PROGRESS_CHECKTIME, &m ) )
-        {
-            /* This key was added in 2.20.
-               Load in the timestamp of when we last checked each piece */
-            for( i=0, n=tor->info.pieceCount; i<n; ++i )
-                if( tr_bencGetInt( tr_bencListChild( m, i ), &timeChecked ) )
-                    tor->info.pieces[i].timeChecked = (time_t)timeChecked;
-        }
-        else if( tr_bencDictFindList( p, KEY_PROGRESS_MTIMES, &m ) )
-        {
-            /* This is how it was done pre-2.20... per file. */
-            for( i=0, n=tr_bencListSize(m); i<n; ++i )
-            {
-                /* get the timestamp of file #i */
-                if( tr_bencGetInt( tr_bencListChild( m, i ), &timeChecked ) )
-                {
-                    /* walk through all the pieces that are in that file... */
-                    tr_piece_index_t j;
-                    tr_file * file = &tor->info.files[i];
-                    for( j=file->firstPiece; j<=file->lastPiece; ++j )
-                    {
-                        tr_piece * piece = &tor->info.pieces[j];
-
-                        /* If the piece's timestamp is unset from earlier,
-                         * set it here. */
-                        if( piece->timeChecked == 0 ) 
-                            piece->timeChecked = timeChecked;
-
-                        /* If the piece's timestamp is *newer* timeChecked,
-                         * the piece probably spans more than one file.
-                         * To be safe, let's use the older timestamp. */
-                        if( piece->timeChecked > timeChecked )
-                            piece->timeChecked = timeChecked;
-                    }
-                }
-            }
-        }
+        size_t rawlen;
 
         err = NULL;
         if( tr_bencDictFindStr( p, KEY_PROGRESS_HAVE, &str ) )
@@ -509,8 +458,9 @@ loadProgress( tr_benc *    dict,
         }
         else err = "Couldn't find 'have' or 'bitfield'";
 
-        if( err != NULL )
-            tr_tordbg( tor, "Torrent needs to be verified - %s", err );
+        if( err )
+            tr_torrentSetLocalError( tor,
+                _( "Failed loading progress information: %s" ), err );
 
         ret = TR_FR_PROGRESS;
     }
