@@ -184,7 +184,7 @@ load_proxy_acl( tr_session * s )
     FILE * f = NULL;
     char line[512];
 
-    path = tr_buildPath( s->configDir, "proxy-bypass.txt", NULL );
+    path = tr_buildPath( s->configDir, "proxy-exclude.txt", NULL );
     cur_mtime = tr_fileMTime( path );
     if( cur_mtime == 0 )
     {
