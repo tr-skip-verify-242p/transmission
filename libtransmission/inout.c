@@ -145,7 +145,7 @@ readOrWriteBytes( tr_session       * session,
         {
             tr_torrentSetLocalError( tor,
                 _( "File deleted while still in cache: %s" ),
-                tor->info.files[fileIndex].name );
+                file->name );
             err = ENOENT;
         }
     }
