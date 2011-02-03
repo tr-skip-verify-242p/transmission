@@ -62,7 +62,7 @@
 #define KEY_IDLELIMIT_MINS         "idle-limit"
 #define KEY_IDLELIMIT_MODE         "idle-mode"
 
-#define KEY_PROGRESS_BITFIELD  "bitfield" /* i.e. blocks */
+#define KEY_PROGRESS_BITFIELD  "bitfield"
 #define KEY_PROGRESS_HAVE      "have"
 
 enum
