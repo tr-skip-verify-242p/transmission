@@ -180,6 +180,19 @@ preallocate_file_full( const char * filename, uint64_t length )
     return success;
 }
 
+
+/* portability wrapper for fsync(). */
+int
+tr_fsync( int fd )
+{
+#ifdef WIN32
+    return _commit( fd );
+#else
+    return fsync( fd );
+#endif
+}
+
+
 /* Like pread and pwrite, except that the position is undefined afterwards.
    And of course they are not thread-safe. */
 
@@ -525,7 +538,14 @@ tr_fdFileClose( tr_session * s, const tr_torrent * tor,
     struct tr_cached_file * o;
 
     if(( o = fileset_lookup( get_fileset( s ), tr_torrentId( tor ), i, it )))
+    {
+        /* flush writable files so that their mtimes will be
+         * up-to-date when this function returns to the caller... */
+        if( o->is_writable )
+            tr_fsync( o->fd );
+
         cached_file_close( o );
+    }
 }
 
 int
