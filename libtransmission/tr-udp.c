@@ -145,7 +145,7 @@ event_callback(int s, short type UNUSED, void *sv)
     if(rc <= 0)
         return;
 
-    if( check_udp_tracker( ss, buf, rc, &from, fromlen ) )
+    if( check_udp_tracker( sv, buf, rc, &from, fromlen ) )
     {
         /* Packet was UDP tracker communication. */
     }
