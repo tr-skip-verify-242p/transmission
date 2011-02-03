@@ -141,10 +141,21 @@ getTimeoutFromURL( const struct tr_web_task * task )
     long timeout;
     const tr_session * session = task->session;
 
-    if( !session || session->isClosed ) timeout = 20L;
-    else if( strstr( task->url, "scrape" ) != NULL ) timeout = 30L;
-    else if( strstr( task->url, "announce" ) != NULL ) timeout = 90L;
-    else timeout = 240L;
+    if( !session || session->isClosed )
+    {
+        timeout = 20L;
+    }
+    else
+    {
+        if( tr_sessionIsProxyEnabled( session ) )
+            timeout = 300L;
+        else if( strstr( task->url, "scrape" ) != NULL )
+            timeout = 30L;
+        else if( strstr( task->url, "announce" ) != NULL )
+            timeout = 90L;
+        else
+            timeout = 240L;
+    }
 
     return timeout;
 }
@@ -158,17 +169,22 @@ createEasy( tr_session * s, struct tr_web_task * task )
     const long verbose = getenv( "TR_CURL_VERBOSE" ) != NULL;
     char * cookie_filename = tr_buildPath( s->configDir, "cookies.txt", NULL );
 
-    if( !task->range && s->isProxyEnabled ) {
-        const long proxyType = getCurlProxyType( s->proxyType );
-        curl_easy_setopt( e, CURLOPT_PROXY, s->proxy );
+    if( !task->range && tr_sessionIsProxyEnabled( s ) )
+    {
+        const tr_proxy_type type = tr_sessionGetProxyType( s );
+        const long proxyType = getCurlProxyType( type );
+        curl_easy_setopt( e, CURLOPT_PROXY, tr_sessionGetProxy( s ) );
         curl_easy_setopt( e, CURLOPT_PROXYAUTH, CURLAUTH_ANY );
-        curl_easy_setopt( e, CURLOPT_PROXYPORT, s->proxyPort );
+        curl_easy_setopt( e, CURLOPT_PROXYPORT, tr_sessionGetProxyPort( s ) );
         curl_easy_setopt( e, CURLOPT_PROXYTYPE, proxyType );
     }
 
-    if( !task->range && s->isProxyAuthEnabled ) {
-        char * str = tr_strdup_printf( "%s:%s", s->proxyUsername,
-                                                s->proxyPassword );
+    if( !task->range && tr_sessionIsProxyAuthEnabled( s ) )
+    {
+        char * str;
+        str = tr_strdup_printf( "%s:%s",
+                                tr_sessionGetProxyUsername( s ),
+                                tr_sessionGetProxyPassword( s ) );
         curl_easy_setopt( e, CURLOPT_PROXYUSERPWD, str );
         tr_free( str );
     }

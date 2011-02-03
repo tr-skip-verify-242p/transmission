@@ -123,15 +123,14 @@ check_udp_tracker( tr_session * s, const uint8_t * data, size_t len,
 }
 
 static void
-event_callback(int s, short type, void *sv)
+event_callback(int s, short type UNUSED, void *sv)
 {
-    tr_session *ss = (tr_session*)sv;
     unsigned char *buf;
     struct sockaddr_storage from;
     socklen_t fromlen;
     int rc;
 
-    assert(tr_isSession(ss));
+    assert(tr_isSession(sv));
     assert(type == EV_READ);
 
     buf = malloc(4096);
@@ -146,7 +145,7 @@ event_callback(int s, short type, void *sv)
     if(rc <= 0)
         return;
 
-    if( check_udp_tracker( ss, buf, rc, &from, fromlen ) )
+    if( check_udp_tracker( sv, buf, rc, &from, fromlen ) )
     {
         /* Packet was UDP tracker communication. */
     }
