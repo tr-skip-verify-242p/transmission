@@ -2872,17 +2872,9 @@ tr_torrentFileCompleted( tr_torrent * tor, tr_file_index_t fileNum )
     const char * base;
     const tr_info * inf = &tor->info;
     const tr_file * f = &inf->files[fileNum];
-    tr_piece * p;
-    const tr_piece * pend;
-    const time_t now = tr_time( );
 
     /* close the file so that we can reopen in read-only mode as needed */
     tr_fdFileClose( tor->session, tor, fileNum );
-
-    /* now that the file is complete and closed, we can start watching its
-     * mtime timestamp for changes to know if we need to reverify pieces */
-    for( p=&inf->pieces[f->firstPiece], pend=&inf->pieces[f->lastPiece]; p!=pend; ++p )
-        p->timeChecked = now;
 
     /* if the torrent's current filename isn't the same as the one in the
      * metadata -- for example, if it had the ".part" suffix appended to
