@@ -3550,6 +3550,8 @@ tr_torrentFileCompleted( tr_torrent * tor, tr_file_index_t fileNum )
 {
     char * sub;
     const char * base;
+    const tr_info * inf = &tor->info;
+    const tr_file * f = &inf->files[fileNum];
 
     /* close the file so that we can reopen in read-only mode as needed */
     tr_fdFileClose( tor->session, tor, fileNum, TR_FD_INDEX_FILE );
@@ -3559,12 +3561,10 @@ tr_torrentFileCompleted( tr_torrent * tor, tr_file_index_t fileNum )
      * it until now -- then rename it to match the one in the metadata */
     if( tr_torrentFindFile2( tor, fileNum, &base, &sub ) )
     {
-        const tr_file * file = &tor->info.files[fileNum];
-
-        if( strcmp( sub, file->name ) )
+        if( strcmp( sub, f->name ) )
         {
             char * oldpath = tr_buildPath( base, sub, NULL );
-            char * newpath = tr_buildPath( base, file->name, NULL );
+            char * newpath = tr_buildPath( base, f->name, NULL );
 
             if( rename( oldpath, newpath ) )
                 tr_torerr( tor, "Error moving \"%s\" to \"%s\": %s", oldpath, newpath, tr_strerror( errno ) );

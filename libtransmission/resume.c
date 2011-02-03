@@ -64,7 +64,7 @@
 #define KEY_IDLELIMIT_MINS         "idle-limit"
 #define KEY_IDLELIMIT_MODE         "idle-mode"
 
-#define KEY_PROGRESS_BITFIELD  "bitfield" /* i.e. blocks */
+#define KEY_PROGRESS_BITFIELD  "bitfield"
 #define KEY_PROGRESS_HAVE      "have"
 
 enum
@@ -446,8 +446,7 @@ loadIdleLimits( tr_benc *    dict,
 ***/
 
 static void
-saveProgress( tr_benc *          dict,
-              const tr_torrent * tor )
+saveProgress( tr_benc * dict, const tr_torrent * tor )
 {
     tr_benc * p = tr_bencDictAdd( dict, KEY_PROGRESS );
     tr_bencInitDict( p, 1 );
@@ -467,13 +466,12 @@ saveProgress( tr_benc *          dict,
 }
 
 static uint64_t
-loadProgress( tr_benc *    dict,
-              tr_torrent * tor )
+loadProgress( tr_benc * dict, tr_torrent * tor )
 {
     uint64_t ret = 0;
-    tr_benc * p;
+    tr_benc * prog;
 
-    if( tr_bencDictFindDict( dict, KEY_PROGRESS, &p ) )
+    if( tr_bencDictFindDict( dict, KEY_PROGRESS, &prog ) )
     {
         const char * err;
         const char * str;
@@ -481,14 +479,14 @@ loadProgress( tr_benc *    dict,
         size_t rawlen;
 
         err = NULL;
-        if( tr_bencDictFindStr( p, KEY_PROGRESS_HAVE, &str ) )
+        if( tr_bencDictFindStr( prog, KEY_PROGRESS_HAVE, &str ) )
         {
             if( !strcmp( str, "all" ) )
                 tr_cpSetHaveAll( &tor->completion );
             else
                 err = "Invalid value for HAVE";
         }
-        else if( tr_bencDictFindRaw( p, KEY_PROGRESS_BITFIELD, &raw, &rawlen ) )
+        else if( tr_bencDictFindRaw( prog, KEY_PROGRESS_BITFIELD, &raw, &rawlen ) )
         {
             tr_bitfield tmp;
             tmp.byteCount = rawlen;
