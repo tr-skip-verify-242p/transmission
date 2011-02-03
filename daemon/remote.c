@@ -238,6 +238,7 @@ static tr_option opts[] =
     { 'c', "incomplete-dir",         "Where to store new torrents until they're complete", "c", 1, "<dir>" },
     { 'C', "no-incomplete-dir",      "Don't store incomplete torrents in a different location", "C", 0, NULL },
     { 'b', "debug",                  "Print debugging information", "b",  0, NULL },
+    { 811, "timeout",                "Request timeout value (0 for none)", NULL, 1, "<seconds>" },
     { 'd', "downlimit",              "Set the max download speed in "SPEED_K_STR" for the current torrent(s) or globally", "d", 1, "<speed>" },
     { 'D', "no-downlimit",           "Disable max download speed for the current torrent(s) or globally", "D", 0, NULL },
     { 'e', "cache",                  "Set the maximum size of the session's memory cache (in " MEM_M_STR ")", "e", 1, "<size>" },
@@ -365,6 +366,7 @@ getOptMode( int val )
         case 'j': /* output json */
         case 'n': /* auth */
         case 810: /* authenv */
+        case 811: /* timeout */
         case 'N': /* netrc */
         case 't': /* set current torrent */
         case 'V': /* show version number */
@@ -494,6 +496,7 @@ static tr_bool output_json = 0;
 static char * auth = NULL;
 static char * netrc = NULL;
 static char * sessionId = NULL;
+static long timeout = -1;
 
 static char*
 tr_getcwd( void )
@@ -752,6 +755,8 @@ parseResponseHeader( void *ptr, size_t size, size_t nmemb, void * stream UNUSED 
 static long
 getTimeoutSecs( const char * req )
 {
+  if( timeout >= 0 )
+    return timeout;
   if( strstr( req, "\"method\":\"blocklist-update\"" ) != NULL )
     return 300L;
 
@@ -1871,6 +1876,10 @@ processArgs( const char * rpcurl, int argc, const char ** argv )
                         }
                         auth = tr_strdup( authenv );
                     }
+                    break;
+
+                case 811: /* timeout */
+                    timeout = atol( optarg );
                     break;
 
                 case 'N': /* netrc */
