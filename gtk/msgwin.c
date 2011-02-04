@@ -391,9 +391,6 @@ onRefresh( gpointer gdata )
         tr_msg_list * msgs = tr_getQueuedMessages( );
         if( msgs )
         {
-            GtkTreeModel * model = GTK_TREE_MODEL( data->store );
-            GtkTreeIter iter;
-            gint count;
             /* add the new messages and append them to the end of
              * our persistent list */
             tr_msg_list * tail = addMessages( data->store, msgs );
@@ -402,13 +399,6 @@ onRefresh( gpointer gdata )
             else
                 myHead = msgs;
             myTail = tail;
-            count = gtk_tree_model_iter_n_children( model, NULL );
-            if( gtk_tree_model_iter_nth_child( model, &iter, NULL, count - 1 ) )
-            {
-                GtkTreePath * path = gtk_tree_model_get_path( model, &iter );
-                gtk_tree_view_scroll_to_cell( data->view, path, NULL, FALSE, 0, 0 );
-                gtk_tree_path_free( path );
-            }
         }
 
         if( pinned_to_new )
