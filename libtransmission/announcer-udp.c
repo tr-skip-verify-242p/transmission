@@ -850,6 +850,9 @@ create_announce( tr_announcer     * announcer,
     int numwant, event;
     tr_port port;
 
+    assert( tor->peer_id != NULL );
+    assert( strlen( (const char *) tor->peer_id ) == sizeof( req->peer_id ) );
+
     ALLOC_PKT( pkt, req, auP_announce_request );
     req->hdr.action = htonl( AUC_ACTION_ANNOUNCE );
 
