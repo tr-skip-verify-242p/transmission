@@ -809,6 +809,8 @@ torrentInit( tr_torrent * tor, const tr_ctor * ctor )
     tr_sha1( tor->obfuscatedHash, "req2", 4,
              tor->info.hash, SHA_DIGEST_LENGTH,
              NULL );
+    tr_free( tor->peer_id );
+    tor->peer_id = tr_peerIdNew( session );
 
     if( !tr_ctorGetDownloadDir( ctor, TR_FORCE, &dir ) ||
         !tr_ctorGetDownloadDir( ctor, TR_FALLBACK, &dir ) )
