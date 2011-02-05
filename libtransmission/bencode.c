@@ -14,8 +14,7 @@
 #include <ctype.h> /* isdigit() */
 #include <errno.h>
 #include <math.h> /* fabs() */
-#include <stdio.h>
-#include <stdlib.h> /* realpath() */
+#include <stdio.h> /* rename() */
 #include <string.h>
 
 #ifdef WIN32 /* tr_mkstemp() */
@@ -24,10 +23,8 @@
  #define _S_IWRITE 128
 #endif
 
-#include <sys/types.h> /* stat() */
-#include <sys/stat.h> /* stat() */
-#include <locale.h>
-#include <unistd.h> /* stat() */
+#include <locale.h> /* setlocale() */
+#include <unistd.h> /* write(), unlink() */
 
 #include <event2/buffer.h>
 
@@ -944,14 +941,13 @@ struct SaveNode
 static void
 nodeInitDict( struct SaveNode * node, const tr_benc * val, tr_bool sort_dicts )
 {
-    int nKeys;
     const int n = val->val.l.count;
+    const int nKeys = n / 2;
 
     assert( tr_bencIsDict( val ) );
 
-    nKeys = n / 2;
     node->val = val;
-    node->children = tr_new0( int, nKeys * 2 );
+    node->children = tr_new0( int, n );
 
     if( sort_dicts )
     {
@@ -974,7 +970,7 @@ nodeInitDict( struct SaveNode * node, const tr_benc * val, tr_bool sort_dicts )
     }
     else
     {
-        int i ;
+        int i;
 
         for( i=0; i<n; ++i )
             node->children[node->childCount++] = i;
@@ -1661,17 +1657,6 @@ tr_mkstemp( char * template )
 #endif
 }
 
-/* portability wrapper for fsync(). */
-static void
-tr_fsync( int fd )
-{
-#ifdef WIN32
-    _commit( fd );
-#else
-    fsync( fd );
-#endif
-}
-
 int
 tr_bencToFile( const tr_benc * top, tr_fmt_mode mode, const char * filename )
 {
@@ -1719,24 +1704,12 @@ tr_bencToFile( const tr_benc * top, tr_fmt_mode mode, const char * filename )
         }
         else
         {
-            struct stat sb;
-            const tr_bool already_exists = !stat( filename, &sb ) && S_ISREG( sb.st_mode );
-
             tr_fsync( fd );
             tr_close_file( fd );
 
-            if( !already_exists || !unlink( filename ) )
+            if( !rename( tmp, filename ) )
             {
-                if( !rename( tmp, filename ) )
-                {
-                    tr_inf( _( "Saved \"%s\"" ), filename );
-                }
-                else
-                {
-                    err = errno;
-                    tr_err( _( "Couldn't save file \"%1$s\": %2$s" ), filename, tr_strerror( err ) );
-                    unlink( tmp );
-                }
+                tr_inf( _( "Saved \"%s\"" ), filename );
             }
             else
             {
