@@ -347,15 +347,10 @@ tr_cpPieceIsComplete( const tr_completion * cp, tr_piece_index_t piece )
 tr_bool
 tr_cpFileIsComplete( const tr_completion * cp, tr_file_index_t fileIndex )
 {
-    tr_block_index_t bi;
-    const tr_torrent * tor = cp->tor;
-    const tr_file * file = &tor->info.files[fileIndex];
-    const tr_block_index_t fbi = tr_torByteBlock( tor, file->offset );
-    const tr_block_index_t lbi = file->length > 0
-        ? tr_torByteBlock( tor, file->offset + file->length - 1 ) : fbi;
-    for( bi = fbi; bi <= lbi; ++bi )
-        if( !tr_cpBlockIsCompleteFast( cp, bi ) )
+    const tr_file * file = &cp->tor->info.files[fileIndex];
+    tr_piece_index_t pi;
+    for( pi = file->firstPiece; pi <= file->lastPiece; ++pi )
+        if( !tr_cpPieceIsComplete( cp, pi ) )
             return FALSE;
-
     return TRUE;
 }
