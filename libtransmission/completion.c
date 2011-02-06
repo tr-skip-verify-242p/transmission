@@ -334,7 +334,7 @@ tr_cpMissingBytesInPiece( const tr_completion * cp, tr_piece_index_t pi )
     bs = tr_torPieceFirstBlock( tor, pi );
     be = bs + tr_torPieceCountBlocks( tor, pi );
     for( bi = bs; bi < be; ++bi )
-        if( tr_cpBlockIsCompleteFast( cp, bi ) )
+        if( !tr_cpBlockIsCompleteFast( cp, bi ) )
             s += tr_torBlockCountBytes( tor, bi );
     return s;
 }
