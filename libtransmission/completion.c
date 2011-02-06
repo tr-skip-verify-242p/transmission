@@ -182,7 +182,8 @@ tr_cpSetHaveAll( tr_completion * cp )
     cp->haveValidIsDirty = 1;
 }
 
-/* Initialize a completion object from a bitfield indicating which blocks we have */
+/* Initialize a completion object from a bitfield indicating which
+ * blocks we have. */
 tr_bool
 tr_cpBlockBitfieldSet( tr_completion * cp, tr_bitfield * blockBitfield )
 {
@@ -196,18 +197,18 @@ tr_cpBlockBitfieldSet( tr_completion * cp, tr_bitfield * blockBitfield )
 
     /* The bitfield of block flags is typically loaded from a resume
      * file. Test the bitfield's length in case the resume file somehow
-     * got corrupted */
+     * got corrupted. */
     if( blockBitfield->byteCount != cp->blockBitfield.byteCount )
         return FALSE;
 
-    /* start cp with a state where it thinks we have nothing */
+    /* Start cp with a state where it thinks we have nothing. */
     tr_cpReset( cp );
 
-    /* init our block bitfield from the one passed in */
+    /* Initialize our block bitfield from the one passed in. */
     memcpy( cp->blockBitfield.bits, blockBitfield->bits,
             blockBitfield->byteCount );
 
-    /* to set the remaining fields, we walk through every block... */
+    /* To set the remaining fields, we walk through every block. */
     blocksInCurrentPiece = tr_torPieceCountBlocks( tor, p );
     while( b < cp->tor->block_count )
     {
@@ -220,17 +221,17 @@ tr_cpBlockBitfieldSet( tr_completion * cp, tr_bitfield * blockBitfield )
         ++b;
         ++pieceBlock;
 
-        /* by the time we reach the end of a piece, we have enough
+        /* By the time we reach the end of a piece, we have enough
          * info to update that piece's slot in cp.completeBlocks
-         * and cp.pieceBitfield */
+         * and cp.pieceBitfield. */
         if( pieceBlock == blocksInCurrentPiece )
         {
             cp->completeBlocks[p] = completeBlocksInPiece;
             if( completeBlocksInPiece == blocksInCurrentPiece )
                 tr_bitfieldAdd( &cp->pieceBitfield, p );
 
-            /* reset the per-piece counters because we're starting on
-             * a new piece now */
+            /* Reset the per-piece counters because we're starting on
+             * a new piece now. */
             ++p;
             completeBlocksInPiece = 0;
             pieceBlock = 0;
