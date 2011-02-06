@@ -1293,7 +1293,8 @@ fileBytesCompleted( const tr_torrent * tor, tr_file_index_t index )
 
     /* the first block */
     if( tr_cpBlockIsCompleteFast( &tor->completion, firstBlock ) )
-        total += f->offset - tr_torBlockByte( tor, firstBlock );
+        total += ( tr_torBlockCountBytes( tor, firstBlock )
+                   - ( f->offset - tr_torBlockByte( tor, firstBlock ) ) );
 
     /* the middle blocks */
     for( bi = firstBlock + 1; bi < lastBlock; ++bi )
