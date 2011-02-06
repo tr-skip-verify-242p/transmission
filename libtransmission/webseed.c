@@ -92,7 +92,7 @@ fire_client_got_rej( tr_torrent * tor, tr_webseed * w, tr_block_index_t block )
     tr_peer_event e = blank_event;
     e.eventType = TR_PEER_CLIENT_GOT_REJ;
     e.pieceIndex = tr_torBlockPiece( tor, block );
-    e.offset = tr_torByteBlockInPiece( tor, block, e.pieceIndex );
+    e.offset = tr_torBlockPieceByte( tor, block, e.pieceIndex );
     e.length = tr_torBlockCountBytes( tor, block );
     publish( w, &e );
 }
@@ -103,7 +103,7 @@ fire_client_got_block( tr_torrent * tor, tr_webseed * w, tr_block_index_t block 
     tr_peer_event e = blank_event;
     e.eventType = TR_PEER_CLIENT_GOT_BLOCK;
     e.pieceIndex = tr_torBlockPiece( tor, block );
-    e.offset = tr_torByteBlockInPiece( tor, block, e.pieceIndex );
+    e.offset = tr_torBlockPieceByte( tor, block, e.pieceIndex );
     e.length = tr_torBlockCountBytes( tor, block );
     publish( w, &e );
 }
@@ -181,7 +181,7 @@ on_idle( tr_webseed * w )
             task->block = b;
             task->piece_index = tr_torBlockPiece( tor, b );
             task->piece_offset
-                = tr_torByteBlockInPiece( tor, b, task->piece_index );
+                = tr_torBlockPieceByte( tor, b, task->piece_index );
             task->length = tr_torBlockCountBytes( tor, b );
             task->content = evbuffer_new( );
             evbuffer_add_cb( task->content, on_content_changed, w );

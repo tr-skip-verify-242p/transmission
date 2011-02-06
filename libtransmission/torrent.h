@@ -315,23 +315,14 @@ tr_torByteBlock( const tr_torrent * tor, uint64_t offset )
     return po / tor->block_size + pi * tor->whole_piece_block_count;
 }
 
-/* what byte offset in the piece does the block start at? */
-static inline uint32_t
-tr_torByteBlockInPiece( const tr_torrent * tor,
-                        tr_block_index_t   bi,
-                        tr_piece_index_t   pi )
-{
-    return tr_torByteBlock( tor, bi ) - tr_torBytePiece( tor, pi );
-}
-
 /* what byte offset does the block start at? */
 static inline uint64_t
 tr_torBlockByte( const tr_torrent * tor, tr_block_index_t b )
 {
     const tr_piece_index_t pi = tr_torBlockPiece( tor, b );
     const tr_block_index_t bi = tr_torPieceFirstBlock( tor, pi );
-    return (uint64_t) pi * tor->info.pieceSize
-        + ( b - bi ) * tor->block_size;
+    return ( (uint64_t) pi * tor->info.pieceSize
+             + ( b - bi ) * tor->block_size );
 }
 
 /* what byte offset does the piece start at? */
@@ -339,6 +330,15 @@ static inline uint64_t
 tr_torPieceByte( const tr_torrent * tor, tr_piece_index_t p )
 {
     return (uint64_t) tor->info.pieceSize * p;
+}
+
+/* what byte offset in the piece does the block start at? */
+static inline uint32_t
+tr_torBlockPieceByte( const tr_torrent * tor,
+                      tr_block_index_t   bi,
+                      tr_piece_index_t   pi )
+{
+    return tr_torBlockByte( tor, bi ) - tr_torPieceByte( tor, pi );
 }
 
 static inline void tr_torrentLock( const tr_torrent * tor )
