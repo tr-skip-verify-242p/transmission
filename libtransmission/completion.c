@@ -35,7 +35,7 @@ tr_cpConstruct( tr_completion * cp, tr_torrent * tor )
 {
     cp->tor = tor;
     cp->completeBlocks  = tr_new( uint16_t, tor->info.pieceCount );
-    tr_bitfieldConstruct( &cp->blockBitfield, tor->blockCount );
+    tr_bitfieldConstruct( &cp->blockBitfield, tor->block_count );
     tr_bitfieldConstruct( &cp->pieceBitfield, tor->info.pieceCount );
     tr_cpReset( cp );
     return cp;
@@ -124,9 +124,9 @@ tr_cpPieceRem( tr_completion *  cp,
 
     assert( cp );
     assert( piece < tor->info.pieceCount );
-    assert( start < tor->blockCount );
+    assert( start < tor->block_count );
     assert( start <= end );
-    assert( end <= tor->blockCount );
+    assert( end <= tor->block_count );
 
     for( block = start; block < end; ++block )
         if( tr_cpBlockIsCompleteFast( cp, block ) )
@@ -174,7 +174,7 @@ tr_cpSetHaveAll( tr_completion * cp )
     tr_cpReset( cp );
 
     cp->sizeNow = tor->info.totalSize;
-    tr_bitfieldAddRange( &cp->blockBitfield, 0, tor->blockCount );
+    tr_bitfieldAddRange( &cp->blockBitfield, 0, tor->block_count );
     tr_bitfieldAddRange( &cp->pieceBitfield, 0, tor->info.pieceCount );
     for( i=0; i<tor->info.pieceCount; ++i )
         cp->completeBlocks[i] = tr_torPieceCountBlocks( tor, i );
@@ -186,70 +186,59 @@ tr_cpSetHaveAll( tr_completion * cp )
 tr_bool
 tr_cpBlockBitfieldSet( tr_completion * cp, tr_bitfield * blockBitfield )
 {
-    tr_bool success = FALSE;
+    tr_torrent * tor = cp->tor;
+    tr_block_index_t b = 0;
+    tr_piece_index_t p = 0;
+    int pieceBlock = 0, blocksInCurrentPiece, completeBlocksInPiece = 0;
 
-    assert( cp );
-    assert( blockBitfield );
+    assert( cp != NULL );
+    assert( blockBitfield != NULL );
 
-    /* The bitfield of block flags is typically loaded from a resume file.
-       Test the bitfield's length in case the resume file somehow got corrupted */
-    if(( success = blockBitfield->byteCount == cp->blockBitfield.byteCount ))
+    /* The bitfield of block flags is typically loaded from a resume
+     * file. Test the bitfield's length in case the resume file somehow
+     * got corrupted */
+    if( blockBitfield->byteCount != cp->blockBitfield.byteCount )
+        return FALSE;
+
+    /* start cp with a state where it thinks we have nothing */
+    tr_cpReset( cp );
+
+    /* init our block bitfield from the one passed in */
+    memcpy( cp->blockBitfield.bits, blockBitfield->bits,
+            blockBitfield->byteCount );
+
+    /* to set the remaining fields, we walk through every block... */
+    blocksInCurrentPiece = tr_torPieceCountBlocks( tor, p );
+    while( b < cp->tor->block_count )
     {
-        tr_block_index_t b = 0;
-        tr_piece_index_t p = 0;
-        uint32_t pieceBlock = 0;
-        uint16_t completeBlocksInPiece = 0;
-        tr_block_index_t completeBlocksInTorrent = 0;
-        uint32_t blocksInCurrentPiece = tr_torPieceCountBlocks( cp->tor, p );
-
-        /* start cp with a state where it thinks we have nothing */
-        tr_cpReset( cp );
-
-        /* init our block bitfield from the one passed in */
-        memcpy( cp->blockBitfield.bits, blockBitfield->bits, blockBitfield->byteCount );
-
-        /* invalidate the fields that are lazy-evaluated */
-        cp->sizeWhenDoneIsDirty = TRUE;
-        cp->haveValidIsDirty = TRUE;
-
-        /* to set the remaining fields, we walk through every block... */
-        while( b < cp->tor->blockCount )
+        if( tr_bitfieldHasFast( blockBitfield, b ) )
         {
-            if( tr_bitfieldHasFast( blockBitfield, b ) )
-                ++completeBlocksInPiece;
-
-            ++b;
-            ++pieceBlock;
-
-            /* by the time we reach the end of a piece, we have enough info
-               to update that piece's slot in cp.completeBlocks and cp.pieceBitfield */
-            if( pieceBlock == blocksInCurrentPiece )
-            {
-                cp->completeBlocks[p] = completeBlocksInPiece;
-                completeBlocksInTorrent += completeBlocksInPiece;
-                if( completeBlocksInPiece == blocksInCurrentPiece )
-                    tr_bitfieldAdd( &cp->pieceBitfield, p );
-
-                /* reset the per-piece counters because we're starting on a new piece now */
-                ++p;
-                completeBlocksInPiece = 0;
-                pieceBlock = 0;
-                blocksInCurrentPiece = tr_torPieceCountBlocks( cp->tor, p );
-            }
+            ++completeBlocksInPiece;
+            cp->sizeNow += tr_torBlockCountBytes( tor, b );
         }
 
-        /* update sizeNow */
-        cp->sizeNow = completeBlocksInTorrent;
-        cp->sizeNow *= tr_torBlockCountBytes( cp->tor, 0 );
-        if( tr_bitfieldHasFast( &cp->blockBitfield, cp->tor->blockCount-1 ) ) {
-            /* the last block is usually smaller than the other blocks,
-               so handle that special case or cp->sizeNow might be too large */
-            cp->sizeNow -= tr_torBlockCountBytes( cp->tor, 0 );
-            cp->sizeNow += tr_torBlockCountBytes( cp->tor, cp->tor->blockCount-1 );
+        ++b;
+        ++pieceBlock;
+
+        /* by the time we reach the end of a piece, we have enough
+         * info to update that piece's slot in cp.completeBlocks
+         * and cp.pieceBitfield */
+        if( pieceBlock == blocksInCurrentPiece )
+        {
+            cp->completeBlocks[p] = completeBlocksInPiece;
+            if( completeBlocksInPiece == blocksInCurrentPiece )
+                tr_bitfieldAdd( &cp->pieceBitfield, p );
+
+            /* reset the per-piece counters because we're starting on
+             * a new piece now */
+            ++p;
+            completeBlocksInPiece = 0;
+            pieceBlock = 0;
+            blocksInCurrentPiece = tr_torPieceCountBlocks( tor, p );
         }
     }
 
-    return success;
+    return TRUE;
 }
 
 /***
@@ -268,12 +257,12 @@ tr_cpGetStatus( const tr_completion * cp )
 static uint64_t
 calculateHaveValid( const tr_completion * ccp )
 {
-    uint64_t                  b = 0;
-    tr_piece_index_t          i;
-    const tr_torrent        * tor            = ccp->tor;
-    const uint64_t            pieceSize      = tor->info.pieceSize;
-    const uint64_t            lastPieceSize  = tor->lastPieceSize;
-    const tr_piece_index_t    lastPiece      = tor->info.pieceCount - 1;
+    uint64_t b = 0;
+    tr_piece_index_t i;
+    const tr_torrent * tor = ccp->tor;
+    const uint64_t pieceSize = tor->info.pieceSize;
+    const tr_piece_index_t lastPiece = tor->info.pieceCount - 1;
+    const uint64_t lastPieceSize = tr_torPieceCountBytes( tor, lastPiece );
 
     if( !tr_torrentHasMetadata( tor ) )
         return 0;
@@ -331,6 +320,23 @@ tr_cpMissingBlocksInPiece( const tr_completion * cp, tr_piece_index_t piece )
     return tr_torPieceCountBlocks( cp->tor, piece ) - cp->completeBlocks[piece];
 }
 
+uint64_t
+tr_cpMissingBytesInPiece( const tr_completion * cp, tr_piece_index_t pi )
+{
+    const tr_torrent * tor = cp->tor;
+    tr_block_index_t bs, be, bi;
+    uint64_t s = 0;
+
+    if( tr_cpMissingBlocksInPiece( cp, pi ) == 0 )
+        return 0;
+
+    bs = tr_torPieceFirstBlock( tor, pi );
+    be = bs + tr_torPieceCountBlocks( tor, pi );
+    for( bi = bs; bi < be; ++bi )
+        if( tr_cpBlockIsCompleteFast( cp, bi ) )
+            s += tr_torBlockCountBytes( tor, bi );
+    return s;
+}
 
 tr_bool
 tr_cpPieceIsComplete( const tr_completion * cp, tr_piece_index_t piece )
@@ -341,57 +347,15 @@ tr_cpPieceIsComplete( const tr_completion * cp, tr_piece_index_t piece )
 tr_bool
 tr_cpFileIsComplete( const tr_completion * cp, tr_file_index_t fileIndex )
 {
-    tr_block_index_t block;
-
+    tr_block_index_t bi;
     const tr_torrent * tor = cp->tor;
     const tr_file * file = &tor->info.files[fileIndex];
-
-    if( file->firstPiece == file->lastPiece )
-    {
-        const tr_block_index_t firstBlock = file->offset / tor->blockSize;
-        const tr_block_index_t lastBlock = file->length ? ( ( file->offset + file->length - 1 ) / tor->blockSize ) : firstBlock;
-        for( block=firstBlock; block<=lastBlock; ++block )
-            if( !tr_cpBlockIsCompleteFast( cp, block ) )
-                return FALSE;
-    }
-    else
-    {
-        tr_piece_index_t piece;
-        tr_block_index_t firstBlock;
-        tr_block_index_t firstBlockInLastPiece;
-        tr_block_index_t lastBlock;
-        tr_block_index_t lastBlockInFirstPiece;
-        uint64_t lastByteInFirstPiece;
-        uint64_t firstByteInLastPiece;
-
-        /* go piece-by-piece in the middle pieces... it's faster than block-by-block */
-        for( piece=file->firstPiece+1; piece<file->lastPiece; ++piece )
-            if( !tr_cpPieceIsComplete( cp, piece ) )
-                return FALSE;
-
-        /* go block-by-block in the first piece */
-        firstBlock = file->offset / tor->blockSize;
-        lastByteInFirstPiece = ( (uint64_t)(file->firstPiece+1) * tor->info.pieceSize ) - 1;
-        lastBlockInFirstPiece = lastByteInFirstPiece / tor->blockSize;
-        assert( lastBlockInFirstPiece >= firstBlock );
-        assert( lastBlockInFirstPiece - firstBlock <= tr_torPieceCountBlocks( tor, file->firstPiece ) );
-        for( block=firstBlock; block<=lastBlockInFirstPiece; ++block )
-            if( !tr_cpBlockIsCompleteFast( cp, block ) )
-                return FALSE;
-
-        /* go block-by-block in the last piece */
-        lastBlock = file->length ? ( ( file->offset + file->length - 1 ) / tor->blockSize ) : firstBlock;
-        firstByteInLastPiece = (uint64_t)file->lastPiece * tor->info.pieceSize;
-        firstBlockInLastPiece = firstByteInLastPiece / tor->blockSize;
-        assert( firstBlockInLastPiece <= lastBlock );
-        assert( firstBlockInLastPiece >= firstBlock );
-        assert( firstBlockInLastPiece >= lastBlockInFirstPiece );
-        assert( lastBlock - firstBlockInLastPiece <= tr_torPieceCountBlocks( tor, file->lastPiece ) );
-        for( block=firstBlockInLastPiece; block<=lastBlock; ++block )
-            if( !tr_cpBlockIsCompleteFast( cp, block ) )
-                return FALSE;
-    }
+    const tr_block_index_t fbi = tr_torByteBlock( tor, file->offset );
+    const tr_block_index_t lbi = file->length > 0
+        ? tr_torByteBlock( tor, file->offset + file->length - 1 ) : fbi;
+    for( bi = fbi; bi <= lbi; ++bi )
+        if( !tr_cpBlockIsCompleteFast( cp, bi ) )
+            return FALSE;
 
     return TRUE;
-
 }

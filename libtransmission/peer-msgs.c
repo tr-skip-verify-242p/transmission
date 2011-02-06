@@ -121,12 +121,12 @@ struct peer_request
 };
 
 static uint32_t
-getBlockOffsetInPiece( const tr_torrent * tor, uint64_t b )
+getBlockOffsetInPiece( const tr_torrent * tor, tr_block_index_t b )
 {
-    const uint64_t piecePos = tor->info.pieceSize * tr_torBlockPiece( tor, b );
-    const uint64_t blockPos = tor->blockSize * b;
-    assert( blockPos >= piecePos );
-    return (uint32_t)( blockPos - piecePos );
+    const tr_piece_index_t pi = tr_torBlockPiece( tor, b );
+    const tr_block_index_t bi = tr_torPieceFirstBlock( tor, pi );
+    assert( b >= bi );
+    return ( b - bi ) * tor->block_size;
 }
 
 static void
@@ -1713,7 +1713,7 @@ updateDesiredRequestCount( tr_peermsgs * msgs )
 
         /* use this desired rate to figure out how
          * many requests we should send to this peer */
-        estimatedBlocksInPeriod = ( rate_Bps * seconds ) / torrent->blockSize;
+        estimatedBlocksInPeriod = ( rate_Bps * seconds ) / torrent->block_size;
         msgs->desiredRequestCount = MAX( floor, estimatedBlocksInPeriod );
 
         /* honor the peer's maximum request count, if specified */
@@ -1884,7 +1884,7 @@ fillOutputBuffer( tr_peermsgs * msgs, time_t now )
     ***  Data Blocks
     **/
 
-    if( ( tr_peerIoGetWriteBufferSpace( msgs->peer->io, now ) >= msgs->torrent->blockSize )
+    if( ( tr_peerIoGetWriteBufferSpace( msgs->peer->io, now ) >= msgs->torrent->block_size )
         && popNextRequest( msgs, &req ) )
     {
         --msgs->prefetchCount;

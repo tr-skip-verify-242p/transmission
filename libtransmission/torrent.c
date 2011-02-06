@@ -543,19 +543,10 @@ onTrackerResponse( tr_torrent * tor, const tr_tracker_event * event, void * unus
 ****
 ***/
 
-static tr_piece_index_t
-getBytePiece( const tr_info * info, uint64_t byteOffset )
-{
-    assert( info );
-    assert( info->pieceSize != 0 );
-
-    return byteOffset / info->pieceSize;
-}
-
 static void
-initFilePieces( tr_info *       info,
-                tr_file_index_t fileIndex )
+initFilePieces( tr_torrent * tor, tr_file_index_t fileIndex )
 {
+    tr_info * info = &tor->info;
     tr_file * file;
     uint64_t  firstByte, lastByte;
 
@@ -565,8 +556,8 @@ initFilePieces( tr_info *       info,
     file = &info->files[fileIndex];
     firstByte = file->offset;
     lastByte = firstByte + ( file->length ? file->length - 1 : 0 );
-    file->firstPiece = getBytePiece( info, firstByte );
-    file->lastPiece = getBytePiece( info, lastByte );
+    file->firstPiece = tr_torBytePiece( tor, firstByte );
+    file->lastPiece = tr_torBytePiece( tor, lastByte );
 }
 
 static int
@@ -630,7 +621,7 @@ tr_torrentInitFilePieces( tr_torrent * tor )
     for( f=0; f<inf->fileCount; ++f ) {
         inf->files[f].offset = offset;
         offset += inf->files[f].length;
-        initFilePieces( inf, f );
+        initFilePieces( tor, f );
     }
 
     /* build the array of first-file hints to give calculatePiecePriority */
@@ -664,22 +655,10 @@ tr_torrentInitFilePieces( tr_torrent * tor )
 
 static void torrentStart( tr_torrent * tor );
 
-/**
- * Decide on a block size. Constraints:
- * (1) most clients decline requests over 16 KiB
- * (2) pieceSize must be a multiple of block size
- */
 uint32_t
 tr_getBlockSize( uint32_t pieceSize )
 {
-    uint32_t b = pieceSize;
-
-    while( b > MAX_BLOCK_SIZE )
-        b /= 2u;
-
-    if( !b || ( pieceSize % b ) ) /* not cleanly divisible */
-        return 0;
-    return b;
+    return MIN( MAX_BLOCK_SIZE, pieceSize );
 }
 
 static void refreshCurrentDir( tr_torrent * tor );
@@ -687,50 +666,52 @@ static void refreshCurrentDir( tr_torrent * tor );
 static void
 torrentInitFromInfo( tr_torrent * tor )
 {
-    uint64_t t;
     tr_info * info = &tor->info;
+    const uint64_t total_size = info->totalSize;
+    const uint32_t piece_size = info->pieceSize;
+    const uint32_t block_size = tr_getBlockSize( piece_size );
+    const tr_piece_index_t piece_count = info->pieceCount;
+    uint64_t check;
 
-    tor->blockSize = tr_getBlockSize( info->pieceSize );
+#define TR_MODR( a, b ) ( ( a ) % ( b ) == 0 ? ( b ) : ( a ) % ( b ) )
+#define TR_CDIV( a, b ) ( ( ( a ) + ( b ) - 1 ) / ( b ) )
 
-    if( info->pieceSize )
-        tor->lastPieceSize = (uint32_t)(info->totalSize % info->pieceSize);
+    assert( total_size > 0 );
+    assert( piece_size > 0 );
+    assert( piece_count > 0 );
+    assert( block_size > 0 );
+    assert( piece_count == TR_CDIV( total_size, piece_size ) );
 
-    if( !tor->lastPieceSize )
-        tor->lastPieceSize = info->pieceSize;
+    tor->whole_piece_final_block_size = TR_MODR( piece_size, block_size );
+    tor->whole_piece_block_count = TR_CDIV( piece_size, block_size );
 
-    if( tor->blockSize )
-        tor->lastBlockSize = info->totalSize % tor->blockSize;
+    tor->final_piece_size = TR_MODR( total_size, piece_size );
+    tor->final_piece_final_block_size = TR_MODR( tor->final_piece_size,
+                                                 block_size );
+    tor->final_piece_block_count = TR_CDIV( tor->final_piece_size,
+                                            block_size );
 
-    if( !tor->lastBlockSize )
-        tor->lastBlockSize = tor->blockSize;
+    tor->block_size = block_size;
+    tor->block_count = ( piece_count - 1 ) * tor->whole_piece_block_count;
+    tor->block_count += tor->final_piece_block_count ;
 
-    tor->blockCount = tor->blockSize
-        ? ( info->totalSize + tor->blockSize - 1 ) / tor->blockSize
-        : 0;
+#undef TR_MODR
+#undef TR_CDIV
 
-    tor->blockCountInPiece = tor->blockSize
-        ? info->pieceSize / tor->blockSize
-        : 0;
+    check = piece_count - 1;
+    check *= piece_size;
+    check += tor->final_piece_size;
+    assert( check == total_size );
 
-    tor->blockCountInLastPiece = tor->blockSize
-        ? ( tor->lastPieceSize + tor->blockSize - 1 ) / tor->blockSize
-        : 0;
+    check = tor->whole_piece_block_count - 1;
+    check *= tor->block_size;
+    check += tor->whole_piece_final_block_size;
+    assert( check == piece_size );
 
-    /* check our work */
-    if( tor->blockSize != 0 )
-        assert( ( info->pieceSize % tor->blockSize ) == 0 );
-    t = info->pieceCount - 1;
-    t *= info->pieceSize;
-    t += tor->lastPieceSize;
-    assert( t == info->totalSize );
-    t = tor->blockCount - 1;
-    t *= tor->blockSize;
-    t += tor->lastBlockSize;
-    assert( t == info->totalSize );
-    t = info->pieceCount - 1;
-    t *= tor->blockCountInPiece;
-    t += tor->blockCountInLastPiece;
-    assert( t == (uint64_t)tor->blockCount );
+    check = tor->final_piece_block_count - 1;
+    check *= tor->block_size;
+    check += tor->final_piece_final_block_size;
+    assert( check == tor->final_piece_size );
 
     tr_cpConstruct( &tor->completion, tor );
 
@@ -1209,8 +1190,7 @@ tr_torrentStat( tr_torrent * tor )
         s->desiredAvailable = 0;
         for( i = 0; i < tor->info.pieceCount; ++i )
             if( !tor->info.pieces[i].dnd && tr_bitfieldHasFast( peerPieces, i ) )
-                s->desiredAvailable += tr_cpMissingBlocksInPiece( &tor->completion, i );
-        s->desiredAvailable *= tor->blockSize;
+                s->desiredAvailable += tr_cpMissingBytesInPiece( &tor->completion, i );
         tr_bitfieldFree( peerPieces );
     }
 
@@ -1297,68 +1277,32 @@ tr_torrentStat( tr_torrent * tor )
 static uint64_t
 fileBytesCompleted( const tr_torrent * tor, tr_file_index_t index )
 {
-    uint64_t total = 0;
     const tr_file * f = &tor->info.files[index];
+    tr_block_index_t firstBlock, lastBlock, bi;
+    uint64_t total = 0;
 
-    if( f->length )
-    {
-        const tr_block_index_t firstBlock = f->offset / tor->blockSize;
-        const uint64_t lastByte = f->offset + f->length - 1;
-        const tr_block_index_t lastBlock = lastByte / tor->blockSize;
+    if( f->length == 0 )
+        return 0;
 
-        if( firstBlock == lastBlock )
-        {
-            if( tr_cpBlockIsCompleteFast( &tor->completion, firstBlock ) )
-                total = f->length;
-        }
-        else
-        {
-            tr_block_index_t i;
+    firstBlock = tr_torByteBlock( tor, f->offset );
+    lastBlock = tr_torByteBlock( tor, f->offset + f->length - 1 );
 
-            /* the first block */
-            if( tr_cpBlockIsCompleteFast( &tor->completion, firstBlock ) )
-                total += tor->blockSize - ( f->offset % tor->blockSize );
+    if( firstBlock == lastBlock )
+        return tr_cpBlockIsCompleteFast( &tor->completion, firstBlock )
+            ? f->length : 0;
 
-            /* the middle blocks */
-            if( f->firstPiece == f->lastPiece )
-            {
-                for( i=firstBlock+1; i<lastBlock; ++i )
-                    if( tr_cpBlockIsCompleteFast( &tor->completion, i ) )
-                        total += tor->blockSize;
-            }
-            else
-            {
-                uint64_t b = 0;
-                const tr_block_index_t firstBlockOfLastPiece
-                           = tr_torPieceFirstBlock( tor, f->lastPiece );
-                const tr_block_index_t lastBlockOfFirstPiece
-                           = tr_torPieceFirstBlock( tor, f->firstPiece )
-                             + tr_torPieceCountBlocks( tor, f->firstPiece ) - 1;
+    /* the first block */
+    if( tr_cpBlockIsCompleteFast( &tor->completion, firstBlock ) )
+        total += f->offset - tr_torBlockByte( tor, firstBlock );
 
-                /* the rest of the first piece */
-                for( i=firstBlock+1; i<lastBlock && i<=lastBlockOfFirstPiece; ++i )
-                    if( tr_cpBlockIsCompleteFast( &tor->completion, i ) )
-                        ++b;
+    /* the middle blocks */
+    for( bi = firstBlock + 1; bi < lastBlock; ++bi )
+        if( tr_cpBlockIsCompleteFast( &tor->completion, bi ) )
+            total += tr_torBlockCountBytes( tor, bi );
 
-                /* the middle pieces */
-                if( f->firstPiece + 1 < f->lastPiece )
-                    for( i=f->firstPiece+1; i<f->lastPiece; ++i )
-                        b += tor->blockCountInPiece - tr_cpMissingBlocksInPiece( &tor->completion, i );
-
-                /* the rest of the last piece */
-                for( i=firstBlockOfLastPiece; i<lastBlock; ++i )
-                    if( tr_cpBlockIsCompleteFast( &tor->completion, i ) )
-                        ++b;
-
-                b *= tor->blockSize;
-                total += b;
-            }
-
-            /* the last block */
-            if( tr_cpBlockIsCompleteFast( &tor->completion, lastBlock ) )
-                total += ( f->offset + f->length ) - ( (uint64_t)tor->blockSize * lastBlock );
-        }
-    }
+    /* the last block */
+    if( tr_cpBlockIsCompleteFast( &tor->completion, lastBlock ) )
+        total += f->offset + f->length - tr_torBlockByte( tor, lastBlock );
 
     return total;
 }
@@ -2296,10 +2240,10 @@ _tr_block( const tr_torrent * tor,
     tr_block_index_t ret;
 
     assert( tr_isTorrent( tor ) );
+    assert( offset < tr_torPieceCountBytes( tor, index ) );
 
-    ret = index;
-    ret *= ( tor->info.pieceSize / tor->blockSize );
-    ret += offset / tor->blockSize;
+    ret = tr_torPieceFirstBlock( tor, index );
+    ret += offset / tor->block_size;
     return ret;
 }
 
