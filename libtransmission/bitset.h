@@ -33,6 +33,9 @@ static inline void
 tr_bitsetConstructor( tr_bitset * b, size_t size )
 {
     tr_bitfieldConstruct( &b->bitfield, size );
+
+    b->haveAll = 0;
+    b->haveNone = 0;
 }
 
 static inline void
@@ -50,6 +53,24 @@ tr_bitsetHasFast( const tr_bitset * b, const size_t nth )
     if( b->haveNone ) return FALSE;
     if( nth >= b->bitfield.bitCount ) return FALSE;
     return tr_bitfieldHasFast( &b->bitfield, nth );
+}
+
+static inline tr_bitset *
+tr_bitsetDup( const tr_bitset * b )
+{
+    tr_bitset * dup = tr_malloc( sizeof( tr_bitset ) );
+    tr_bitfieldConstruct( &dup->bitfield, 0 );
+
+    dup->haveAll = b->haveAll;
+    dup->haveNone = b->haveNone;
+
+    if( !dup->haveAll && !dup->haveNone )
+    {
+        tr_bitsetReserve( dup, b->bitfield.bitCount );
+        if( ( b->bitfield.bits != NULL ) && ( b->bitfield.byteCount > 0 ) )
+            memcpy( dup->bitfield.bits, b->bitfield.bits, b->bitfield.byteCount );
+    }
+    return dup;
 }
 
 static inline tr_bool
