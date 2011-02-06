@@ -306,7 +306,7 @@ recalculateHash( tr_torrent       * tor,
     size_t   bytesLeft;
     uint32_t offset = 0;
     tr_bool  success = TRUE;
-    const size_t buflen = tor->block_size;
+    const size_t buflen = tor->block_size; /* maximum block size */
     void * buffer = tr_valloc( buflen );
     SHA_CTX  sha;
 
