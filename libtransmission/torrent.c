@@ -1277,33 +1277,30 @@ tr_torrentStat( tr_torrent * tor )
 static uint64_t
 fileBytesCompleted( const tr_torrent * tor, tr_file_index_t index )
 {
+    const tr_completion * cp = &tor->completion;
     const tr_file * f = &tor->info.files[index];
-    tr_block_index_t firstBlock, lastBlock, bi;
+    tr_piece_index_t pi;
     uint64_t total = 0;
 
     if( f->length == 0 )
         return 0;
 
-    firstBlock = tr_torByteBlock( tor, f->offset );
-    lastBlock = tr_torByteBlock( tor, f->offset + f->length - 1 );
+    if( f->firstPiece == f->lastPiece )
+        return tr_cpPieceIsComplete( cp, f->firstPiece ) ? f->length : 0;
 
-    if( firstBlock == lastBlock )
-        return tr_cpBlockIsCompleteFast( &tor->completion, firstBlock )
-            ? f->length : 0;
+    /* the first piece */
+    if( tr_cpPieceIsComplete( cp, f->firstPiece ) )
+        total += ( tr_torPieceCountBytes( tor, f->firstPiece )
+                   - ( f->offset - tr_torPieceByte( tor, f->firstPiece ) ) );
 
-    /* the first block */
-    if( tr_cpBlockIsCompleteFast( &tor->completion, firstBlock ) )
-        total += ( tr_torBlockCountBytes( tor, firstBlock )
-                   - ( f->offset - tr_torBlockByte( tor, firstBlock ) ) );
+    /* the middle pieces */
+    for( pi = f->firstPiece + 1; pi < f->lastPiece; ++pi )
+        if( tr_cpPieceIsComplete( cp, pi ) )
+            total += tr_torPieceCountBytes( tor, pi );
 
-    /* the middle blocks */
-    for( bi = firstBlock + 1; bi < lastBlock; ++bi )
-        if( tr_cpBlockIsCompleteFast( &tor->completion, bi ) )
-            total += tr_torBlockCountBytes( tor, bi );
-
-    /* the last block */
-    if( tr_cpBlockIsCompleteFast( &tor->completion, lastBlock ) )
-        total += f->offset + f->length - tr_torBlockByte( tor, lastBlock );
+    /* the last piece */
+    if( tr_cpPieceIsComplete( cp, f->lastPiece ) )
+        total += f->offset + f->length - tr_torPieceByte( tor, f->lastPiece );
 
     return total;
 }
