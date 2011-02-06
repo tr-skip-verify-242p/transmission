@@ -161,12 +161,14 @@ struct tr_torrent
      * This pointer will be equal to downloadDir or incompleteDir */
     const char * currentDir;
 
+    /* These values are derived from the total size and the piece
+     * size of the torrent. Do not use them directly. Use the inline
+     * functions prefixed by 'tr_tor' defined below.
+     * NB: In particular do not assume all blocks have the same size. */
     uint32_t block_size;
     tr_block_index_t block_count;
-
     uint32_t whole_piece_final_block_size;
     uint32_t whole_piece_block_count;
-
     uint32_t final_piece_size;
     uint32_t final_piece_final_block_size;
     uint32_t final_piece_block_count;
