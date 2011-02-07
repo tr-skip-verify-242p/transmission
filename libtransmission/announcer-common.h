@@ -53,9 +53,6 @@ enum
     /* the value of the 'numwant' argument passed in tracker requests. */
     NUMWANT = 80,
 
-    /* how long to put slow (nonresponsive) trackers in the penalty box */
-    SLOW_HOST_PENALTY_SECS = ( 60 * 10 ),
-
     UPKEEP_INTERVAL_SECS = 1,
 
     /* this is an upper limit for the frequency of LDS announces */
@@ -74,7 +71,6 @@ struct au_context;
  */
 typedef struct tr_announcer
 {
-    tr_ptrArray hosts; /* tr_host */
     tr_ptrArray stops; /* struct stop_message */
     tr_session * session;
     struct au_context * udpctx;
@@ -114,8 +110,7 @@ tr_tracker_type;
 typedef struct
 {
     tr_tracker_type type;
-    tr_host * host;
-
+    char * hostname;
     char * announce;
     char * scrape;
 
