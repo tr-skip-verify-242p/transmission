@@ -38,7 +38,7 @@ struct evbuffer * au_create_stop( tr_announcer *,
                                   const tr_torrent *,
                                   const tr_tier * );
 /** @note Takes ownership of the @a evbuffer. */
-void au_send_stop( tr_announcer *, tr_host *, struct evbuffer * );
+void au_send_stop( tr_announcer *, const char *, struct evbuffer * );
 void au_send_announce( tr_announcer *, const tr_torrent *,
                        const tr_tier *, const char *,
                        tr_web_done_func *, void * );
