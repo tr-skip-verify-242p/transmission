@@ -771,21 +771,17 @@ au_context_get_transaction( au_context * c, tnid_t id )
 }
 
 static au_state *
-au_context_get_state( au_context * c, const tr_host * host )
+au_context_get_state( au_context * c, const char * endpoint )
 {
-    char * endpoint;
     au_state key, * s;
-
-    endpoint = host->name;
-    key.endpoint = endpoint;
+    key.endpoint = tr_strdup( endpoint );
     s = tr_ptrArrayFindSorted( &c->states, &key, au_state_cmp );
-
     if( !s )
     {
         s = au_state_new( c, endpoint );
         tr_ptrArrayInsertSorted( &c->states, s, au_state_cmp );
     }
-
+    tr_free( key.endpoint );
     return s;
 }
 
@@ -844,7 +840,7 @@ create_announce( tr_announcer     * announcer,
 {
     const tr_tracker_item * tracker = tier->currentTracker;
     au_context * c = announcer->udpctx;
-    au_state * s = au_context_get_state( c, tracker->host );
+    au_state * s = au_context_get_state( c, tracker->hostname );
     auP_announce_request * req;
     struct evbuffer * pkt;
     int numwant, event;
@@ -911,18 +907,20 @@ au_create_stop( tr_announcer     * announcer,
 }
 
 void
-au_send_stop( tr_announcer * announcer, tr_host * host, struct evbuffer * pkt )
+au_send_stop( tr_announcer    * announcer,
+              const char      * endpoint,
+              struct evbuffer * pkt )
 {
     au_context * c;
     au_transaction * t;
     au_state * s;
 
     assert( announcer != NULL );
-    assert( host != NULL );
+    assert( endpoint != NULL );
     assert( pkt != NULL );
 
     c = announcer->udpctx;
-    s = au_context_get_state( c, host );
+    s = au_context_get_state( c, endpoint );
     t = au_transaction_new( s, pkt );
     au_context_add_transaction( c, t );
     au_state_send( s, t );
@@ -953,7 +951,7 @@ au_send_announce( tr_announcer     * announcer,
     assert( tracker->type == TR_TRACKER_TYPE_UDP );
 
     c = announcer->udpctx;
-    s = au_context_get_state( c, tracker->host );
+    s = au_context_get_state( c, tracker->hostname );
     pkt = create_announce( announcer, tor, tier, evstr );
     t = au_transaction_new( s, pkt );
     au_transaction_set_callback( t, callback, cbdata );
@@ -985,7 +983,7 @@ au_send_scrape( tr_announcer     * announcer,
     assert( tracker->type == TR_TRACKER_TYPE_UDP );
 
     c = announcer->udpctx;
-    s = au_context_get_state( c, tracker->host );
+    s = au_context_get_state( c, tracker->hostname );
     pkt = create_scrape( announcer, tor, tracker );
     t = au_transaction_new( s, pkt );
     au_transaction_set_callback( t, callback, cbdata );

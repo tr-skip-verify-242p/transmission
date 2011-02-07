@@ -80,25 +80,6 @@ typedef struct tr_announcer
 }
 tr_announcer;
 
-/**
- * used by tr_announcer to recognize nonresponsive
- * trackers and de-prioritize them
- */
-typedef struct
-{
-    char * name;
-
-    /* how many seconds it took to get the last tracker response */
-    int lastResponseInterval;
-
-    /* the last time we sent an announce or scrape message */
-    time_t lastRequestTime;
-
-    /* the last successful announce/scrape time for this host */
-    time_t lastSuccessfulRequest;
-}
-tr_host;
-
 typedef enum tr_tracker_types
 {
     TR_TRACKER_TYPE_WEB,

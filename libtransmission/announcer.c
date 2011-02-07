@@ -55,7 +55,7 @@ if( tr_deepLoggingIsActive( ) ) do { \
 struct stop_message
 {
     tr_tracker_type type;
-    tr_host * host;
+    char * hostname;
     struct evbuffer * data;
     uint64_t up;
     uint64_t down;
@@ -89,7 +89,7 @@ stopNew( tr_announcer * announcer, tr_torrent * tor, tr_tier * tier )
         evbuffer_add_printf( s->data, "%s", url );
         tr_free( url );
     }
-    s->host = tracker->host;
+    s->hostname = tr_strdup( tracker->hostname );
     return s;
 }
 
@@ -98,6 +98,7 @@ stopFree( struct stop_message * stop )
 {
     if( stop->data )
         evbuffer_free( stop->data );
+    tr_free( stop->hostname );
     tr_free( stop );
 }
 
@@ -129,7 +130,7 @@ stopSend( struct stop_message * stop, tr_announcer * announcer )
 {
     if( stop->type == TR_TRACKER_TYPE_UDP )
     {
-        au_send_stop( announcer, stop->host, stop->data );
+        au_send_stop( announcer, stop->hostname, stop->data );
         stop->data = NULL;
     }
     else
