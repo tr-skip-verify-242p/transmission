@@ -338,7 +338,7 @@ tr_torBlockPieceByte( const tr_torrent * tor,
                       tr_block_index_t   bi,
                       tr_piece_index_t   pi )
 {
-    return tr_torBlockByte( tor, bi ) - tr_torPieceByte( tor, pi );
+    return ( bi - tr_torPieceFirstBlock( tor, pi ) ) * tor->block_size;
 }
 
 static inline void tr_torrentLock( const tr_torrent * tor )

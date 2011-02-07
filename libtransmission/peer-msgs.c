@@ -120,15 +120,6 @@ struct peer_request
     uint32_t    length;
 };
 
-static uint32_t
-getBlockOffsetInPiece( const tr_torrent * tor, tr_block_index_t b )
-{
-    const tr_piece_index_t pi = tr_torBlockPiece( tor, b );
-    const tr_block_index_t bi = tr_torPieceFirstBlock( tor, pi );
-    assert( b >= bi );
-    return ( b - bi ) * tor->block_size;
-}
-
 static void
 blockToReq( const tr_torrent     * tor,
             tr_block_index_t       block,
@@ -137,7 +128,7 @@ blockToReq( const tr_torrent     * tor,
     assert( setme != NULL );
 
     setme->index = tr_torBlockPiece( tor, block );
-    setme->offset = getBlockOffsetInPiece( tor, block );
+    setme->offset = tr_torBlockPieceByte( tor, block, setme->index );
     setme->length = tr_torBlockCountBytes( tor, block );
 }
 
