@@ -680,7 +680,6 @@ onRowActivated( GtkTreeView * view, GtkTreePath * path,
     return handled;
 }
 
-#if 0
 static void
 fileMenuSetDownload( GtkWidget * item, gpointer gdata )
 {
@@ -772,7 +771,6 @@ fileMenuPopup( GtkWidget * w, GdkEventButton * event, gpointer filedata )
                     event ? event->button : 0,
                     event ? event->time : gtk_get_current_event_time( ) );
 }
-#endif
 
 static gboolean
 onViewPathToggled( GtkTreeView       * view,
@@ -879,7 +877,6 @@ onViewButtonPressed( GtkWidget * w, GdkEventButton * event, gpointer gdata )
     {
         handled = onViewPathToggled( treeview, col, path, data );
     }
-#if 0
     else if( event->type == GDK_BUTTON_PRESS && event->button == 3
              && getAndSelectEventPath( treeview, event, &col, &path ) )
     {
@@ -890,20 +887,17 @@ onViewButtonPressed( GtkWidget * w, GdkEventButton * event, gpointer gdata )
             handled = TRUE;
         }
     }
-#endif
 
     gtk_tree_path_free( path );
     return handled;
 }
 
-#if 0
 static gboolean
 onViewPopupMenu( GtkWidget * w, gpointer gdata )
 {
     fileMenuPopup( w, NULL, gdata );
     return TRUE;
 }
-#endif
 
 GtkWidget *
 gtr_file_list_new( TrCore * core, int torrentId )
@@ -932,10 +926,8 @@ gtr_file_list_new( TrCore * core, int torrentId )
     gtk_container_set_border_width( GTK_CONTAINER( view ), GUI_PAD_BIG );
     g_signal_connect( view, "button-press-event",
                       G_CALLBACK( onViewButtonPressed ), data );
-#if 0
     g_signal_connect( view, "popup-menu",
                       G_CALLBACK( onViewPopupMenu ), data );
-#endif
     g_signal_connect( view, "row_activated",
                       G_CALLBACK( onRowActivated ), data );
     g_signal_connect( view, "button-release-event",
