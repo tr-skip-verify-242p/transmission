@@ -661,7 +661,7 @@ tr_getBlockSize( uint32_t pieceSize )
 
 static void refreshCurrentDir( tr_torrent * tor );
 
-#define MODR( a, b ) ( ( a ) % ( b ) == 0 ? ( b ) : ( a ) % ( b ) )
+#define CMOD( a, b ) ( ( a ) % ( b ) == 0 ? ( b ) : ( a ) % ( b ) )
 #define CDIV( a, b ) ( ( ( a ) + ( b ) - 1 ) / ( b ) )
 
 static void
@@ -680,11 +680,11 @@ torrentInitFromInfo( tr_torrent * tor )
     assert( block_size > 0 );
     assert( piece_count == CDIV( total_size, piece_size ) );
 
-    tor->whole_piece_final_block_size = MODR( piece_size, block_size );
+    tor->whole_piece_final_block_size = CMOD( piece_size, block_size );
     tor->whole_piece_block_count = CDIV( piece_size, block_size );
 
-    tor->final_piece_size = MODR( total_size, piece_size );
-    tor->final_piece_final_block_size = MODR( tor->final_piece_size,
+    tor->final_piece_size = CMOD( total_size, piece_size );
+    tor->final_piece_final_block_size = CMOD( tor->final_piece_size,
                                               block_size );
     tor->final_piece_block_count = CDIV( tor->final_piece_size,
                                          block_size );
