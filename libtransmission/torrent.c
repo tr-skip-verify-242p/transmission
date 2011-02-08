@@ -485,8 +485,6 @@ tr_torrentSetLocalError( tr_torrent * tor, const char * fmt, ... )
 static void
 tr_torrentClearError( tr_torrent * tor )
 {
-    assert( tr_isTorrent( tor ) );
-
     tor->error = TR_STAT_OK;
     tor->errorString[0] = '\0';
     tor->errorTracker[0] = '\0';
@@ -1487,8 +1485,6 @@ tr_torrentAmountFinished( const tr_torrent * tor,
 static void
 tr_torrentResetTransferStats( tr_torrent * tor )
 {
-    assert( tr_isTorrent( tor ) );
-
     tr_torrentLock( tor );
 
     tor->downloadedPrev += tor->downloadedCur;
@@ -1528,7 +1524,6 @@ freeTorrent( tr_torrent * tor )
     tr_session *  session = tor->session;
     tr_info *    inf = &tor->info;
 
-    assert( tr_isTorrent( tor ) );
     assert( !tor->isRunning );
 
     tr_sessionLock( session );
@@ -1622,8 +1617,6 @@ tr_torrentGetCurrentSizeOnDisk( const tr_torrent * tor )
 static void
 torrentStart( tr_torrent * tor )
 {
-    assert( tr_isTorrent( tor ) );
-
     /* already running... */
     if( tor->isRunning )
         return;
@@ -1696,7 +1689,6 @@ verifyTorrent( void * vtor )
 {
     tr_torrent * tor = vtor;
 
-    assert( tr_isTorrent( tor ) );
     tr_sessionLock( tor->session );
 
     /* if the torrent's already being verified, stop it */
@@ -1930,7 +1922,6 @@ fireCompletenessChange( tr_torrent       * tor,
                         tr_completeness    status,
                         tr_bool            wasRunning )
 {
-    assert( tr_isTorrent( tor ) );
     assert( ( status == TR_LEECH )
          || ( status == TR_SEED )
          || ( status == TR_PARTIAL_SEED ) );
@@ -2002,8 +1993,6 @@ torrentCallScript( const tr_torrent * tor, const char * script )
 {
     char timeStr[128];
     const time_t now = tr_time( );
-
-    assert( tr_isTorrent( tor ) );
 
     tr_strlcpy( timeStr, ctime( &now ), sizeof( timeStr ) );
     *strchr( timeStr,'\n' ) = '\0';
@@ -2886,14 +2875,10 @@ walkLocalData( const tr_torrent * tor,
                tr_ptrArray      * folders,
                tr_ptrArray      * dirtyFolders )
 {
-    int i;
     struct stat sb;
-    char * buf;
+    char * buf = tr_buildPath( dir, base, NULL );
+    int i = stat( buf, &sb );
 
-    assert( tr_isTorrent( tor ) );
-
-    buf = tr_buildPath( dir, base, NULL );
-    i = stat( buf, &sb );
     if( !i )
     {
         DIR * odir = NULL;
@@ -2933,8 +2918,6 @@ deleteLocalData( tr_torrent * tor, tr_fileFunc fileFunc )
     const char * cpch = strchr( firstFile, TR_PATH_DELIMITER );
     char * tmp = cpch ? tr_strndup( firstFile, cpch - firstFile ) : NULL;
     char * root = tr_buildPath( tor->currentDir, tmp, NULL );
-
-    assert( tr_isTorrent( tor ) );
 
     for( f=0; f<tor->info.fileCount; ++f ) {
         tr_ptrArrayInsertSorted( &torrentFiles, tr_strdup( tor->info.files[f].name ), vstrcmp );
