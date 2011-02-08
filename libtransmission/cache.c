@@ -443,11 +443,11 @@ tr_cacheFlushPiece( tr_cache * cache, tr_torrent * torrent, tr_piece_index_t i )
 {
     int err = 0;
     const tr_block_index_t begin = tr_torPieceFirstBlock( torrent, i );
-    const tr_block_index_t end  = ( tr_torPieceFirstBlock( torrent, i )
-                                    + tr_torPieceCountBlocks( torrent, i ) );
+    const tr_block_index_t end = ( tr_torPieceFirstBlock( torrent, i )
+                                   + tr_torPieceCountBlocks( torrent, i ) );
     const int pos = findPiece( cache, torrent, i );
     dbgmsg( "flushing piece %d from cache to disk: blocks [%zu...%zu)",
-            (int)i, (size_t)begin, (size_t)end );
+            (int) i, (size_t) begin, (size_t) end );
 
     /* flush out all the blocks in that piece */
     while( !err && pos < tr_ptrArraySize( &cache->blocks ) )
