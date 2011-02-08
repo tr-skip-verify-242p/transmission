@@ -13,7 +13,6 @@
 #ifndef TR_UTILS_H
 #define TR_UTILS_H 1
 
-#include <endian.h> /* __BYTE_ORDER */
 #include <inttypes.h>
 #include <stddef.h> /* size_t */
 #include <stdio.h> /* FILE* */
@@ -622,14 +621,13 @@ void tr_formatter_get_units( struct tr_benc * dict );
                          ((uint64_t)(x)  >> 56))
 #endif
 
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-#define htonll( x ) tr_bswap64( x )
-#define ntohll( x ) tr_bswap64( x )
-#elif __BYTE_ORDER == __BIG_ENDIAN
+#if defined( WORDS_BIGENDIAN )
 #define htonll( x ) ( x )
 #define ntohll( x ) ( x )
 #else
-#error portme
+/* NB: Assumed to be little endian. */
+#define htonll( x ) tr_bswap64( x )
+#define ntohll( x ) tr_bswap64( x )
 #endif
 #endif /* !defined( HAVE_HTONLL ) */
 
