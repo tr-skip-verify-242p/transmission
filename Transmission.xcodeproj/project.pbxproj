@@ -2507,6 +2507,7 @@
 					"\"$(SRCROOT)/build/Debug\"",
 				);
 				OTHER_CFLAGS = (
+					"$(inherited)",
 					"-DSYS_DARWIN",
 					"-DHAVE_OPENSSL",
 					"-D__TRANSMISSION__",
@@ -2702,6 +2703,7 @@
 					"\"$(SRCROOT)/build/Debug\"",
 				);
 				OTHER_CFLAGS = (
+					"$(inherited)",
 					"-DSYS_DARWIN",
 					"-DHAVE_OPENSSL",
 					"-D__TRANSMISSION__",
@@ -2790,6 +2792,7 @@
 					"third-party/openssl/lib",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 10.5;
+				OTHER_CFLAGS = "-DNDEBUG";
 				OTHER_LDFLAGS = "";
 				PREBINDING = NO;
 				RUN_CLANG_STATIC_ANALYZER = NO;
@@ -2946,6 +2949,7 @@
 					"\"$(SRCROOT)/build/Debug\"",
 				);
 				OTHER_CFLAGS = (
+					"$(inherited)",
 					"-DSYS_DARWIN",
 					"-DHAVE_OPENSSL",
 					"-D__TRANSMISSION__",
@@ -3009,11 +3013,6 @@
 				GCC_ENABLE_FIX_AND_CONTINUE = NO;
 				GCC_MODEL_TUNING = G5;
 				INSTALL_PATH = /usr/local/lib;
-				OTHER_CFLAGS = (
-					"$(inherited)",
-					"-DNDEBUG",
-				);
-				OTHER_CPLUSPLUSFLAGS = "$(OTHER_CFLAGS)";
 				PREBINDING = NO;
 				PRODUCT_NAME = miniupnp;
 				ZERO_LINK = NO;
@@ -3027,10 +3026,6 @@
 				GCC_ENABLE_FIX_AND_CONTINUE = YES;
 				GCC_MODEL_TUNING = G5;
 				INSTALL_PATH = /usr/local/lib;
-				OTHER_CFLAGS = (
-					"$(inherited)",
-					"-DNDEBUG",
-				);
 				OTHER_CPLUSPLUSFLAGS = "$(OTHER_CFLAGS)";
 				PREBINDING = NO;
 				PRODUCT_NAME = miniupnp;
@@ -3048,10 +3043,6 @@
 				GCC_MODEL_TUNING = G5;
 				GCC_OPTIMIZATION_LEVEL = 0;
 				INSTALL_PATH = /usr/local/lib;
-				OTHER_CFLAGS = (
-					"$(inherited)",
-					"-DNDEBUG",
-				);
 				OTHER_CPLUSPLUSFLAGS = "$(OTHER_CFLAGS)";
 				PREBINDING = NO;
 				PRODUCT_NAME = miniupnp;
