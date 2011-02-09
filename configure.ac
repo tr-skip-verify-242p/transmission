@@ -79,7 +79,6 @@ LIBAPPINDICATOR_MINIMUM=0.0.11
 AC_PROG_CC
 AC_PROG_CXX
 AC_C_INLINE
-AC_C_BIGENDIAN
 
 AC_HEADER_STDC
 AC_HEADER_TIME
@@ -105,6 +104,15 @@ AC_PATH_ZLIB
 AC_SYS_LARGEFILE
 AC_CHECK_FUNCS([lseek64])
 
+dnl ----------------------------------------------------------------------------
+dnl
+dnl endianness
+
+AC_C_BIGENDIAN(
+    AC_DEFINE(WORDS_BIGENDIAN, 1, [byte ordering is big-endian]),
+    AC_DEFINE(WORDS_LITTLEENDIAN, 1, [byte ordering is little-endian]),
+    AC_MSG_ERROR(unrecognized endianness, please port to your platform)
+)
 
 dnl ----------------------------------------------------------------------------
 dnl
