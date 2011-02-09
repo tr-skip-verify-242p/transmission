@@ -201,11 +201,10 @@ typedef struct tr_torrent_peers
     struct weighted_piece    * pieces;
     int                        pieceCount;
 
-    /* How many peers have a given piece */
+    /* How many peers have a given piece. */
     size_t                   * pieceReplication;
-    /* TRUE if the weighted_piece array is sorted.
-     * This is usefull to avoid resorting the list everytime we receive 
-     * a bitfield (especially at the begining of a download */
+
+    /* TRUE if the 'pieces' array is sorted. */
     tr_bool                    arePiecesSorted;
 
     int                        interestedCount;
@@ -237,61 +236,112 @@ struct tr_peerMgr
     } while( 0 )
 
 
-
 /**
- *   Replication count manipulation functions ( declarations )
- */
-
-
-/**
- * Increase the replication count of this piece and sort it if the
- * piece list is already sorted
- */
-static void
-tr_incrReplicationOfPiece( Torrent * t, const size_t index );
-
-/**
- * Increase the replication count of pieces  present in the bitset
- * If the piece list needs to be resorted, it sets the arePiecesSorted
- * field to FALSE
- */
-static void
-tr_incrReplicationFromBitset( Torrent * t, const tr_bitset * bitset );
-
-/**
- * Increases the replication count of pieces present in the bitfield
- * Sets the arePiecesSorted field to FALSE
- */
-static void
-tr_incrReplicationFromBitfield( Torrent * t, const tr_bitfield * bitfield );
-
-/**
- * Increase the replication count of every piece
- */
-static void
-tr_incrReplication( Torrent * t );
-
-/**
- * Decrease the replication count of pieces present in the bitset
- * If the piece list needs to be resorted, it sets the arePiecesSorted
- * field to FALSE
- */
-static void
-tr_decrReplicationFromBitset( Torrent * t, const tr_bitset * bitset );
-
-/**
- * Return TRUE if the piece list is sorted, FALSE otherwise
+ * Return TRUE if the piece list is sorted, FALSE otherwise.
  */
 static inline tr_bool
-tr_arePiecesSorted( const Torrent * t )
+arePiecesSorted( const Torrent * t )
 {
     return t->arePiecesSorted;
 }
 
 static inline void
-tr_setPiecesSorted( Torrent * t, const tr_bool areSorted )
+setPiecesSorted( Torrent * t, const tr_bool areSorted )
 {
     t->arePiecesSorted = areSorted;
+}
+
+/**
+*** Replication count manipulation functions
+**/
+
+/**
+ * Increase the replication count of every piece in the torrent.
+ */
+static void
+incrReplication( Torrent * t )
+{
+    tr_piece_index_t i;
+    for( i = 0 ; i < t->tor->info.pieceCount ; i++ )
+        ++t->pieceReplication[i];
+}
+
+static void
+pieceListResortPiece( Torrent * t, struct weighted_piece * p );
+
+static struct weighted_piece *
+pieceListLookup( Torrent * t, tr_piece_index_t index );
+
+/**
+ * Increase the replication count of this piece and sort it if the
+ * piece list is already sorted.
+ */
+static void
+incrReplicationOfPiece( Torrent * t, const tr_piece_index_t i )
+{
+    /* One more replication of this piece is present in the swarm. */
+    ++t->pieceReplication[i];
+
+    /* We only resort the piece if the list is already sorted. */
+    if( arePiecesSorted( t ) )
+        pieceListResortPiece( t, pieceListLookup( t, i ) );
+}
+
+/**
+ * Increases the replication count of pieces present in the bitfield
+ * Sets the @a arePiecesSorted field in @a t to @a FALSE.
+ */
+static void
+incrReplicationFromBitfield( Torrent * t, const tr_bitfield * bitfield )
+{
+    tr_piece_index_t i;
+
+    assert( tr_bitfieldTestFast( bitfield, t->tor->info.pieceCount - 1 ) );
+
+    for( i = 0 ; i < t->tor->info.pieceCount ; i++ )
+        if( tr_bitfieldHasFast( bitfield, i ) )
+            ++t->pieceReplication[i];
+    setPiecesSorted( t, FALSE );
+}
+
+/**
+ * Increase the replication count of pieces present in the bitset.
+ * If the piece list needs to be resorted, it sets the
+ * @a arePiecesSorted field in @a t to @a FALSE.
+ */
+static void
+incrReplicationFromBitset( Torrent * t, const tr_bitset * bitset )
+{
+    if( bitset->haveAll )
+        incrReplication( t );
+    else if( !bitset->haveNone )
+        incrReplicationFromBitfield( t, &bitset->bitfield );
+}
+
+/**
+ * Decrease the replication count of pieces present in the bitset.
+ * If the piece list needs to be resorted, it sets the
+ * @a arePiecesSorted field in @a t to @a FALSE.
+ */
+static void
+decrReplicationFromBitset( Torrent * t, const tr_bitset * bitset )
+{
+    tr_piece_index_t i;
+
+    if( bitset->haveAll )
+    {
+        for( i = 0 ; i < t->tor->info.pieceCount ; ++i )
+            --t->pieceReplication[i];
+    }
+    else if( !bitset->haveNone )
+    {
+        for( i = 0 ; i < bitset->bitfield.bitCount ; ++i )
+        {
+            if( tr_bitfieldHasFast( &bitset->bitfield, i ) )
+                --t->pieceReplication[i];
+        }
+        setPiecesSorted( t, FALSE );
+    }
 }
 
 /**
@@ -426,7 +476,7 @@ peerConstructor( struct peer_atom * atom )
 
     tr_bitsetConstructor( &peer->have, 0 );
 
-    /* as long as we know the peer doesn't have any piece */
+    /* As long as we know the peer doesn't have any piece. */
     tr_bitsetSetHaveNone( &peer->have );
 
     peer->atom = atom;
@@ -499,7 +549,7 @@ removePeer( Torrent * t, tr_peer * peer )
 
     removed = tr_ptrArrayRemoveSorted( &t->peers, peer, peerCompare );
 
-    tr_decrReplicationFromBitset( t, &peer->have );
+    decrReplicationFromBitset( t, &peer->have );
 
     assert( removed == peer );
     peerDestructor( t, removed );
@@ -674,9 +724,7 @@ atomSetSeedProbability( struct peer_atom * atom, int seedProbability )
     {
         atom->flags |= ADDED_F_SEED_FLAG;
 
-        /* check if the  peer really has all the pieces. 
-         * This could be a weakness of the BT protocol if an attacker/peer 
-         * send false PEX messages */
+        /* Check if the peer really has all the pieces. */
         if( atom->peer != NULL && tr_bitsetPercent( &atom->peer->have ) >= 1.0 )
             tr_bitsetSetHaveAll( &atom->peer->have );
     }
@@ -930,7 +978,7 @@ pieceListSort( Torrent * t, int mode )
     if( mode == PIECES_SORTED_BY_WEIGHT )
     {
         qsort( t->pieces, t->pieceCount, sizeof( struct weighted_piece ), comparePieceByWeight );
-        tr_setPiecesSorted( t, TRUE );
+        setPiecesSorted( t, TRUE );
     }
     else
         qsort( t->pieces, t->pieceCount, sizeof( struct weighted_piece ), comparePieceByIndex );
@@ -1104,24 +1152,26 @@ pieceListRemovePiece( Torrent * t, tr_piece_index_t piece )
 static void
 pieceListResortPiece( Torrent * t, struct weighted_piece * p )
 {
-    int pos;
     tr_bool isSorted = TRUE;
+    int pos;
 
     if( p == NULL )
         return;
 
-    /* is the torrent already sorted? */
     pos = p - t->pieces;
     weightTorrent = t->tor;
-    if( isSorted && ( pos > 0 ) && ( comparePieceByWeight( p-1, p ) > 0 ) )
-        isSorted = FALSE;
-    if( isSorted && ( pos < t->pieceCount - 1 ) && ( comparePieceByWeight( p, p+1 ) > 0 ) )
-        isSorted = FALSE;
 
-    if( !tr_arePiecesSorted( t ) )
+    if( arePiecesSorted( t ) )
     {
-       pieceListSort( t, PIECES_SORTED_BY_WEIGHT);
-       isSorted = TRUE;
+        /* is the torrent already sorted? */
+        if( isSorted && ( pos > 0 ) && ( comparePieceByWeight( p-1, p ) > 0 ) )
+            isSorted = FALSE;
+        if( isSorted && ( pos < t->pieceCount - 1 ) && ( comparePieceByWeight( p, p+1 ) > 0 ) )
+            isSorted = FALSE;
+    }
+    else
+    {
+        pieceListSort( t, PIECES_SORTED_BY_WEIGHT);
     }
 
     /* if it's not sorted, move it around */
@@ -1202,7 +1252,7 @@ tr_peerMgrGetNextRequests( tr_torrent           * tor,
     if( t->pieces == NULL )
         pieceListRebuild( t );
 
-    if( !tr_arePiecesSorted( t ) )
+    if( !arePiecesSorted( t ) )
         pieceListSort( t, PIECES_SORTED_BY_WEIGHT );
 
     assertReplicationCountIsExact( t );
@@ -1490,14 +1540,14 @@ peerCallbackFunc( tr_peer * peer, const tr_peer_event * e, void * vt )
 
         case TR_PEER_PEER_GOT_HAVE:
         {
-            tr_incrReplicationOfPiece( t, e->pieceIndex );
+            incrReplicationOfPiece( t, e->pieceIndex );
             break;
         }
 
         case TR_PEER_PEER_GOT_BITFIELD:
         {
             assert( e->bitset != 0 );
-            tr_incrReplicationFromBitset( t, e->bitset );
+            incrReplicationFromBitset( t, e->bitset );
             break;
         }
 
@@ -2205,7 +2255,7 @@ tr_peerMgrStartTorrent( tr_torrent * tor )
     ensureMgrTimersExist( t->manager );
 
     memset( t->pieceReplication, 0, sizeof( size_t ) * t->tor->info.pieceCount );
-    tr_setPiecesSorted( t, FALSE );
+    setPiecesSorted( t, FALSE );
 
     t->isRunning = TRUE;
     t->maxPeers = t->tor->maxConnectedPeers;
@@ -2221,7 +2271,7 @@ stopTorrent( Torrent * t )
     t->isRunning = FALSE;
 
     memset( t->pieceReplication, 0, sizeof( size_t ) * t->tor->info.pieceCount );
-    tr_setPiecesSorted( t, FALSE );
+    setPiecesSorted( t, FALSE );
 
     /* disconnect the peers. */
     for( i=0, n=tr_ptrArraySize( &t->peers ); i<n; ++i )
@@ -3718,81 +3768,3 @@ makeNewPeerConnections( struct tr_peerMgr * mgr, const int max )
 
     tr_free( candidates );
 }
-
-
-/**
- * Replication count ( for rarest first policy )
- */
-
-
-void
-tr_incrReplicationOfPiece( Torrent * t, const size_t index )
-{
-    /* One more replication of this piece is present in the swarm */
-    ++t->pieceReplication[index];
-
-    /* we only resort the piece if the list is already sorted */
-    if( tr_arePiecesSorted( t ) )
-        pieceListResortPiece( t, pieceListLookup( t, index ) );
-}
-
-void
-tr_incrReplicationFromBitset( Torrent * t, const tr_bitset * bitset )
-{
-    if( bitset->haveAll )
-    {
-        tr_incrReplication( t );
-    }
-    else if ( !bitset->haveNone )
-    {
-        tr_incrReplicationFromBitfield( t, &bitset->bitfield );
-    }
-}
-
-void
-tr_incrReplication( Torrent * t )
-{
-    uint32_t it;
-
-    for( it=0 ; it < t->tor->info.pieceCount ; it++ )
-        ++t->pieceReplication[it];
-}
-
-void
-tr_incrReplicationFromBitfield( Torrent * t, const tr_bitfield * bitfield )
-{
-    uint32_t it;
-
-    assert( bitfield->bitCount == t->tor->info.pieceCount );
-    assert( tr_bitfieldTestFast( bitfield, t->tor->info.pieceCount - 1 ) );
-
-    for( it=0 ; it < t->tor->info.pieceCount ; it++ )
-    {
-        if( tr_bitfieldHasFast( bitfield, it ) )
-            ++t->pieceReplication[it];
-    }
-    tr_setPiecesSorted( t, FALSE );
-}
-
-void
-tr_decrReplicationFromBitset( Torrent * t, const tr_bitset * bitset )
-{
-    uint32_t it;
-
-    if( bitset->haveAll )
-    {
-        for( it=0 ; it < t->tor->info.pieceCount ; ++it )
-            --t->pieceReplication[it];
-    }
-    else if ( !bitset->haveNone )
-    {
-        for( it=0 ; it < bitset->bitfield.bitCount ; it++ )
-        {
-            if( tr_bitfieldHasFast( &bitset->bitfield, it ) )
-                --t->pieceReplication[it];
-        }
-        tr_setPiecesSorted( t, FALSE );
-    }
-
-}
-
