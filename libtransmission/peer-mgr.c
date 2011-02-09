@@ -1010,7 +1010,7 @@ isInEndgame( Torrent * t )
  * expensive even for nightly builds. Let's leave them disabled
  * but add an easy hook to compile them back in.
  */
-#if 1
+#if 0
 static void
 assertWeightedPiecesAreSorted( Torrent * t )
 {
