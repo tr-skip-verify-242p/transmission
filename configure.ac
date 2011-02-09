@@ -109,10 +109,9 @@ dnl
 dnl endianness
 
 AC_C_BIGENDIAN(
-    AC_DEFINE(WORDS_BIGENDIAN, 1, [byte ordering is big-endian]),
-    AC_DEFINE(WORDS_LITTLEENDIAN, 1, [byte ordering is little-endian]),
-    AC_MSG_ERROR(unrecognized endianness, please port to your platform)
-)
+    [AC_DEFINE([WORDS_BIGENDIAN], [1], [Define to 1 if byte ordering is big-endian.])],
+    [AC_DEFINE([WORDS_LITTLEENDIAN], [1], [Define to 1 if byte ordering is little-endian.])],
+    [AC_MSG_ERROR([unrecognized endianness, please port to your platform])])
 
 dnl ----------------------------------------------------------------------------
 dnl
