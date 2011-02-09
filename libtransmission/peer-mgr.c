@@ -1033,9 +1033,9 @@ assertReplicationCountIsExact( Torrent * t )
     int itPeer;
     tr_peer * peer;
 
-    for( itPiece = 0 ; itPiece < pieceCount; ++itPiece )
+    for( itPiece = 0; itPiece < pieceCount; ++itPiece )
     {
-        for( itPeer = 0 ; itPeer < peerCount; ++itPeer )
+        for( itPeer = 0; itPeer < peerCount; ++itPeer )
         {
             peer = tr_ptrArrayNth( &t->peers, itPeer );
             if( tr_bitsetHasFast( &peer->have, itPiece ) )

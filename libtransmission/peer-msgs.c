@@ -566,18 +566,16 @@ firePeerGotData( tr_peermsgs  * msgs,
 }
 
 static void
-firePeerGotHave( tr_peermsgs * msgs,
-                 uint32_t      index )
+firePeerGotHave( tr_peermsgs * msgs, uint32_t piece_index )
 {
     tr_peer_event e = blankEvent;
     e.eventType = TR_PEER_PEER_GOT_HAVE;
-    e.pieceIndex = index;
+    e.pieceIndex = piece_index;
     publish( msgs, &e );
 }
 
 static void
-firePeerGotBitset( tr_peermsgs * msgs,
-                     tr_bitset * bitset )
+firePeerGotBitset( tr_peermsgs * msgs, tr_bitset * bitset )
 {
     tr_peer_event e = blankEvent;
     e.eventType = TR_PEER_PEER_BITSET_DIFF;
@@ -1430,7 +1428,7 @@ readBtMessage( tr_peermsgs * msgs, struct evbuffer * inbuf, size_t inlen )
                 return READ_ERR;
             }
 
-            /* a peer can send the same HAVE message twice */
+            /* A peer may send the same HAVE message more than once. */
             if( !tr_bitsetHas( &msgs->peer->have, ui32 ) )
             {
                 if( tr_bitsetAdd( &msgs->peer->have, ui32 ) )

@@ -56,8 +56,8 @@ tr_bitsetHasFast( const tr_bitset * b, const size_t nth )
 }
 
 /**
- * @return A newly allocated bitset which you must free
- *         using tr_bitsetFree() when no longer needed.
+ * @return A newly allocated bitset which you must free using
+ *         tr_bitsetFree() when it is no longer needed.
  */
 static inline tr_bitset *
 tr_bitsetDup( const tr_bitset * b )
@@ -71,7 +71,7 @@ tr_bitsetDup( const tr_bitset * b )
     if( !dup->haveAll && !dup->haveNone )
     {
         tr_bitsetReserve( dup, b->bitfield.bitCount );
-        if( ( b->bitfield.bits != NULL ) && ( b->bitfield.byteCount > 0 ) )
+        if( b->bitfield.bits && b->bitfield.byteCount > 0 )
             memcpy( dup->bitfield.bits, b->bitfield.bits, b->bitfield.byteCount );
     }
     return dup;
