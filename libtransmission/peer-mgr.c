@@ -1002,9 +1002,9 @@ isInEndgame( Torrent * t )
 }
 
 /**
- * This function is useful for sanity checking,
- * but is too expensive even for nightly builds...
- * let's leave it disabled but add an easy hook to compile it back in
+ * These functions are useful for sanity checking, but are too
+ * expensive even for nightly builds. Let's leave them disabled
+ * but add an easy hook to compile them back in.
  */
 #if 1
 static void
@@ -1018,28 +1018,23 @@ assertWeightedPiecesAreSorted( Torrent * t )
             assert( comparePieceByWeight( &t->pieces[i], &t->pieces[i+1] ) <= 0 );
     }
 }
-#else
-#define assertWeightedPiecesAreSorted(t)
-#endif
 
-#if 1
 static void
 assertReplicationCountIsExact( Torrent * t )
 {
-    const int pieceCount = t->tor->info.pieceCount;
+    const tr_piece_index_t pieceCount = t->tor->info.pieceCount;
     const int peerCount = tr_ptrArraySize( &t->peers );
-    size_t * replicationCount = tr_new( size_t, pieceCount );
-    int itPiece, itPeer; /* iterators */
+    size_t * replicationCount = tr_new0( size_t, pieceCount );
+    tr_piece_index_t itPiece;
+    int itPeer;
     tr_peer * peer;
 
-    for( itPiece=0 ; itPiece<pieceCount ; ++itPiece )
+    for( itPiece = 0 ; itPiece < pieceCount; ++itPiece )
     {
-        replicationCount[itPiece] = 0;
-
-        for( itPeer=0 ; itPeer<peerCount ; ++itPeer )
+        for( itPeer = 0 ; itPeer < peerCount; ++itPeer )
         {
             peer = tr_ptrArrayNth( &t->peers, itPeer );
-            if( tr_bitsetHasFast( &peer->have , (size_t) itPiece ) )
+            if( tr_bitsetHasFast( &peer->have, itPiece ) )
                 ++replicationCount[itPiece];
         }
 
@@ -1050,6 +1045,7 @@ assertReplicationCountIsExact( Torrent * t )
 
 }
 #else
+#define assertWeightedPiecesAreSorted(t)
 #define assertReplicationCountIsExact(t)
 #endif
 
