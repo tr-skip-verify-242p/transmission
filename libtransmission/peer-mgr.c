@@ -1540,7 +1540,7 @@ peerCallbackFunc( tr_peer * peer, const tr_peer_event * e, void * vt )
             break;
         }
 
-        case TR_PEER_PEER_GOT_BITFIELD:
+        case TR_PEER_PEER_BITSET_DIFF:
         {
             assert( e->bitset != 0 );
             incrReplicationFromBitset( t, e->bitset );
@@ -2998,7 +2998,7 @@ shouldPeerBeClosed( const Torrent    * t,
         else
         {
             tr_bitfield * tmp = tr_bitfieldDup( tr_cpPieceBitfield( &tor->completion ) );
-            tr_bitsetDifference( tmp, &peer->have );
+            tr_bitsetFieldDifference( tmp, &peer->have );
             peerHasEverything = tr_bitfieldCountTrueBits( tmp ) == 0;
             tr_bitfieldFree( tmp );
         }

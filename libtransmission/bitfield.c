@@ -199,7 +199,6 @@ tr_bitfieldInverse( tr_bitfield * b )
     }
 }
 
-
 size_t
 tr_bitfieldCountTrueBits( const tr_bitfield* b )
 {

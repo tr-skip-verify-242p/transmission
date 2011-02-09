@@ -69,7 +69,7 @@ typedef enum
     TR_PEER_PEER_GOT_DATA,
     TR_PEER_PEER_PROGRESS,
     TR_PEER_PEER_GOT_HAVE,
-    TR_PEER_PEER_GOT_BITFIELD,
+    TR_PEER_PEER_BITSET_DIFF,
     TR_PEER_ERROR
 }
 PeerEventType;
@@ -78,7 +78,7 @@ typedef struct
 {
     PeerEventType       eventType;
     uint32_t            pieceIndex;   /* for GOT_BLOCK, GOT_HAVE, CANCEL, ALLOWED, SUGGEST */
-    struct tr_bitset *  bitset;       /* for GOT_BITFIELD */
+    struct tr_bitset *  bitset;       /* for PEER_BITSET_DIFF */
     uint32_t            offset;       /* for GOT_BLOCK */
     uint32_t            length;       /* for GOT_BLOCK + GOT_DATA */
     float               progress;     /* for PEER_PROGRESS */

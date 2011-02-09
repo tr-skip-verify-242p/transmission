@@ -55,6 +55,10 @@ tr_bitsetHasFast( const tr_bitset * b, const size_t nth )
     return tr_bitfieldHasFast( &b->bitfield, nth );
 }
 
+/**
+ * @return A newly allocated bitset which you must free
+ *         using tr_bitsetFree() when no longer needed.
+ */
 static inline tr_bitset *
 tr_bitsetDup( const tr_bitset * b )
 {
@@ -71,6 +75,18 @@ tr_bitsetDup( const tr_bitset * b )
             memcpy( dup->bitfield.bits, b->bitfield.bits, b->bitfield.byteCount );
     }
     return dup;
+}
+
+/**
+ * @note Frees @a b itself in addition to the bitfield memory.
+ */
+static inline void
+tr_bitsetFree( tr_bitset * b )
+{
+    if( !b )
+        return;
+    tr_bitsetDestructor( b );
+    tr_free( b );
 }
 
 static inline tr_bool
@@ -93,7 +109,7 @@ tr_bitsetOr( tr_bitfield * a, const tr_bitset * b )
 
 /* set 'a' to all the flags that were in 'a' but not 'b' */
 static inline void
-tr_bitsetDifference( tr_bitfield * a, const tr_bitset * b )
+tr_bitsetFieldDifference( tr_bitfield * a, const tr_bitset * b )
 {
     if( b->haveAll )
         tr_bitfieldClear( a );
@@ -124,6 +140,20 @@ tr_bitsetSetHaveNone( tr_bitset * b )
     b->haveNone = 1;
 }
 
+static inline void
+tr_bitsetDifference( tr_bitset * a, const tr_bitset * b )
+{
+    if( b->haveAll )
+    {
+        tr_bitfieldClear( &a->bitfield );
+        tr_bitsetSetHaveNone( a );
+    }
+    else if( !b->haveNone )
+    {
+        tr_bitfieldDifference( &a->bitfield, &b->bitfield );
+    }
+}
+
 static inline int
 tr_bitsetAdd( tr_bitset * b, size_t i )
 {
@@ -134,6 +164,17 @@ tr_bitsetAdd( tr_bitset * b, size_t i )
         ret = tr_bitfieldAdd( &b->bitfield, i );
     }
     return ret;
+}
+
+static inline void
+tr_bitsetInverse( tr_bitset * b )
+{
+    if( b->haveNone )
+        tr_bitsetSetHaveAll( b );
+    else if( b->haveAll )
+        tr_bitsetSetHaveNone( b );
+    else
+        tr_bitfieldInverse( &b->bitfield );
 }
 
 #endif
