@@ -575,7 +575,7 @@ firePeerGotHave( tr_peermsgs * msgs, uint32_t piece_index )
 }
 
 static void
-firePeerGotBitset( tr_peermsgs * msgs, tr_bitset * bitset )
+firePeerBitsetDiff( tr_peermsgs * msgs, tr_bitset * bitset )
 {
     tr_peer_event e = blankEvent;
     e.eventType = TR_PEER_PEER_BITSET_DIFF;
@@ -1462,7 +1462,7 @@ readBtMessage( tr_peermsgs * msgs, struct evbuffer * inbuf, size_t inlen )
 
             diff = tr_bitsetDup( cur );
             tr_bitsetDifference( diff, old );
-            firePeerGotBitset( msgs, diff );
+            firePeerBitsetDiff( msgs, diff );
             updatePeerProgress( msgs );
 
             tr_bitsetFree( diff );
@@ -1544,7 +1544,7 @@ readBtMessage( tr_peermsgs * msgs, struct evbuffer * inbuf, size_t inlen )
                 tr_bitset * diff = tr_bitsetDup( &msgs->peer->have );
                 tr_bitsetInverse( diff );
                 tr_bitsetSetHaveAll( &msgs->peer->have );
-                firePeerGotBitset( msgs, diff );
+                firePeerBitsetDiff( msgs, diff );
                 updatePeerProgress( msgs );
                 tr_bitsetFree( diff );
             } else {
