@@ -624,10 +624,11 @@ void tr_formatter_get_units( struct tr_benc * dict );
 #if defined( WORDS_BIGENDIAN )
 #define htonll( x ) ( x )
 #define ntohll( x ) ( x )
-#else
-/* NB: Assumed to be little endian. */
+#elif defined( WORDS_LITTLEENDIAN )
 #define htonll( x ) tr_bswap64( x )
 #define ntohll( x ) tr_bswap64( x )
+#else
+#error portme
 #endif
 #endif /* !defined( HAVE_HTONLL ) */
 
