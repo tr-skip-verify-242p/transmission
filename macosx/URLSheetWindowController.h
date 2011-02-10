@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2008-2011 Transmission authors and contributors
+ * Copyright (c) 2011 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,51 +22,23 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-#import "BonjourController.h"
+#import <Cocoa/Cocoa.h>
 
-@implementation BonjourController
+@class Controller;
 
-BonjourController * fDefaultController = nil;
-+ (BonjourController *) defaultController
+@interface URLSheetWindowController : NSWindowController
 {
-    if (!fDefaultController)
-        fDefaultController = [[BonjourController alloc] init];
-    return fDefaultController;
-}
-
-- (void) dealloc
-{
-    [fService release];
-    [super dealloc];
-}
-
-- (void) startWithPort: (NSInteger) port
-{
-    [self stop];
+	IBOutlet NSTextField * fLabelField;
+    IBOutlet NSTextField * fTextField;
+    IBOutlet NSButton * fOpenButton;
     
-    NSString * serviceName = [NSString stringWithFormat: @"Transmission Web Interface (%@)", NSUserName()];
-    
-    fService = [[NSNetService alloc] initWithDomain: @"" type: @"_http._tcp." name: serviceName port: port];
-    [fService setDelegate: self];
-    
-    [fService publish];
+    Controller * fController;
 }
 
-- (void) stop
-{
-    [fService stop];
-    [fService release];
-    fService = nil;
-}
+- (id) initWithController: (Controller *) controller;
+- (void) beginSheetForWindow: (NSWindow *) window;
 
-- (void) netService: (NSNetService *) sender didNotPublish: (NSDictionary *) errorDict
-{
-    NSLog(@"Failed to publish the web interface service on port %ld, with error: %@", [sender port], errorDict);
-}
-
-- (void) netService: (NSNetService *) sender didNotResolve: (NSDictionary *) errorDict
-{
-    NSLog(@"Failed to resolve the web interface service on port %ld, with error: %@", [sender port], errorDict);
-}
+- (void) openURLEndSheet: (id) sender;
+- (void) openURLCancelEndSheet: (id) sender;
 
 @end
