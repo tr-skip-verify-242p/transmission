@@ -401,9 +401,8 @@ cached_file_open( struct tr_cached_file  * o,
         if( ftruncate( o->fd, file_size ) == -1 )
         {
             const int err = errno;
-            tr_err( _( "Couldn't truncate file \"%1$s\": %2$s" ),
-                    filename, tr_strerror( err ) );
-            /* Continue anyway. */
+            tr_err( _( "Couldn't truncate \"%1$s\": %2$s" ), filename, tr_strerror( err ) );
+            return err;
         }
     }
 
