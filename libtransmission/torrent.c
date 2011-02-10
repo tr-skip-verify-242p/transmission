@@ -676,12 +676,15 @@ static void refreshCurrentDir( tr_torrent * tor );
 static void
 torrentInitFromInfo( tr_torrent * tor )
 {
-    tr_info * info = &tor->info;
+    const tr_info * info = &tor->info;
     const uint64_t total_size = info->totalSize;
     const uint32_t piece_size = info->pieceSize;
     const uint32_t block_size = tr_getBlockSize( piece_size );
     const tr_piece_index_t piece_count = info->pieceCount;
     uint64_t check;
+
+    if( !tr_torrentHasMetadata( tor ) )
+        goto OUT;
 
     assert( total_size > 0 );
     assert( piece_size > 0 );
@@ -717,10 +720,9 @@ torrentInitFromInfo( tr_torrent * tor )
     check += tor->final_piece_final_block_size;
     assert( check == tor->final_piece_size );
 
+OUT:
     tr_cpConstruct( &tor->completion, tor );
-
     tr_torrentInitFilePieces( tor );
-
     tor->completeness = tr_cpGetStatus( &tor->completion );
 }
 
