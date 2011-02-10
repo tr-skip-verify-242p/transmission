@@ -355,12 +355,18 @@ main( int argc, char ** argv )
     dtr_watchdir * watchdir = NULL;
     FILE * logfile = NULL;
     tr_bool pidfile_created = FALSE;
+    sigset_t alarm_sig;
+    int i;
 
     signal( SIGINT, gotsig );
     signal( SIGTERM, gotsig );
 #ifndef WIN32
     signal( SIGHUP, gotsig );
 #endif
+    sigemptyset( &alarm_sig );
+    for( i = SIGRTMIN; i <= SIGRTMAX; ++i )
+        sigaddset( &alarm_sig, i );
+    sigprocmask( SIG_BLOCK, &alarm_sig, NULL );
 
     /* load settings from defaults + config file */
     tr_bencInitDict( &settings, 0 );
