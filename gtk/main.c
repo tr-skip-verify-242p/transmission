@@ -484,8 +484,15 @@ rpc_torrent_add_idle( gpointer gdata )
 static void
 setupsighandlers( void )
 {
+    sigset_t alarm_sig;
+    int i;
+
     signal( SIGINT, signal_handler );
     signal( SIGKILL, signal_handler );
+    sigemptyset( &alarm_sig );
+    for( i = SIGRTMIN; i <= SIGRTMAX; ++i )
+        sigaddset( &alarm_sig, i );
+    sigprocmask( SIG_BLOCK, &alarm_sig, NULL );
 }
 
 static tr_rpc_callback_status
@@ -779,6 +786,8 @@ main( int argc, char ** argv )
         { NULL, 0,   0, 0, NULL, NULL, NULL }
     };
 
+    setupsighandlers( ); /* set up handlers for fatal signals */
+
     /* bind the gettext domain */
     setlocale( LC_ALL, "" );
     bindtextdomain( domain, TRANSMISSIONLOCALEDIR );
@@ -813,8 +822,6 @@ main( int argc, char ** argv )
 
     gtr_notify_init( );
     didinit = cf_init( configDir, NULL ); /* must come before actions_init */
-
-    setupsighandlers( ); /* set up handlers for fatal signals */
 
     didlock = cf_lock( &tr_state, &err );
     argfiles = checkfilenames( argc - 1, argv + 1 );
