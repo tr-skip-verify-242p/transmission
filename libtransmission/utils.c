@@ -330,6 +330,76 @@ tr_msg( const char * file, int line,
 ****
 ***/
 
+#ifdef __GNUC__
+#define tr_byteswap64( x ) __builtin_bswap64( x )
+#else
+#define tr_byteswap64( x ) \
+    ( ( (uint64_t) ( x ) << 56 ) | \
+      ( ( (uint64_t) ( x ) << 40 ) & 0xff000000000000ULL ) | \
+      ( ( (uint64_t) ( x ) << 24 ) & 0xff0000000000ULL ) | \
+      ( ( (uint64_t) ( x ) << 8 ) & 0xff00000000ULL ) | \
+      ( ( (uint64_t) ( x ) >> 8 ) & 0xff000000ULL ) | \
+      ( ( (uint64_t) ( x ) >> 24 ) & 0xff0000ULL ) | \
+      ( ( (uint64_t) ( x ) >> 40 ) & 0xff00ULL) | \
+      ( (uint64_t) ( x ) >> 56 ) )
+#endif
+
+typedef enum
+{
+    TR_BIG_ENDIAN    = 1,
+    TR_MIDDLE_ENDIAN = 2, /* A.k.a. mixed-endian, PDP-endian. */
+    TR_LITTLE_ENDIAN = 4
+}
+tr_endianness_t;
+
+static tr_endianness_t
+get_endianness( void )
+{
+    union {
+        uint32_t i;
+        uint8_t c[4];
+    } bytes = { 0x01020304 };
+    return bytes.c[0];
+}
+
+uint64_t
+tr_htonll( uint64_t x )
+{
+#ifdef HAVE_HTONLL
+    return htonll( x );
+#else
+    tr_endianness_t e = get_endianness( );
+    if( e == TR_BIG_ENDIAN )
+        return x;
+    if( e == TR_LITTLE_ENDIAN )
+        return tr_byteswap64( x );
+    fprintf( stderr, "Please port tr_htonll() to your platform.\n" );
+    abort();
+    return x;
+#endif
+}
+
+uint64_t
+tr_ntohll( uint64_t x )
+{
+#ifdef HAVE_NTOHLL
+    return ntohll( x );
+#else
+    tr_endianness_t e = get_endianness( );
+    if( e == TR_BIG_ENDIAN )
+        return x;
+    if( e == TR_LITTLE_ENDIAN )
+        return tr_byteswap64( x );
+    fprintf( stderr, "Please port tr_ntohll() to your platform.\n" );
+    abort();
+    return x;
+#endif
+}
+
+/***
+****
+***/
+
 void*
 tr_malloc( size_t size )
 {

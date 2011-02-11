@@ -535,6 +535,11 @@ char* tr_strtruncd( char * buf, double x, int precision, size_t buflen );
 /** @brief Portability wrapper for localtime_r() that uses the system implementation if available */
 struct tm * tr_localtime_r( const time_t *_clock, struct tm *_result );
 
+/** @brief Portability wrapper for htonll(). */
+uint64_t tr_htonll( uint64_t x );
+
+/** @brief Portability wrapper for ntohll(). */
+uint64_t tr_ntohll( uint64_t x );
 
 /**
  * @brief move a file
@@ -609,35 +614,6 @@ static inline char* tr_formatter_mem_MB( char * buf, double MBps, size_t buflen 
 char* tr_formatter_size_B( char * buf, int64_t bytes, size_t buflen );
 
 void tr_formatter_get_units( struct tr_benc * dict );
-
-/***
-****
-***/
-
-#if !defined( HAVE_HTONLL )
-#ifdef __GNUC__
-#define tr_bswap64( x ) __builtin_bswap64( x )
-#else
-#define tr_bswap64( x ) (((uint64_t)(x)  << 56) |                        \
-                         (((uint64_t)(x) << 40) & 0xff000000000000ULL) | \
-                         (((uint64_t)(x) << 24) & 0xff0000000000ULL) |   \
-                         (((uint64_t)(x) << 8)  & 0xff00000000ULL) |     \
-                         (((uint64_t)(x) >> 8)  & 0xff000000ULL) |       \
-                         (((uint64_t)(x) >> 24) & 0xff0000ULL) |         \
-                         (((uint64_t)(x) >> 40) & 0xff00ULL) |           \
-                         ((uint64_t)(x)  >> 56))
-#endif
-
-#if defined( WORDS_BIGENDIAN )
-#define htonll( x ) ( x )
-#define ntohll( x ) ( x )
-#elif defined( WORDS_LITTLEENDIAN )
-#define htonll( x ) tr_bswap64( x )
-#define ntohll( x ) tr_bswap64( x )
-#else
-#error portme
-#endif
-#endif /* !defined( HAVE_HTONLL ) */
 
 /***
 ****
