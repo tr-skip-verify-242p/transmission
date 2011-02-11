@@ -1445,15 +1445,15 @@ readBtMessage( tr_peermsgs * msgs, struct evbuffer * inbuf, size_t inlen )
             updatePeerProgress( msgs );
             break;
 
-        case BT_BITFIELD: {
-            tr_bitset * cur = &msgs->peer->have;
-            tr_bitset * old = tr_bitsetDup( cur );
-            tr_bitset * diff;
+        case BT_BITFIELD:
+        {
+            const tr_torrent * tor = msgs->torrent;
+            tr_bitset * cur = &msgs->peer->have, * old, * diff;
+            const size_t bitCount = tr_torrentHasMetadata( tor )
+                ? tor->info.pieceCount : msglen * 8;
 
-            const size_t bitCount = tr_torrentHasMetadata( msgs->torrent )
-                ? msgs->torrent->info.pieceCount : msglen * 8;
             dbgmsg( msgs, "got a bitfield" );
-
+            old = tr_bitsetDup( cur );
             tr_bitsetReserve( cur, bitCount );
             tr_peerIoReadBytes( msgs->peer->io, inbuf,
                                 cur->bitfield.bits, msglen );
