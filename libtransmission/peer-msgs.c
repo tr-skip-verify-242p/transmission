@@ -574,6 +574,10 @@ firePeerGotHave( tr_peermsgs * msgs, uint32_t piece_index )
     publish( msgs, &e );
 }
 
+/**
+ * A bit in @a bitset is set if the peer acquired the piece
+ * since its last HAVE or BITFIELD message.
+ */
 static void
 firePeerBitsetDiff( tr_peermsgs * msgs, tr_bitset * bitset )
 {

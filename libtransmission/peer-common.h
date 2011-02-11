@@ -69,7 +69,7 @@ typedef enum
     TR_PEER_PEER_GOT_DATA,
     TR_PEER_PEER_PROGRESS,
     TR_PEER_PEER_GOT_HAVE,
-    TR_PEER_PEER_BITSET_DIFF,
+    TR_PEER_PEER_BITSET_DIFF, /** @see firePeerBitsetDiff */
     TR_PEER_ERROR
 }
 PeerEventType;
