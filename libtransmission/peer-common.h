@@ -76,15 +76,15 @@ PeerEventType;
 
 typedef struct
 {
-    PeerEventType       eventType;
-    uint32_t            pieceIndex;   /* for GOT_BLOCK, GOT_HAVE, CANCEL, ALLOWED, SUGGEST */
-    struct tr_bitset *  bitset;       /* for PEER_BITSET_DIFF */
-    uint32_t            offset;       /* for GOT_BLOCK */
-    uint32_t            length;       /* for GOT_BLOCK + GOT_DATA */
-    float               progress;     /* for PEER_PROGRESS */
-    int                 err;          /* errno for GOT_ERROR */
-    tr_bool             wasPieceData; /* for GOT_DATA */
-    tr_port             port;         /* for GOT_PORT */
+    PeerEventType      eventType;
+    uint32_t           pieceIndex;   /* for GOT_BLOCK, GOT_HAVE, CANCEL, ALLOWED, SUGGEST */
+    struct tr_bitset * bitset;       /* for PEER_BITSET_DIFF */
+    uint32_t           offset;       /* for GOT_BLOCK */
+    uint32_t           length;       /* for GOT_BLOCK + GOT_DATA */
+    float              progress;     /* for PEER_PROGRESS */
+    int                err;          /* errno for GOT_ERROR */
+    tr_bool            wasPieceData; /* for GOT_DATA */
+    tr_port            port;         /* for GOT_PORT */
 }
 tr_peer_event;
 
