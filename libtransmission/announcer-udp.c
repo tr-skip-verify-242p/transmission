@@ -1092,7 +1092,7 @@ handle_connect( au_transaction * t, const uint8_t * data, size_t len )
     {
         au_transaction_error( t,
             _( "Malformed connect response: expecting length "
-               "%1$u but got %2$u" ), sizeof( *res ), len );
+               "%1$zu but got %2$zu" ), sizeof( *res ), len );
         return;
     }
 
@@ -1110,7 +1110,7 @@ handle_announce( au_transaction * t, const uint8_t * data, size_t len )
     {
         au_transaction_error( t,
             _( "Malformed announce response: expecting length "
-               "at least %1$u but got %2$u" ), sizeof( *res ), len );
+               "at least %1$zu but got %2$zu" ), sizeof( *res ), len );
         return;
     }
 
@@ -1127,7 +1127,7 @@ handle_scrape( au_transaction * t, const uint8_t * data, size_t len )
     {
         au_transaction_error( t,
             _( "Malformed scrape response: expecting length "
-               "at least %1$u but got %2$u" ), sizeof( *res ), len );
+               "at least %1$zu but got %2$zu" ), sizeof( *res ), len );
         return;
     }
 
@@ -1144,7 +1144,7 @@ handle_error( au_transaction * t, const uint8_t * data, size_t len )
     {
         au_transaction_error( t,
             _( "Malformed error response: expecting length "
-               "greater than %1$u but got %2$u" ), sizeof( *res ), len );
+               "greater than %1$zu but got %2$zu" ), sizeof( *res ), len );
         return;
     }
 
