@@ -580,7 +580,7 @@ au_state_connect( au_state * s )
 
     ALLOC_PKT( pkt, req, auP_connect_request );
 
-    req->protocol_id = htonll( AUC_PROTOCOL_ID );
+    req->protocol_id = tr_htonll( AUC_PROTOCOL_ID );
     req->action = htonl( AUC_ACTION_CONNECT );
 
     t = au_transaction_new( s, pkt );
@@ -623,7 +623,7 @@ au_state_send( au_state * s, au_transaction * t )
     }
 
     hdr = (auP_request_header *) evbuffer_pullup( t->pkt, -1 );
-    hdr->connection_id = htonll( s->con_id );
+    hdr->connection_id = tr_htonll( s->con_id );
 
     au_context_transmit( s->context, t );
 }
@@ -807,9 +807,9 @@ create_announce( tr_announcer     * announcer,
     memcpy( req->info_hash, tor->info.hash, sizeof( req->info_hash ) );
     memcpy( req->peer_id, tor->peer_id, sizeof( req->peer_id ) );
 
-    req->downloaded = htonll( tier->byteCounts[TR_ANN_DOWN] );
-    req->left = htonll( tr_cpLeftUntilComplete( &tor->completion ) );
-    req->uploaded = htonll( tier->byteCounts[TR_ANN_UP] );
+    req->downloaded = tr_htonll( tier->byteCounts[TR_ANN_DOWN] );
+    req->left = tr_htonll( tr_cpLeftUntilComplete( &tor->completion ) );
+    req->uploaded = tr_htonll( tier->byteCounts[TR_ANN_UP] );
 
     event = get_event_id( evstr );
     req->event = htonl( event );
@@ -1044,13 +1044,13 @@ handle_connect( au_transaction * t, const uint8_t * data, size_t len )
     {
         au_transaction_error( t,
             _( "Malformed connect response: expecting length "
-               "%1$u but got %2$u" ), sizeof( *res ), len );
+               "%1$zu but got %2$zu" ), sizeof( *res ), len );
         return;
     }
 
     res = (const auP_connect_response *) data;
 
-    au_state_establish( s, t, ntohll( res->connection_id ) );
+    au_state_establish( s, t, tr_ntohll( res->connection_id ) );
 }
 
 static void
@@ -1062,7 +1062,7 @@ handle_announce( au_transaction * t, const uint8_t * data, size_t len )
     {
         au_transaction_error( t,
             _( "Malformed announce response: expecting length "
-               "at least %1$u but got %2$u" ), sizeof( *res ), len );
+               "at least %1$zu but got %2$zu" ), sizeof( *res ), len );
         return;
     }
 
@@ -1079,7 +1079,7 @@ handle_scrape( au_transaction * t, const uint8_t * data, size_t len )
     {
         au_transaction_error( t,
             _( "Malformed scrape response: expecting length "
-               "at least %1$u but got %2$u" ), sizeof( *res ), len );
+               "at least %1$zu but got %2$zu" ), sizeof( *res ), len );
         return;
     }
 
@@ -1096,7 +1096,7 @@ handle_error( au_transaction * t, const uint8_t * data, size_t len )
     {
         au_transaction_error( t,
             _( "Malformed error response: expecting length "
-               "greater than %1$u but got %2$u" ), sizeof( *res ), len );
+               "greater than %1$zu but got %2$zu" ), sizeof( *res ), len );
         return;
     }
 

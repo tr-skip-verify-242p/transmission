@@ -95,7 +95,7 @@ fi
 AC_SEARCH_LIBS(cos, [m])
 AC_SEARCH_LIBS([socket], [socket net])
 AC_SEARCH_LIBS([gethostbyname], [nsl bind])
-AC_CHECK_FUNCS([htonll])
+AC_CHECK_FUNCS([htonll ntohll])
 PKG_CHECK_MODULES(OPENSSL, [openssl >= $OPENSSL_MINIMUM], , [CHECK_SSL()])
 PKG_CHECK_MODULES(LIBCURL, [libcurl >= $CURL_MINIMUM])
 PKG_CHECK_MODULES(LIBEVENT, [libevent >= $LIBEVENT_MINIMUM])
@@ -104,14 +104,6 @@ AC_PATH_ZLIB
 AC_SYS_LARGEFILE
 AC_CHECK_FUNCS([lseek64])
 
-dnl ----------------------------------------------------------------------------
-dnl
-dnl endianness
-
-AC_C_BIGENDIAN(
-    [AC_DEFINE([WORDS_BIGENDIAN], [1], [Define to 1 if byte ordering is big-endian.])],
-    [AC_DEFINE([WORDS_LITTLEENDIAN], [1], [Define to 1 if byte ordering is little-endian.])],
-    [AC_MSG_ERROR([unrecognized endianness, please port to your platform])])
 
 dnl ----------------------------------------------------------------------------
 dnl
