@@ -88,6 +88,8 @@ typedef struct
 }
 tr_peer_event;
 
+#define TR_PEER_EVENT_INIT { 0, 0, 0, 0, 0.0f, 0, FALSE, 0, NULL, NULL }
+
 struct tr_peer;
 
 typedef void tr_peer_callback( struct tr_peer       * peer,

@@ -451,8 +451,6 @@ protocolSendHaveNone( tr_peermsgs * msgs )
 ***  EVENTS
 **/
 
-static const tr_peer_event blankEvent = { 0, 0, 0, 0, 0, 0.0f, 0, 0, 0 };
-
 static void
 publish( tr_peermsgs * msgs, tr_peer_event * e )
 {
@@ -466,7 +464,7 @@ publish( tr_peermsgs * msgs, tr_peer_event * e )
 static void
 fireError( tr_peermsgs * msgs, int err )
 {
-    tr_peer_event e = blankEvent;
+    tr_peer_event e = TR_PEER_EVENT_INIT;
     e.eventType = TR_PEER_ERROR;
     e.err = err;
     publish( msgs, &e );
@@ -475,7 +473,7 @@ fireError( tr_peermsgs * msgs, int err )
 static void
 firePeerProgress( tr_peermsgs * msgs )
 {
-    tr_peer_event e = blankEvent;
+    tr_peer_event e = TR_PEER_EVENT_INIT;
     e.eventType = TR_PEER_PEER_PROGRESS;
     e.progress = msgs->peer->progress;
     publish( msgs, &e );
@@ -484,7 +482,7 @@ firePeerProgress( tr_peermsgs * msgs )
 static void
 fireGotBlock( tr_peermsgs * msgs, const struct peer_request * req )
 {
-    tr_peer_event e = blankEvent;
+    tr_peer_event e = TR_PEER_EVENT_INIT;
     e.eventType = TR_PEER_CLIENT_GOT_BLOCK;
     e.pieceIndex = req->index;
     e.offset = req->offset;
@@ -495,7 +493,7 @@ fireGotBlock( tr_peermsgs * msgs, const struct peer_request * req )
 static void
 fireGotRej( tr_peermsgs * msgs, const struct peer_request * req )
 {
-    tr_peer_event e = blankEvent;
+    tr_peer_event e = TR_PEER_EVENT_INIT;
     e.eventType = TR_PEER_CLIENT_GOT_REJ;
     e.pieceIndex = req->index;
     e.offset = req->offset;
@@ -506,7 +504,7 @@ fireGotRej( tr_peermsgs * msgs, const struct peer_request * req )
 static void
 fireGotChoke( tr_peermsgs * msgs )
 {
-    tr_peer_event e = blankEvent;
+    tr_peer_event e = TR_PEER_EVENT_INIT;
     e.eventType = TR_PEER_CLIENT_GOT_CHOKE;
     publish( msgs, &e );
 }
@@ -516,7 +514,7 @@ fireClientGotData( tr_peermsgs * msgs,
                    uint32_t      length,
                    int           wasPieceData )
 {
-    tr_peer_event e = blankEvent;
+    tr_peer_event e = TR_PEER_EVENT_INIT;
 
     e.length = length;
     e.eventType = TR_PEER_CLIENT_GOT_DATA;
@@ -527,7 +525,7 @@ fireClientGotData( tr_peermsgs * msgs,
 static void
 fireClientGotSuggest( tr_peermsgs * msgs, uint32_t pieceIndex )
 {
-    tr_peer_event e = blankEvent;
+    tr_peer_event e = TR_PEER_EVENT_INIT;
     e.eventType = TR_PEER_CLIENT_GOT_SUGGEST;
     e.pieceIndex = pieceIndex;
     publish( msgs, &e );
@@ -536,7 +534,7 @@ fireClientGotSuggest( tr_peermsgs * msgs, uint32_t pieceIndex )
 static void
 fireClientGotPort( tr_peermsgs * msgs, tr_port port )
 {
-    tr_peer_event e = blankEvent;
+    tr_peer_event e = TR_PEER_EVENT_INIT;
     e.eventType = TR_PEER_CLIENT_GOT_PORT;
     e.port = port;
     publish( msgs, &e );
@@ -545,7 +543,7 @@ fireClientGotPort( tr_peermsgs * msgs, tr_port port )
 static void
 fireClientGotAllowedFast( tr_peermsgs * msgs, uint32_t pieceIndex )
 {
-    tr_peer_event e = blankEvent;
+    tr_peer_event e = TR_PEER_EVENT_INIT;
     e.eventType = TR_PEER_CLIENT_GOT_ALLOWED_FAST;
     e.pieceIndex = pieceIndex;
     publish( msgs, &e );
@@ -556,7 +554,7 @@ firePeerGotData( tr_peermsgs  * msgs,
                  uint32_t       length,
                  int            wasPieceData )
 {
-    tr_peer_event e = blankEvent;
+    tr_peer_event e = TR_PEER_EVENT_INIT;
 
     e.length = length;
     e.eventType = TR_PEER_PEER_GOT_DATA;
@@ -568,7 +566,7 @@ firePeerGotData( tr_peermsgs  * msgs,
 static void
 firePeerGotHave( tr_peermsgs * msgs, uint32_t piece_index )
 {
-    tr_peer_event e = blankEvent;
+    tr_peer_event e = TR_PEER_EVENT_INIT;
     e.eventType = TR_PEER_PEER_GOT_HAVE;
     e.pieceIndex = piece_index;
     publish( msgs, &e );
@@ -581,7 +579,7 @@ firePeerGotHave( tr_peermsgs * msgs, uint32_t piece_index )
 static void
 firePeerBitsetDiff( tr_peermsgs * msgs, tr_bitset * bitset )
 {
-    tr_peer_event e = blankEvent;
+    tr_peer_event e = TR_PEER_EVENT_INIT;
     e.eventType = TR_PEER_PEER_BITSET_DIFF;
     e.bitset = bitset;
     publish( msgs, &e );
