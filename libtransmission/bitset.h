@@ -177,4 +177,19 @@ tr_bitsetInverse( tr_bitset * b )
         tr_bitfieldInverse( &b->bitfield );
 }
 
+static inline void
+tr_bitsetXor( tr_bitset * a, const tr_bitset * b )
+{
+    if( b->haveNone )
+        return;
+    if( b->haveAll )
+    {
+        tr_bitsetInverse( a );
+        return;
+    }
+    a->haveNone = a->haveAll = 0;
+    tr_bitsetReserve( a, b->bitfield.bitCount );
+    tr_bitfieldXor( &a->bitfield, &b->bitfield );
+}
+
 #endif

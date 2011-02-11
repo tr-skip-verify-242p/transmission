@@ -260,21 +260,78 @@ bitsetMatchesMetadata( const tr_torrent * tor, const tr_bitset * bitset )
 }
 
 /**
-*** Replication count manipulation functions
+*** Replication count internal functions
 **/
 
-/**
- * Increase the replication count of every piece in the torrent.
- */
 static void
 incrReplication( Torrent * t )
 {
-    assert( tr_torrentHasMetadata( t->tor ) );
-
     tr_piece_index_t i;
-    for( i = 0 ; i < t->tor->info.pieceCount ; i++ )
+    for( i = 0; i < t->tor->info.pieceCount; ++i )
         ++t->pieceReplication[i];
+    setPiecesSorted( t, FALSE );
 }
+
+static void
+incrReplicationFromBitfield( Torrent * t,
+                             const tr_bitfield * bitfield )
+{
+    tr_piece_index_t i;
+    size_t count = 0;
+
+    for( i = 0; i < t->tor->info.pieceCount; ++i )
+    {
+        if( tr_bitfieldHasFast( bitfield, i ) )
+        {
+            ++t->pieceReplication[i];
+            ++count;
+        }
+    }
+    if( count )
+        setPiecesSorted( t, FALSE );
+}
+
+static void
+updateReplicationFromBitfield( Torrent           * t,
+                               const tr_bitfield * current,
+                               const tr_bitfield * changed )
+{
+    tr_piece_index_t i;
+    size_t count = 0;
+
+    for( i = 0; i < t->tor->info.pieceCount; ++i )
+    {
+        if( !tr_bitfieldHasFast( changed, i ) )
+            continue;
+        if( tr_bitfieldHasFast( current, i ) )
+            ++t->pieceReplication[i];
+        else
+            --t->pieceReplication[i];
+        ++count;
+    }
+    if( count )
+        setPiecesSorted( t, FALSE );
+}
+
+static const tr_bitfield *
+expandBitfield( const tr_bitset * bs, size_t size, tr_bitfield ** freerv )
+{
+    tr_bitfield * bf;
+    if( !bs->haveAll && !bs->haveNone )
+    {
+        *freerv = NULL;
+        return &bs->bitfield;
+    }
+    bf = tr_bitfieldNew( size );
+    *freerv = bf;
+    if( bs->haveAll )
+        tr_bitfieldInverse( bf );
+    return bf;
+}
+
+/**
+*** Replication count manipulation functions
+**/
 
 static void
 pieceListResortPiece( Torrent * t, struct weighted_piece * p );
@@ -301,25 +358,8 @@ incrReplicationOfPiece( Torrent * t, const tr_piece_index_t i )
 }
 
 /**
- * Increases the replication count of pieces present in the bitfield
- * Sets the @a arePiecesSorted field in @a t to @a FALSE.
- */
-static void
-incrReplicationFromBitfield( Torrent * t, const tr_bitfield * bitfield )
-{
-    tr_piece_index_t i;
-
-    assert( tr_torrentHasMetadata( t->tor ) );
-    assert( tr_bitfieldTestFast( bitfield, t->tor->info.pieceCount - 1 ) );
-
-    for( i = 0 ; i < t->tor->info.pieceCount ; i++ )
-        if( tr_bitfieldHasFast( bitfield, i ) )
-            ++t->pieceReplication[i];
-    setPiecesSorted( t, FALSE );
-}
-
-/**
  * Increase the replication count of pieces present in the bitset.
+ *
  * If the piece list needs to be resorted, it sets the
  * @a arePiecesSorted field in @a t to @a FALSE.
  */
@@ -328,11 +368,45 @@ incrReplicationFromBitset( Torrent * t, const tr_bitset * bitset )
 {
     assert( tr_torrentHasMetadata( t->tor ) );
     assert( bitsetMatchesMetadata( t->tor, bitset ) );
+    assert( t->pieceReplication != NULL );
 
     if( bitset->haveAll )
         incrReplication( t );
     else if( !bitset->haveNone )
         incrReplicationFromBitfield( t, &bitset->bitfield );
+}
+
+/**
+ * Update the replication count of all pieces for which bits
+ * are set in @a changed. If a bit in @a current is 0, the
+ * count is decreased, otherwise it is increased.
+ *
+ * If the piece list needs to be resorted, it sets the
+ * @a arePiecesSorted field in @a t to @a FALSE.
+ */
+static void
+updateReplicationFromBitset( Torrent         * t,
+                             const tr_bitset * current,
+                             const tr_bitset * changed )
+{
+    const tr_bitfield * fcur, * fchg;
+    tr_bitfield * fcurfree = NULL, * fchgfree = NULL;
+    size_t bitcount;
+
+    assert( tr_torrentHasMetadata( t->tor ) );
+    assert( t->pieceReplication != NULL );
+    assert( bitsetMatchesMetadata( t->tor, current ) );
+    assert( bitsetMatchesMetadata( t->tor, changed ) );
+
+    if( changed->haveNone )
+        return;
+
+    bitcount = t->tor->info.pieceCount;
+    fcur = expandBitfield( current, bitcount, &fcurfree );
+    fchg = expandBitfield( changed, bitcount, &fchgfree );
+    updateReplicationFromBitfield( t, fcur, fchg );
+    tr_bitfieldFree( fcurfree );
+    tr_bitfieldFree( fchgfree );
 }
 
 /**
@@ -1063,7 +1137,7 @@ isInEndgame( Torrent * t )
  * expensive even for nightly builds. Let's leave them disabled
  * but add an easy hook to compile them back in.
  */
-#if 0
+#if 1
 static void
 assertWeightedPiecesAreSorted( Torrent * t )
 {
@@ -1592,18 +1666,19 @@ peerCallbackFunc( tr_peer * peer, const tr_peer_event * e, void * vt )
         }
 
         case TR_PEER_PEER_GOT_HAVE:
-        {
             if( tr_torrentHasMetadata( t->tor ) )
                 incrReplicationOfPiece( t, e->pieceIndex );
             break;
-        }
 
-        case TR_PEER_PEER_BITSET_DIFF:
-        {
+        case TR_PEER_PEER_GOT_HAVE_ALL:
             if( tr_torrentHasMetadata( t->tor ) )
-                incrReplicationFromBitset( t, e->bitset );
+                incrReplicationFromBitset( t, e->changed );
             break;
-        }
+
+        case TR_PEER_PEER_GOT_BITSET:
+            if( tr_torrentHasMetadata( t->tor ) )
+                updateReplicationFromBitset( t, e->bitset, e->changed );
+            break;
 
         case TR_PEER_CLIENT_GOT_REJ:
             removeRequestFromTables( t, _tr_block( t->tor, e->pieceIndex, e->offset ), peer );

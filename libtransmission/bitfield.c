@@ -199,6 +199,18 @@ tr_bitfieldInverse( tr_bitfield * b )
     }
 }
 
+void
+tr_bitfieldXor( tr_bitfield * a, const tr_bitfield * b )
+{
+    uint8_t * ait = a->bits;
+    const uint8_t * aend = ait + a->byteCount;
+    const uint8_t * bit = b->bits;
+    const uint8_t * bend = bit + b->byteCount;
+
+    while( ait != aend && bit != bend )
+        *ait++ ^= *bit++;
+}
+
 size_t
 tr_bitfieldCountTrueBits( const tr_bitfield* b )
 {
