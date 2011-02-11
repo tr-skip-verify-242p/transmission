@@ -620,7 +620,7 @@ au_state_connect( au_state * s )
 
     ALLOC_PKT( pkt, req, auP_connect_request );
 
-    req->protocol_id = htonll( AUC_PROTOCOL_ID );
+    req->protocol_id = tr_htonll( AUC_PROTOCOL_ID );
     req->action = htonl( AUC_ACTION_CONNECT );
 
     t = au_transaction_new( s, pkt );
@@ -663,7 +663,7 @@ au_state_send( au_state * s, au_transaction * t )
     }
 
     hdr = (auP_request_header *) evbuffer_pullup( t->pkt, -1 );
-    hdr->connection_id = htonll( s->con_id );
+    hdr->connection_id = tr_htonll( s->con_id );
 
     au_context_transmit( s->context, t );
 }
@@ -855,9 +855,9 @@ create_announce( tr_announcer     * announcer,
     memcpy( req->info_hash, tor->info.hash, sizeof( req->info_hash ) );
     memcpy( req->peer_id, tor->peer_id, sizeof( req->peer_id ) );
 
-    req->downloaded = htonll( tier->byteCounts[TR_ANN_DOWN] );
-    req->left = htonll( tr_cpLeftUntilComplete( &tor->completion ) );
-    req->uploaded = htonll( tier->byteCounts[TR_ANN_UP] );
+    req->downloaded = tr_htonll( tier->byteCounts[TR_ANN_DOWN] );
+    req->left = tr_htonll( tr_cpLeftUntilComplete( &tor->completion ) );
+    req->uploaded = tr_htonll( tier->byteCounts[TR_ANN_UP] );
 
     event = get_event_id( evstr );
     req->event = htonl( event );
@@ -1098,7 +1098,7 @@ handle_connect( au_transaction * t, const uint8_t * data, size_t len )
 
     res = (const auP_connect_response *) data;
 
-    au_state_establish( s, t, ntohll( res->connection_id ) );
+    au_state_establish( s, t, tr_ntohll( res->connection_id ) );
 }
 
 static void
