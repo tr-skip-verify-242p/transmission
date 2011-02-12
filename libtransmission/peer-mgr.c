@@ -424,14 +424,14 @@ decrReplicationFromBitset( Torrent * t, const tr_bitset * bitset )
 
     if( bitset->haveAll )
     {
-        for( i = 0 ; i < t->tor->info.pieceCount ; ++i )
+        for( i = 0; i < t->tor->info.pieceCount; ++i )
             --t->pieceReplication[i];
     }
     else if( !bitset->haveNone )
     {
         const tr_bitfield * bitfield = &bitset->bitfield;
         assert( tr_bitfieldTestFast( bitfield, t->tor->info.pieceCount - 1 ) );
-        for( i = 0 ; i < t->tor->info.pieceCount ; ++i )
+        for( i = 0; i < t->tor->info.pieceCount; ++i )
         {
             if( tr_bitfieldHasFast( bitfield, i ) )
                 --t->pieceReplication[i];
