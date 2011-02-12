@@ -1799,6 +1799,32 @@ copyMagnetLinkToClipboard( GtkWidget * w, tr_torrent * tor )
     tr_free( magnet );
 }
 
+static void
+renameTorrent( GtkWindow * parent, TrCore * core, tr_torrent * tor )
+{
+    GtkWidget * w;
+    int err = 0;
+
+    w = gtr_rename_top_dialog_new( parent, core, tor );
+    if( gtk_dialog_run( GTK_DIALOG( w ) ) == GTK_RESPONSE_APPLY )
+    {
+        const char * newname;
+        newname = gtr_rename_top_dialog_get_new_name( w );
+        err = tr_torrentRename( tor, newname );
+    }
+    gtk_widget_destroy( w );
+
+    if( !err )
+        return;
+    w = gtk_message_dialog_new( parent,
+        GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR,
+        GTK_BUTTONS_CLOSE, "%s", _( "Rename Error" ) );
+    gtk_message_dialog_format_secondary_text( GTK_MESSAGE_DIALOG( w ),
+        _( "Failed to rename torrent: %s" ), tr_strerror( err ) );
+    gtk_dialog_run( GTK_DIALOG( w ) );
+    gtk_widget_destroy( w );
+}
+
 void
 gtr_actions_handler( const char * action_name, gpointer user_data )
 {
@@ -1855,18 +1881,7 @@ gtr_actions_handler( const char * action_name, gpointer user_data )
     {
         tr_torrent * tor;
         if( ( tor = getFirstSelectedTorrent( data ) ) )
-        {
-            GtkWindow * parent = data->wind;
-            TrCore * core = data->core;
-            GtkWidget * w = gtr_rename_top_dialog_new( parent, core, tor );
-            if( gtk_dialog_run( GTK_DIALOG( w ) ) == GTK_RESPONSE_APPLY )
-            {
-                const char * newname;
-                newname = gtr_rename_top_dialog_get_new_name( w );
-                tr_torrentRename( tor, newname );
-            }
-            gtk_widget_destroy( w );
-        }
+            renameTorrent( data->wind, data->core, tor );
     }
     else if( !strcmp( action_name, "start-torrent" ) )
     {
