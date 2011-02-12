@@ -330,6 +330,7 @@ tr_msg( const char * file, int line,
 ****
 ***/
 
+#if !defined( HAVE_HTONLL ) || !defined( HAVE_NTOHLL )
 #ifdef __GNUC__
 #define tr_byteswap64( x ) __builtin_bswap64( x )
 #else
@@ -361,6 +362,7 @@ get_endianness( void )
     } bytes = { 0x01020304 };
     return bytes.c[0];
 }
+#endif /* !defined( HAVE_HTONLL ) || !defined( HAVE_NTOHLL ) */
 
 uint64_t
 tr_htonll( uint64_t x )
