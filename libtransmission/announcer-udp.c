@@ -960,10 +960,11 @@ au_parse_announce( tr_tier * tier, const char * data,
 
     if( action == AUC_ACTION_ERROR )
     {
+        const size_t hdrsz = sizeof( auP_response_header );
         const size_t rlen = sizeof( tier->lastAnnounceStr );
-        assert( len > sizeof( auP_error_response ) );
-        data += sizeof( auP_error_response );
-        len -= sizeof( auP_error_response );
+        assert( len > hdrsz );
+        data += hdrsz;
+        len -= hdrsz;
         tr_strlcpy( tier->lastAnnounceStr, data, MIN( len, rlen ) );
         publishMessage( tier, tier->lastAnnounceStr, TR_TRACKER_ERROR );
         return FALSE;
@@ -1001,9 +1002,10 @@ au_parse_scrape( tr_tier * tier, const char * data, size_t len,
 
     if( action == AUC_ACTION_ERROR )
     {
-        assert( len > sizeof( auP_error_response ) );
-        data += sizeof( auP_error_response );
-        len -= sizeof( auP_error_response );
+        const size_t hdrsz = sizeof( auP_response_header );
+        assert( len > hdrsz );
+        data += hdrsz;
+        len -= hdrsz;
         tr_strlcpy( result, data, MIN( resultlen, len ) );
         return FALSE;
     }
