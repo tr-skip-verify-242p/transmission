@@ -314,7 +314,7 @@ updateReplicationFromBitfield( Torrent           * t,
 }
 
 static const tr_bitfield *
-expandBitfield( const tr_bitset * bs, size_t size, tr_bitfield ** freerv )
+getBitfield( const tr_bitset * bs, size_t size, tr_bitfield ** freerv )
 {
     tr_bitfield * bf;
     if( !bs->haveAll && !bs->haveNone )
@@ -402,8 +402,8 @@ updateReplicationFromBitset( Torrent         * t,
         return;
 
     bitcount = t->tor->info.pieceCount;
-    fcur = expandBitfield( current, bitcount, &fcurfree );
-    fchg = expandBitfield( changed, bitcount, &fchgfree );
+    fcur = getBitfield( current, bitcount, &fcurfree );
+    fchg = getBitfield( changed, bitcount, &fchgfree );
     updateReplicationFromBitfield( t, fcur, fchg );
     tr_bitfieldFree( fcurfree );
     tr_bitfieldFree( fchgfree );
