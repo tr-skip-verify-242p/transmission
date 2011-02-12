@@ -28,8 +28,6 @@
 
 #include "transmission.h"
 
-struct tr_bitfield;
-
 enum
 {
     /** when we're making requests from another peer,
@@ -75,6 +73,8 @@ typedef enum
 }
 PeerEventType;
 
+struct tr_bitset;
+
 typedef struct
 {
     PeerEventType    eventType;
@@ -85,8 +85,8 @@ typedef struct
     int              err;          /* errno for GOT_ERROR */
     tr_bool          wasPieceData; /* for GOT_DATA */
     tr_port          port;         /* for GOT_PORT */
-    const struct tr_bitset * bitset;  /* for GOT_BITFIELD */
-    const struct tr_bitset * changed; /* for GOT_BITFIELD, GOT_HAVE_ALL */
+    const struct tr_bitset * bitset;  /* for GOT_BITSET */
+    const struct tr_bitset * changed; /* for GOT_BITSET, GOT_HAVE_ALL */
 }
 tr_peer_event;
 
