@@ -110,7 +110,7 @@ worker( void * varg UNUSED )
 }
 
 static void
-spawn_workers( )
+spawn_workers( void )
 {
     tr_lockLock( lock );
     if( queue && ( workers < 1 || tasks / workers > WORKER_LOAD )
