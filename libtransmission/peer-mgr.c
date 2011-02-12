@@ -1170,7 +1170,6 @@ assertReplicationCountIsExact( Torrent * t )
 
     }
     tr_free( replicationCount );
-
 }
 #else
 #define assertWeightedPiecesAreSorted(t)
