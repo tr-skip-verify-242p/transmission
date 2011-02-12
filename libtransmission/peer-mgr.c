@@ -1055,8 +1055,7 @@ comparePieceByWeight( const void * va, const void * vb )
     const struct weighted_piece * b = vb;
     int ia, ib, missing, pending;
     const tr_torrent * tor = weightTorrent;
-    const size_t * replication = tor->torrentPeers->pieceReplication;
-    size_t pra, prb;
+    const size_t * repl = tor->torrentPeers->pieceReplication;
 
     /* primary key: weight */
     missing = tr_cpMissingBlocksInPiece( &tor->completion, a->index );
@@ -1074,11 +1073,9 @@ comparePieceByWeight( const void * va, const void * vb )
     if( ia > ib ) return -1;
     if( ia < ib ) return 1;
 
-    /* tertiary key: perturbed rarest first */
-    pra = ( replication[a->index] << 4 ) | ( a->salt & 0xf );
-    prb = ( replication[b->index] << 4 ) | ( b->salt & 0xf );
-    if( pra < prb ) return -1;
-    if( pra > prb ) return 1;
+    /* tertiary key: rarest first */
+    if( repl[a->index] < repl[b->index] ) return -1;
+    if( repl[a->index] > repl[b->index] ) return 1;
 
     /* quaternary key: random */
     if( a->salt < b->salt ) return -1;
