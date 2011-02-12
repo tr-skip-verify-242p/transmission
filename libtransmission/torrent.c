@@ -2958,6 +2958,14 @@ dirExists( const char * path )
     return stat( path, &sb ) == 0 && S_ISDIR( sb.st_mode );
 }
 
+static tr_bool
+fileExists( const char * filename )
+{
+    struct stat sb;
+    const tr_bool ok = !stat( filename, &sb );
+    return ok;
+}
+
 int
 tr_torrentRename( tr_torrent * tor, const char * newname )
 {
@@ -2997,12 +3005,19 @@ tr_torrentRename( tr_torrent * tor, const char * newname )
         if( dirExists( oldpath ) )
         {
             newpath = tr_buildPath( root, newname, NULL );
+            if( fileExists( newpath ) )
+            {
+                err = EEXIST;
+                /* %1$s is the original file name.
+                 * %2$s is the new file name.
+                 * %3$s is the error message. */
+                tr_torerr( tor, _( "Cannot rename \"%1$s\" to \"%2$s\": %3$s" ),
+                           oldpath, newpath, tr_strerror( err ) );
+                goto OUT;
+            }
             if( rename( oldpath, newpath ) == -1 )
             {
                 err = errno;
-                /* %1$s is the original directory name.
-                 * %2$s is the new directory name.
-                 * %3$s is the error message. */
                 tr_torerr( tor, _( "Error renaming \"%1$s\" to \"%2$s\": %3$s" ),
                            oldpath, newpath, tr_strerror( err ) );
                 goto OUT;
@@ -3027,12 +3042,16 @@ tr_torrentRename( tr_torrent * tor, const char * newname )
         {
             oldpath = tr_buildPath( base, subpath, NULL );
             newpath = tr_buildPath( base, newname, NULL );
+            if( fileExists( newpath ) )
+            {
+                err = EEXIST;
+                tr_torerr( tor, _( "Cannot rename \"%1$s\" to \"%2$s\": %3$s" ),
+                           oldpath, newpath, tr_strerror( err ) );
+                goto OUT;
+            }
             if( rename( oldpath, newpath ) == -1 )
             {
                 err = errno;
-                /* %1$s is the original file name.
-                 * %2$s is the new file name.
-                 * %3$s is the error message. */
                 tr_torerr( tor, _( "Error renaming \"%1$s\" to \"%2$s\": %3$s" ),
                            oldpath, newpath, tr_strerror( err ) );
                 goto OUT;
@@ -3104,14 +3123,6 @@ tr_torrentFileCompleted( tr_torrent * tor, tr_file_index_t fileNum )
 /***
 ****
 ***/
-
-static tr_bool
-fileExists( const char * filename )
-{
-    struct stat sb;
-    const tr_bool ok = !stat( filename, &sb );
-    return ok;
-}
 
 tr_bool
 tr_torrentFindFile2( const tr_torrent * tor, tr_file_index_t fileNum,
