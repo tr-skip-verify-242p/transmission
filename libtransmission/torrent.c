@@ -2962,7 +2962,6 @@ int
 tr_torrentRename( tr_torrent * tor, const char * newname )
 {
     tr_info * info;
-    tr_bool restart = FALSE;
     const char * root, * p, * oldname, * base;
     char * oldpath = NULL, * newpath = NULL, * subpath = NULL;
     int err = 0;
@@ -2988,9 +2987,6 @@ tr_torrentRename( tr_torrent * tor, const char * newname )
     }
     if( !strcmp( newname, oldname ) )
         goto OUT;
-
-    restart = tor->isRunning;
-    tr_torrentStop( tor );
 
     root = tr_torrentGetCurrentDir( tor );
 
@@ -3054,12 +3050,10 @@ tr_torrentRename( tr_torrent * tor, const char * newname )
     tr_torrentSetDirty( tor );
 
 OUT:
+    tr_torrentUnlock( tor );
     tr_free( oldpath );
     tr_free( newpath );
     tr_free( subpath );
-    if( restart && !err )
-        tr_torrentStart( tor );
-    tr_torrentUnlock( tor );
     return err;
 }
 
