@@ -254,6 +254,21 @@ gtr_rename_dialog_new( GtkWindow  * parent,
     const char * s;
     int row = 0;
 
+    if( !tr_torrentHasMetadata( tor ) )
+    {
+        d = gtk_message_dialog_new( parent,
+            GTK_DIALOG_DESTROY_WITH_PARENT | GTK_DIALOG_MODAL,
+            GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE,
+            "%s", _( "Cannot Rename Torrent" ) );
+        gtk_message_dialog_format_secondary_text(
+            GTK_MESSAGE_DIALOG( d ), "%s",
+            _( "The torrent does not have anything to rename yet "
+               "because its metadata has not been fully received." ) );
+        g_signal_connect_swapped( d, "response",
+            G_CALLBACK( gtk_widget_destroy ), d );
+        return d;
+    }
+
     d = gtk_dialog_new_with_buttons(
         _( "Rename Torrent" ), parent,
         GTK_DIALOG_DESTROY_WITH_PARENT | GTK_DIALOG_MODAL,
