@@ -2974,15 +2974,20 @@ tr_torrentRename( tr_torrent * tor, const char * newname )
     int err = 0;
 
     assert( tr_isTorrent( tor ) );
+    tr_torrentLock( tor );
 
     if( !tr_torrentHasMetadata( tor ) )
-        return 0;
+    {
+        err = ENOENT;
+        goto OUT;
+    }
 
     if( !newname || !newname[0] || strchr( newname, TR_PATH_DELIMITER )
         || !strcmp( newname, "." ) || !strcmp( newname,  ".." ) )
-        return EINVAL;
-
-    tr_torrentLock( tor );
+    {
+        err = EINVAL;
+        goto OUT;
+    }
 
     info = &tor->info;
     oldname = tr_torrentName( tor );
@@ -3007,18 +3012,11 @@ tr_torrentRename( tr_torrent * tor, const char * newname )
             if( fileExists( newpath ) )
             {
                 err = EEXIST;
-                /* %1$s is the original file name.
-                 * %2$s is the new file name.
-                 * %3$s is the error message. */
-                tr_torerr( tor, _( "Cannot rename \"%1$s\" to \"%2$s\": %3$s" ),
-                           oldpath, newpath, tr_strerror( err ) );
                 goto OUT;
             }
             if( rename( oldpath, newpath ) == -1 )
             {
                 err = errno;
-                tr_torerr( tor, _( "Error renaming \"%1$s\" to \"%2$s\": %3$s" ),
-                           oldpath, newpath, tr_strerror( err ) );
                 goto OUT;
             }
         }
@@ -3044,15 +3042,11 @@ tr_torrentRename( tr_torrent * tor, const char * newname )
             if( fileExists( newpath ) )
             {
                 err = EEXIST;
-                tr_torerr( tor, _( "Cannot rename \"%1$s\" to \"%2$s\": %3$s" ),
-                           oldpath, newpath, tr_strerror( err ) );
                 goto OUT;
             }
             if( rename( oldpath, newpath ) == -1 )
             {
                 err = errno;
-                tr_torerr( tor, _( "Error renaming \"%1$s\" to \"%2$s\": %3$s" ),
-                           oldpath, newpath, tr_strerror( err ) );
                 goto OUT;
             }
         }
@@ -3068,6 +3062,30 @@ tr_torrentRename( tr_torrent * tor, const char * newname )
     tr_torrentSetDirty( tor );
 
 OUT:
+    if( err )
+    {
+        const char * es = tr_strerror( err ), * fmt;
+        if( oldpath && newpath )
+        {
+            /* %1$s is the original file path.
+             * %2$s is the new file path.
+             * %3$s is the error message. */
+            fmt = _( "Cannot rename \"%1$s\" to \"%2$s\": %3$s" );
+            tr_torerr( tor, fmt, oldpath, newpath, es );
+        }
+        else if( oldpath )
+        {
+            /* %1$s is the existing file name.
+             * %2$s is the error message. */
+            fmt = _( "Cannot rename \"%1$s\": %2$s" );
+            tr_torerr( tor, fmt, oldpath, es );
+        }
+        else
+        {
+            fmt = _( "Cannot rename torrent: %s" );
+            tr_torerr( tor, fmt, es );
+        }
+    }
     tr_torrentUnlock( tor );
     tr_free( oldpath );
     tr_free( newpath );

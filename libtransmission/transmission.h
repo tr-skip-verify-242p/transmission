@@ -1137,10 +1137,9 @@ void tr_torrentSetLocation( tr_torrent  * torrent,
  * the new location.
  *
  * For single file torrents, the file itself will be renamed to
- * @newname.
+ * @a newname.
  *
- * If the torrent does not have a toplevel directory for some reason,
- * or the torrent has incomplete metadata, this function does nothing.
+ * If the torrent has incomplete metadata, @a ENOENT is returned.
  *
  * If no errors occur, the new name will be accessible via
  * tr_torrentName() while the original will be in @a torrent->info.name.
@@ -1160,6 +1159,7 @@ void tr_torrentSetLocation( tr_torrent  * torrent,
  *       @a torrent->info.rename.
  *
  * @see tr_torrentName()
+ * @see tr_torrentHasMetadata()
  */
 int tr_torrentRename( tr_torrent * torrent, const char * newname );
 
