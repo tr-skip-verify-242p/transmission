@@ -2962,8 +2962,7 @@ static tr_bool
 fileExists( const char * filename )
 {
     struct stat sb;
-    const tr_bool ok = !stat( filename, &sb );
-    return ok;
+    return stat( filename, &sb ) == 0;
 }
 
 int
