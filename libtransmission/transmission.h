@@ -1220,6 +1220,7 @@ const tr_info * tr_torrentInfo( const tr_torrent * torrent );
 void tr_torrentSetDownloadDir( tr_torrent  * torrent, const char * path );
 
 const char * tr_torrentGetDownloadDir( const tr_torrent * torrent );
+int64_t tr_torrentGetDownloadDirFreeSpace( const tr_torrent * tor );
 
 /**
  * Returns the root directory of where the torrent is.

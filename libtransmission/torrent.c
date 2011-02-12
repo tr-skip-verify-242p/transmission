@@ -1016,6 +1016,14 @@ tr_torrentGetDownloadDir( const tr_torrent * tor )
     return tor->downloadDir;
 }
 
+int64_t
+tr_torrentGetDownloadDirFreeSpace( const tr_torrent * tor )
+{
+    assert( tr_isTorrent( tor  ) );
+
+    return tr_getFreeSpace( tor->downloadDir );
+}
+
 const char *
 tr_torrentGetCurrentDir( const tr_torrent * tor )
 {
