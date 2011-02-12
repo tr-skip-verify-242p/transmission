@@ -30,7 +30,7 @@
 #define _TR_ANNOUNCER_UDP_H_
 
 typedef struct au_context au_context;
-au_context * au_context_new( );
+au_context * au_context_new( tr_session * session );
 void au_context_free( au_context * );
 void au_context_periodic( au_context * );
 
