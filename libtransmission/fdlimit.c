@@ -401,9 +401,8 @@ cached_file_open( struct tr_cached_file  * o,
         if( ftruncate( o->fd, file_size ) == -1 )
         {
             const int err = errno;
-            tr_err( _( "Couldn't truncate file \"%1$s\": %2$s" ),
-                    filename, tr_strerror( err ) );
-            /* Continue anyway. */
+            tr_err( _( "Couldn't truncate \"%1$s\": %2$s" ), filename, tr_strerror( err ) );
+            return err;
         }
     }
 
@@ -794,7 +793,7 @@ tr_fdSetPeerLimit( tr_session * session, int socket_limit )
 #endif
     gFd->public_socket_limit = socket_limit;
 
-    tr_dbg( "socket limit is %d", (int)gFd->socket_limit );
+    tr_dbg( "socket limit is %d", gFd->socket_limit );
 }
 
 int
