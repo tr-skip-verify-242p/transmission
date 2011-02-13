@@ -87,7 +87,7 @@ checkOperation( tr_torrent * tor, const tr_file * file,
 
     assert( mode == TR_IO_WRITE );
 
-    if( file->exists )
+    if( file->exists && !file->usept )
     {
         tr_torrentSetLocalError( tor, fmt, path );
         return ENOENT;

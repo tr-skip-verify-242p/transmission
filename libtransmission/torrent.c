@@ -786,7 +786,7 @@ updateFileExistence( tr_torrent * tor )
     {
         tr_file * file = &tor->info.files[fi];
         file->exists = tr_torrentFindFile2( tor, fi, NULL, NULL );
-        if( file->exists )
+        if( file->exists || file->usept )
             continue;
         for( pi = file->firstPiece; pi <= file->lastPiece; ++pi )
         {
