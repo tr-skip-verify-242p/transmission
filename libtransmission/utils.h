@@ -101,7 +101,7 @@ const char * tr_strip_positional_args( const char * fmt );
 
 /* #define DISABLE_GETTEXT */
 #ifndef DISABLE_GETTEXT
- #if defined(WIN32) || defined(TR_EMBEDDED)
+ #if defined(WIN32) || defined(TR_LIGHTWEIGHT)
    #define DISABLE_GETTEXT
  #endif
 #endif
@@ -323,13 +323,13 @@ void evbuffer_ref_cleanup_tr_free( const void * data UNUSED, size_t datalen UNUS
 void* tr_memdup( const void * src, size_t byteCount );
 
 #define tr_new( struct_type, n_structs )           \
-    ( (struct_type *) tr_malloc ( ( (size_t) sizeof ( struct_type ) ) * ( ( size_t) ( n_structs ) ) ) )
+    ( (struct_type *) tr_malloc ( sizeof ( struct_type ) * ( ( size_t) ( n_structs ) ) ) )
 
 #define tr_new0( struct_type, n_structs )          \
-    ( (struct_type *) tr_malloc0 ( ( (size_t) sizeof ( struct_type ) ) * ( ( size_t) ( n_structs ) ) ) )
+    ( (struct_type *) tr_malloc0 ( sizeof ( struct_type ) * ( ( size_t) ( n_structs ) ) ) )
 
 #define tr_renew( struct_type, mem, n_structs )    \
-    ( (struct_type *) realloc ( ( mem ), ( (size_t) sizeof ( struct_type ) ) * ( ( size_t) ( n_structs ) ) ) )
+    ( (struct_type *) realloc ( ( mem ), sizeof ( struct_type ) * ( ( size_t) ( n_structs ) ) ) )
 
 void* tr_valloc( size_t bufLen );
 

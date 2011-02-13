@@ -803,10 +803,10 @@ comparePieceByWeight( const void * va, const void * vb )
     /* primary key: weight */
     missing = tr_cpMissingBlocksInPiece( &tor->completion, a->index );
     pending = a->requestCount;
-    ia = missing > pending ? missing - pending : (int)(tor->blockCountInPiece + pending);
+    ia = missing > pending ? missing - pending : (tor->blockCountInPiece + pending);
     missing = tr_cpMissingBlocksInPiece( &tor->completion, b->index );
     pending = b->requestCount;
-    ib = missing > pending ? missing - pending : (int)(tor->blockCountInPiece + pending);
+    ib = missing > pending ? missing - pending : (tor->blockCountInPiece + pending);
     if( ia < ib ) return -1;
     if( ia > ib ) return 1;
 
@@ -2750,12 +2750,12 @@ rechokeUploads( Torrent * t, const uint64_t now )
 static void
 rechokePulse( int foo UNUSED, short bar UNUSED, void * vmgr )
 {
-    uint64_t now;
     tr_torrent * tor = NULL;
     tr_peerMgr * mgr = vmgr;
+    const uint64_t now = tr_sessionGetTimeMsec( mgr->session );
+
     managerLock( mgr );
 
-    now = tr_time_msec( );
     while(( tor = tr_torrentNext( mgr->session, tor ))) {
         if( tor->isRunning ) {
             rechokeUploads( tor->torrentPeers, now );
@@ -3113,7 +3113,7 @@ reconnectPulse( int foo UNUSED, short bar UNUSED, void * vmgr )
     tr_torrent * tor;
     tr_peerMgr * mgr = vmgr;
     const time_t now_sec = tr_time( );
-    const uint64_t now_msec = tr_time_msec( );
+    const uint64_t now_msec = tr_sessionGetTimeMsec( mgr->session );
 
     /**
     ***  enforce the per-session and per-torrent peer limits
