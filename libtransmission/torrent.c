@@ -747,9 +747,29 @@ tr_torrentGotNewInfoDict( tr_torrent * tor )
     tr_torrentFireMetadataCompleted( tor );
 }
 
-/** @return TRUE if files exist for all completed pieces. */
+/**
+ * Check that the piece completion status matches the
+ * existence of files in the filesystem. If pieces are
+ * complete but files containing those pieces do not exist,
+ * an error state is set by tr_torrentSetLocalError() and
+ * FALSE is returned.
+ *
+ * The file's @a exists fields are updated to match their
+ * current state of either being present or being absent in
+ * the filesystem.
+ *
+ * @return TRUE if files exist for all completed pieces.
+ *
+ * @note This function assumes that there is no data pending
+ *       in the file cache.
+ *
+ * @note This function will still return TRUE if files exist
+ *       when they should not according to piece completion.
+ *
+ * @see checkOperation()
+ */
 static tr_bool
-checkFilePieces( tr_torrent * tor )
+updateFileExistence( tr_torrent * tor )
 {
     const tr_completion * cp;
     tr_piece_index_t pi;
@@ -763,11 +783,13 @@ checkFilePieces( tr_torrent * tor )
     cp = &tor->completion;
     for( fi = 0; fi < tor->info.fileCount; ++fi )
     {
-        const tr_bool exists = tr_torrentFindFile2( tor, fi, NULL, NULL );
-        const tr_file * file = &tor->info.files[fi];
+        tr_file * file = &tor->info.files[fi];
+        file->exists = tr_torrentFindFile2( tor, fi, NULL, NULL );
+        if( file->exists )
+            continue;
         for( pi = file->firstPiece; pi <= file->lastPiece; ++pi )
         {
-            if( !exists && tr_cpPieceIsComplete( cp, pi ) )
+            if( tr_cpPieceIsComplete( cp, pi ) )
             {
                 tr_torrentSetLocalError( tor,
                     _( "Expected file not found: %s" ), file->name );
@@ -829,7 +851,7 @@ torrentInit( tr_torrent * tor, const tr_ctor * ctor )
     torrentInitFromInfo( tor );
     loaded = tr_torrentLoadResume( tor, ~0, ctor );
     tor->completeness = tr_cpGetStatus( &tor->completion );
-    checkFilePieces( tor );
+    updateFileExistence( tor );
 
     tr_ctorInitTorrentPriorities( ctor, tor );
     tr_ctorInitTorrentWanted( ctor, tor );
@@ -1614,7 +1636,7 @@ torrentStart( tr_torrent * tor )
     /* otherwise, start it now... */
     tr_sessionLock( tor->session );
 
-    if( !checkFilePieces( tor ) )
+    if( !updateFileExistence( tor ) )
         goto OUT;
 
     /* allow finished torrents to be resumed */
