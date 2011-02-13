@@ -1894,16 +1894,9 @@ gtr_actions_handler( const char * action_name, gpointer user_data )
         tr_torrent * tor;
         if( ( tor = getFirstSelectedTorrent( data ) ) )
         {
-            GtkWindow * parent = data->wind;
-            TrCore * core = data->core;
-            GtkWidget * w = gtr_rename_top_dialog_new( parent, core, tor );
-            if( gtk_dialog_run( GTK_DIALOG( w ) ) == GTK_RESPONSE_APPLY )
-            {
-                const char * newname;
-                newname = gtr_rename_top_dialog_get_new_name( w );
-                tr_torrentRename( tor, newname );
-            }
-            gtk_widget_destroy( w );
+            GtkWidget * w;
+            w = gtr_rename_dialog_new( data->wind, data->core, tor );
+            gtr_window_present( GTK_WINDOW( w ) );
         }
     }
     else if( !strcmp( action_name, "start-torrent" ) )
