@@ -2222,13 +2222,7 @@ tr_torrentInitFileName( tr_torrent *    tor,
 ***
 **/
 
-static tr_bool
-fileExists( const char * filename )
-{
-    struct stat sb;
-    const tr_bool ok = !stat( filename, &sb );
-    return ok;
-}
+static tr_bool fileExists( const char * filename );
 
 tr_bool
 tr_torrentFindPieceTemp2( const tr_torrent  * tor,
