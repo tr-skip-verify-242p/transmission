@@ -740,13 +740,16 @@ tr_torrentGotNewInfoDict( tr_torrent * tor )
 static tr_bool
 checkFilePieces( tr_torrent * tor )
 {
-    const tr_completion * cp = &tor->completion;
+    const tr_completion * cp;
     tr_piece_index_t pi;
     tr_file_index_t fi;
+
+    assert( tr_torrentIsLocked( tor ) );
 
     if( !tr_torrentHasMetadata( tor ) )
         return TRUE;
 
+    cp = &tor->completion;
     for( fi = 0; fi < tor->info.fileCount; ++fi )
     {
         const tr_bool exists = tr_torrentFindFile2( tor, fi, NULL, NULL );
@@ -1583,9 +1586,6 @@ torrentStart( tr_torrent * tor )
     if( tor->isRunning )
         return;
 
-    if( !checkFilePieces( tor ) )
-        return;
-
     /* verifying right now... wait until that's done so
      * we'll know what completeness to use/announce */
     if( tor->verifyState != TR_VERIFY_NONE ) {
@@ -1595,6 +1595,9 @@ torrentStart( tr_torrent * tor )
 
     /* otherwise, start it now... */
     tr_sessionLock( tor->session );
+
+    if( !checkFilePieces( tor ) )
+        goto OUT;
 
     /* allow finished torrents to be resumed */
     if( tr_torrentIsSeedRatioDone( tor ) ) {
@@ -1613,6 +1616,7 @@ torrentStart( tr_torrent * tor )
     tr_torrentSetDirty( tor );
     tr_runInEventThread( tor->session, torrentStartImpl, tor );
 
+OUT:
     tr_sessionUnlock( tor->session );
 }
 
@@ -1826,7 +1830,7 @@ tr_torrentRemovePieceTemp( tr_torrent * tor )
         tr_list_append( &files, tr_strdup( path ) );
     }
 
-    for( l=files; l!=NULL; l=l->next )
+    for( l = files; l != NULL; l = l->next )
         deleteLocalFile( l->data, remove );
 
     tr_list_free( &files, tr_free );
@@ -2233,9 +2237,8 @@ tr_torrentFindPieceTemp2( const tr_torrent  * tor,
                           char             ** subpath )
 {
     const char * b = tor->pieceTempDir;
-    char       * s;
-    char       * filename;
-    tr_bool      exists = FALSE;
+    char * s, * filename;
+    tr_bool exists = FALSE;
 
     s = tr_strdup_printf( "%010u.dat", pieceIndex );
 
@@ -2258,8 +2261,7 @@ tr_torrentFindPieceTemp( const tr_torrent * tor,
                          tr_piece_index_t   pieceIndex )
 {
     const char * base;
-    char       * subpath;
-    char       * filename = NULL;
+    char * subpath, * filename = NULL;
 
     if( tr_torrentFindPieceTemp2( tor, pieceIndex, &base, &subpath ) )
     {
@@ -2351,7 +2353,7 @@ getFileOverlap( tr_torrent * tor,
 
 /**
  * @note This function assumes @a tor is valid and already locked, and
- *       @a fileIndex is a valid file index for the torrent.
+ *       @a file_index is a valid file index for the torrent.
  * @note When @a file->dnd is TRUE and @a dnd is FALSE, this function has
  *       the side effect of copying over data from temporary piece files
  *       to the destination file.
@@ -2434,7 +2436,7 @@ setFileDND( tr_torrent * tor, tr_file_index_t file_index, int8_t dnd )
      * - We can set the piece to DND if all files using
      *   that piece are DND.
      * - We can remove the temporary piece file if all
-     *   files using it have @a usept set to FALSE. */
+     *   files using it have 'usept' set to FALSE. */
 
     fpdnd = file->dnd;
     fpnopt = !file->usept;
