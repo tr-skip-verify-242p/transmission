@@ -57,6 +57,55 @@ enum { TR_IO_READ, TR_IO_PREFETCH,
        TR_IO_WRITE
 };
 
+/**
+ * Set a torrent error if the operation given by @a mode
+ * requires that the file exists.
+ *
+ * @return An errno value.
+ *
+ * @note This function assumes the file does not exist.
+ */
+static int
+checkOperation( tr_torrent * tor, const tr_file * file,
+                const char * path, int mode )
+{
+    const char * fmt = _( "Expected file not found: %s" );
+    const tr_completion * cp;
+    tr_piece_index_t pi;
+    int err;
+
+    if( mode == TR_IO_READ )
+    {
+        tr_torrentSetLocalError( tor, fmt, path );
+        return ENOENT;
+    }
+
+    if( mode == TR_IO_PREFETCH )
+    {
+        /* Allow prefetch to fail silently. */
+        return ENOENT;
+    }
+
+    assert( mode == TR_IO_WRITE );
+
+    err = 0;
+    cp = &tor->completion;
+
+    /* FIXME: Make this O(1). */
+    for( pi = file->firstPiece; pi <= file->lastPiece; ++pi )
+    {
+        if( tr_cpPieceIsComplete( cp, pi ) )
+        {
+            err = ENOENT;
+            break;
+        }
+    }
+
+    if( err )
+        tr_torrentSetLocalError( tor, fmt, path );
+    return err;
+}
+
 /* returns 0 on success, or an errno on failure */
 static int
 readOrWriteBytes( tr_session       * session,
@@ -113,22 +162,16 @@ readOrWriteBytes( tr_session       * session,
             preallocationMode = tor->session->preallocationMode;
 
         filename = tr_buildPath( base, subpath, NULL );
-        if( ioMode < TR_IO_WRITE && !fileExists )
+        if( !fileExists )
+            err = checkOperation( tor, file, filename, ioMode );
+        if( !err && ( fd = tr_fdFileCheckout( session, tor->uniqueId,
+                                              fileIndex, filename,
+                                              doWrite, preallocationMode,
+                                              file->length ) ) < 0 )
         {
-            err = ENOENT;
-            /* Allow prefetch to fail silently. */
-            if( ioMode == TR_IO_READ )
-                tr_torrentSetLocalError( tor,
-                    _( "Expected file not found: %s" ), filename );
-        }
-        else
-        {
-            if( ( fd = tr_fdFileCheckout( session, tor->uniqueId, fileIndex, filename,
-                                          doWrite, preallocationMode, file->length ) ) < 0 )
-            {
-                err = errno;
-                tr_torerr( tor, "tr_fdFileCheckout failed for \"%s\": %s", filename, tr_strerror( err ) );
-            }
+            err = errno;
+            tr_torerr( tor, "tr_fdFileCheckout failed for \"%s\": %s",
+                       filename, tr_strerror( err ) );
         }
 
         if( doWrite && !err )
