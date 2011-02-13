@@ -66,17 +66,12 @@ enum { TR_IO_READ, TR_IO_PREFETCH,
  * @note This function assumes the file does not exist.
  */
 static int
-checkOperation( tr_torrent * tor, const tr_file * file,
-                const char * path, int mode )
+checkOperation( tr_torrent * tor, const char * path, int mode )
 {
-    const char * fmt = _( "Expected file not found: %s" );
-    const tr_completion * cp;
-    tr_piece_index_t pi;
-    int err;
-
     if( mode == TR_IO_READ )
     {
-        tr_torrentSetLocalError( tor, fmt, path );
+        tr_torrentSetLocalError( tor,
+            _( "Expected file not found: %s" ), path );
         return ENOENT;
     }
 
@@ -88,22 +83,10 @@ checkOperation( tr_torrent * tor, const tr_file * file,
 
     assert( mode == TR_IO_WRITE );
 
-    err = 0;
-    cp = &tor->completion;
+    /* FIXME: Distinguish between creating a new file
+     * and writing to an existing one. */
 
-    /* FIXME: Make this O(1). */
-    for( pi = file->firstPiece; pi <= file->lastPiece; ++pi )
-    {
-        if( tr_cpPieceIsComplete( cp, pi ) )
-        {
-            err = ENOENT;
-            break;
-        }
-    }
-
-    if( err )
-        tr_torrentSetLocalError( tor, fmt, path );
-    return err;
+    return 0;
 }
 
 /* returns 0 on success, or an errno on failure */
@@ -163,7 +146,7 @@ readOrWriteBytes( tr_session       * session,
 
         filename = tr_buildPath( base, subpath, NULL );
         if( !fileExists )
-            err = checkOperation( tor, file, filename, ioMode );
+            err = checkOperation( tor, filename, ioMode );
         if( !err && ( fd = tr_fdFileCheckout( session, tor->uniqueId,
                                               fileIndex, filename,
                                               doWrite, preallocationMode,
