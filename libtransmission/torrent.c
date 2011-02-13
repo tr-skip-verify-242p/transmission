@@ -751,13 +751,16 @@ tr_torrentGotNewInfoDict( tr_torrent * tor )
 static tr_bool
 checkFilePieces( tr_torrent * tor )
 {
-    const tr_completion * cp = &tor->completion;
+    const tr_completion * cp;
     tr_piece_index_t pi;
     tr_file_index_t fi;
+
+    assert( tr_torrentIsLocked( tor ) );
 
     if( !tr_torrentHasMetadata( tor ) )
         return TRUE;
 
+    cp = &tor->completion;
     for( fi = 0; fi < tor->info.fileCount; ++fi )
     {
         const tr_bool exists = tr_torrentFindFile2( tor, fi, NULL, NULL );
@@ -1601,9 +1604,6 @@ torrentStart( tr_torrent * tor )
     if( tor->isRunning )
         return;
 
-    if( !checkFilePieces( tor ) )
-        return;
-
     /* verifying right now... wait until that's done so
      * we'll know what completeness to use/announce */
     if( tor->verifyState != TR_VERIFY_NONE ) {
@@ -1613,6 +1613,9 @@ torrentStart( tr_torrent * tor )
 
     /* otherwise, start it now... */
     tr_sessionLock( tor->session );
+
+    if( !checkFilePieces( tor ) )
+        goto OUT;
 
     /* allow finished torrents to be resumed */
     if( tr_torrentIsSeedRatioDone( tor ) ) {
@@ -1631,6 +1634,7 @@ torrentStart( tr_torrent * tor )
     tr_torrentSetDirty( tor );
     tr_runInEventThread( tor->session, torrentStartImpl, tor );
 
+OUT:
     tr_sessionUnlock( tor->session );
 }
 
