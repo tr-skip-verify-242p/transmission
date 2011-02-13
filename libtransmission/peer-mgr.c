@@ -1455,18 +1455,12 @@ peerCallbackFunc( tr_peer * peer, const tr_peer_event * e, void * vt )
                     const tr_piece_index_t p = e->pieceIndex;
                     const tr_bool ok = tr_torrentCheckPiece( tor, p );
 
-                    tordbg( t, "[LAZY] checked just-completed piece %zu", (size_t)p );
+                    tr_peerMgrSetBlame( tor, p, ok );
 
                     if( !ok )
                     {
                         tr_torerr( tor, _( "Piece %lu, which was just downloaded, failed its checksum test" ),
                                    (unsigned long)p );
-                    }
-
-                    tr_peerMgrSetBlame( tor, p, ok );
-
-                    if( !ok )
-                    {
                         gotBadPiece( t, p );
                     }
                     else

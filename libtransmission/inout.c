@@ -58,6 +58,55 @@ enum { TR_IO_READ, TR_IO_PREFETCH,
 };
 
 /**
+ * Set a torrent error if the operation given by @a mode
+ * requires that the file exists.
+ *
+ * @return An errno value.
+ *
+ * @note This function assumes the file does not exist.
+ */
+static int
+checkOperation( tr_torrent * tor, const tr_file * file,
+                const char * path, int mode )
+{
+    const char * fmt = _( "Expected file not found: %s" );
+    const tr_completion * cp;
+    tr_piece_index_t pi;
+    int err;
+
+    if( mode == TR_IO_READ )
+    {
+        tr_torrentSetLocalError( tor, fmt, path );
+        return ENOENT;
+    }
+
+    if( mode == TR_IO_PREFETCH )
+    {
+        /* Allow prefetch to fail silently. */
+        return ENOENT;
+    }
+
+    assert( mode == TR_IO_WRITE );
+
+    err = 0;
+    cp = &tor->completion;
+
+    /* FIXME: Make this O(1). */
+    for( pi = file->firstPiece; pi <= file->lastPiece; ++pi )
+    {
+        if( tr_cpPieceIsComplete( cp, pi ) )
+        {
+            err = ENOENT;
+            break;
+        }
+    }
+
+    if( err )
+        tr_torrentSetLocalError( tor, fmt, path );
+    return err;
+}
+
+/**
  * @return 0 on success, or an errno on failure.
  *
  * @note If @a tor->info.files[fileIndex]->usept is TRUE the IO
@@ -120,7 +169,7 @@ readOrWriteBytes( tr_session       * session,
     {
         /* the fd cache doesn't have this file...
          * we'll need to open it and maybe create it */
-        char * subpath;
+        char * subpath, * filename = NULL;
         const char * base;
         tr_bool fileExists;
         tr_preallocation_mode preallocationMode;
@@ -151,39 +200,35 @@ readOrWriteBytes( tr_session       * session,
         else
             preallocationMode = tor->session->preallocationMode;
 
-        if( ( ioMode < TR_IO_WRITE ) && !fileExists ) /* does file exist? */
+        filename = tr_buildPath( base, subpath, NULL );
+        if( !fileExists )
+            err = checkOperation( tor, file, filename, ioMode );
+        if( !err && ( fd = tr_fdFileCheckout( session, tor->uniqueId,
+                                              indexNum, indexType,
+                                              filename, doWrite,
+                                              preallocationMode,
+                                              desiredSize ) ) < 0 )
         {
-            err = ENOENT;
-        }
-        else
-        {
-            char * filename = tr_buildPath( base, subpath, NULL );
-
-            if( ( fd = tr_fdFileCheckout( session, tor->uniqueId, indexNum,
-                                          indexType, filename, doWrite,
-                                          preallocationMode, desiredSize ) ) < 0 )
-            {
-                err = errno;
-                tr_torerr( tor, "tr_fdFileCheckout failed for \"%s\": %s", filename, tr_strerror( err ) );
-            }
-
-            tr_free( filename );
+            err = errno;
+            tr_torerr( tor, "tr_fdFileCheckout failed for \"%s\": %s",
+                       filename, tr_strerror( err ) );
         }
 
         if( doWrite && !err )
             tr_statsFileCreated( tor->session );
 
+        tr_free( filename );
         tr_free( subpath );
     }
-
-    /* check that the file corresponding to 'fd' still exists */
-    if( fd >= 0 )
+    else
     {
         struct stat sb;
-
+        /* Check that the file corresponding to 'fd' still exists. */
         if( !fstat( fd, &sb ) && sb.st_nlink < 1 )
         {
-            tr_torrentSetLocalError( tor, "Please Verify Local Data! A file disappeared: \"%s\"", file->name );
+            tr_torrentSetLocalError( tor,
+                _( "File deleted while still in cache: %s" ),
+                file->name );
             err = ENOENT;
         }
     }
@@ -313,7 +358,7 @@ readOrWritePiece( tr_torrent       * tor,
             fileOffset = 0;
         }
 
-        if( ( err != 0 ) && (ioMode == TR_IO_WRITE ) && ( tor->error != TR_STAT_LOCAL_ERROR ) )
+        if( err != 0 && ioMode != TR_IO_PREFETCH && tor->error != TR_STAT_LOCAL_ERROR )
         {
             char * path = tr_buildPath( tor->downloadDir, file->name, NULL );
             tr_torrentSetLocalError( tor, "%s (%s)", tr_strerror( err ), path );
