@@ -2469,6 +2469,7 @@ deleteDNDFile( tr_torrent      * tor,
     if( !path )
     {
         /* The file is already gone for some reason. */
+        file->exists = FALSE;
         return TRUE;
     }
 
@@ -2496,6 +2497,7 @@ deleteDNDFile( tr_torrent      * tor,
     tr_fdFileClose( tor->session, tor, file_index, TR_FD_INDEX_FILE );
     deleteLocalFile( path, removeFunc );
     tr_free( path );
+    file->exists = FALSE;
 
     /* Make subsequent writes to temporary piece files, if needed. */
     file->usept = TRUE;
