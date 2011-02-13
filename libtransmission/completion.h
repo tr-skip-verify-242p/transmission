@@ -40,12 +40,12 @@ typedef struct tr_completion
     uint16_t *  completeBlocks;
 
     /* total number of blocks that we want downloaded
-       DON'T access this directly; it's a lazy field. 
+       DON'T access this directly; it's a lazy field.
        Used by tr_cpBlocksMissing(). */
     tr_block_index_t    blocksWantedLazy;
 
     /* total number of completed blocks that we want downloaded
-       DON'T access this directly; it's a lazy field. 
+       DON'T access this directly; it's a lazy field.
        Used by tr_cpBlocksMissing(). */
     tr_block_index_t    blocksWantedCompleteLazy;
 

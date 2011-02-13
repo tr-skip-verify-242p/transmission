@@ -83,7 +83,7 @@ tr_cpBlocksMissing( const tr_completion * ccp )
         cp->blocksWantedCompleteLazy = complete;
         cp->blocksWantedIsDirty = FALSE;
     }
-    
+
     return ccp->blocksWantedLazy - ccp->blocksWantedCompleteLazy;
 }
 
@@ -190,10 +190,10 @@ tr_cpBlockAdd( tr_completion * cp, tr_block_index_t block )
             tr_bitfieldAdd( &cp->pieceBitfield, piece );
 
         tr_bitfieldAdd( &cp->blockBitfield, block );
-        
+
         if( !tor->info.pieces[piece].dnd )
             cp->blocksWantedCompleteLazy++;
-            
+
         cp->sizeNow += blockSize;
         cp->haveValidIsDirty = 1;
         cp->sizeWhenDoneIsDirty = 1;

@@ -728,14 +728,13 @@ requestListLookup( Torrent * t, tr_block_index_t block, const tr_peer * peer )
 
 /* find the peers are we currently requesting this block from and return
    the first count found. */
-static tr_peer **
-getBlockRequestPeers( Torrent * t, tr_block_index_t block, int * n )
+static void
+getBlockRequestPeers( Torrent * t, tr_block_index_t block, tr_ptrArray * peerArr )
 {
     tr_bool exact;
     int i, pos;
     struct block_request key;
-    tr_ptrArray peerArr = TR_PTR_ARRAY_INIT;
-    
+
     key.block = block;
     key.peer = NULL;
     pos = tr_lowerBound( &key, t->requests, t->requestCount,
@@ -747,12 +746,11 @@ getBlockRequestPeers( Torrent * t, tr_block_index_t block, int * n )
     for( i = pos; i < t->requestCount; i++ )
     {
         if( t->requests[i].block == block )
-            tr_ptrArrayAppend( &peerArr, t->requests[i].peer );
+            tr_ptrArrayAppend( peerArr, t->requests[i].peer );
         else
             break;
     }
 
-    return (tr_peer **) tr_ptrArrayPeek( &peerArr, n );
 }
 
 static void
@@ -1122,13 +1120,14 @@ tr_peerMgrGetNextRequests( tr_torrent           * tor,
             {
                 int peerCount;
                 tr_peer ** peers;
+                tr_ptrArray peerArr = TR_PTR_ARRAY_INIT;
 
                 /* don't request blocks we've already got */
                 if( tr_cpBlockIsCompleteFast( &tor->completion, b ) )
                     continue;
 
-                peers = (tr_peer **) getBlockRequestPeers( t, b, &peerCount );
-
+                getBlockRequestPeers( t, b, &peerArr );
+                peers = (tr_peer **) tr_ptrArrayPeek( &peerArr, &peerCount );
                 /* always add peer if this block has no peers yet */
                 if( peerCount != 0 )
                 {
@@ -1144,16 +1143,16 @@ tr_peerMgrGetNextRequests( tr_torrent           * tor,
                     if( peer == peers[0] )
                         continue;
 
-                    /* in the endgame allow an additional peer to download a 
-                       block but only if the peer seems to be handling requests 
+                    /* in the endgame allow an additional peer to download a
+                       block but only if the peer seems to be handling requests
                        relatively fast */
                     if( peer->pendingReqsToPeer + numwant - got < t->endgame )
                         continue;
                 }
 
+                tr_ptrArrayDestruct( &peerArr, FALSE );
                 /* update the caller's table */
                 setme[got++] = b;
-
                 /* update our own tables */
                 requestListAdd( t, b, peer );
                 ++p->requestCount;
@@ -1464,16 +1463,20 @@ peerCallbackFunc( tr_peer * peer, const tr_peer_event * e, void * vt )
             tr_block_index_t block = _tr_block( tor, e->pieceIndex, e->offset );
             int i, peerCount;
             tr_peer ** peers;
+            tr_ptrArray peerArr = TR_PTR_ARRAY_INIT;
 
             removeRequestFromTables( t, block, peer );
-            peers = (tr_peer **) getBlockRequestPeers( t, block, &peerCount );
-            
+            getBlockRequestPeers( t, block, &peerArr );
+            peers = (tr_peer **) tr_ptrArrayPeek( &peerArr, &peerCount );
+
             /* remove additional block requests and send cancel to peers */
             for( i = 0; i < peerCount; i++ ) {
                 tr_historyAdd( peers[i]->cancelsSentToPeer, tr_time( ), 1 );
                 tr_peerMsgsCancel( peer->msgs, block );
                 removeRequestFromTables( t, block, peers[i] );
             }
+
+            tr_ptrArrayDestruct( &peerArr, FALSE );
 
             if( peer && peer->blocksSentToClient )
                 tr_historyAdd( peer->blocksSentToClient, tr_time( ), 1 );
@@ -1626,7 +1629,7 @@ ensureAtomExists( Torrent           * t,
     {
         if( from < a->fromBest )
             a->fromBest = from;
-        
+
         if( a->seedProbability == -1 )
             atomSetSeedProbability( a, seedProbability );
 
