@@ -331,6 +331,11 @@ tr_cpMissingBlocksInPiece( const tr_completion * cp, tr_piece_index_t piece )
     return tr_torPieceCountBlocks( cp->tor, piece ) - cp->completeBlocks[piece];
 }
 
+int
+tr_cpCompleteBlocksInPiece( const tr_completion * cp, tr_piece_index_t piece )
+{
+    return cp->completeBlocks[piece];
+}
 
 tr_bool
 tr_cpPieceIsComplete( const tr_completion * cp, tr_piece_index_t piece )

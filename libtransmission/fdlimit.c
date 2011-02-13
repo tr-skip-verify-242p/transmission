@@ -323,7 +323,8 @@ struct tr_cached_file
     tr_bool          is_writable;
     int              fd;
     int              torrent_id;
-    tr_file_index_t  file_index;
+    uint32_t         index_num;
+    tr_fd_index_type index_type;
     time_t           used_at;
 };
 
@@ -432,7 +433,8 @@ static void
 fileset_construct( struct tr_fileset * set, int n )
 {
     struct tr_cached_file * o;
-    const struct tr_cached_file TR_CACHED_FILE_INIT = { 0, -1, 0, 0, 0 };
+    const struct tr_cached_file TR_CACHED_FILE_INIT
+        = { 0, -1, 0, 0, 0, TR_FD_INDEX_FILE };
 
     set->begin = tr_new( struct tr_cached_file, n );
     set->end = set->begin + n;
@@ -472,13 +474,15 @@ fileset_close_torrent( struct tr_fileset * set, int torrent_id )
 }
 
 static struct tr_cached_file *
-fileset_lookup( struct tr_fileset * set, int torrent_id, tr_file_index_t i )
+fileset_lookup( struct tr_fileset * set, int torrent_id,
+                uint32_t i, tr_fd_index_type it )
 {
     struct tr_cached_file * o;
 
     if( set != NULL )
         for( o=set->begin; o!=set->end; ++o )
-            if( ( torrent_id == o->torrent_id ) && ( i == o->file_index ) && cached_file_is_open( o ) )
+            if( ( torrent_id == o->torrent_id ) && ( i == o->index_num )
+                && ( it == o->index_type ) && cached_file_is_open( o ) )
                 return o;
 
     return NULL;
@@ -528,18 +532,21 @@ get_fileset( tr_session * session )
 }
 
 void
-tr_fdFileClose( tr_session * s, const tr_torrent * tor, tr_file_index_t i )
+tr_fdFileClose( tr_session * s, const tr_torrent * tor,
+                uint32_t i, tr_fd_index_type it )
 {
     struct tr_cached_file * o;
 
-    if(( o = fileset_lookup( get_fileset( s ), tr_torrentId( tor ), i )))
+    if(( o = fileset_lookup( get_fileset( s ), tr_torrentId( tor ), i, it )))
         cached_file_close( o );
 }
 
 int
-tr_fdFileGetCached( tr_session * s, int torrent_id, tr_file_index_t i, tr_bool writable )
+tr_fdFileGetCached( tr_session * s, int torrent_id, uint32_t i,
+                    tr_fd_index_type it, tr_bool writable )
 {
-    struct tr_cached_file * o = fileset_lookup( get_fileset( s ), torrent_id, i );
+    struct tr_cached_file * o = fileset_lookup( get_fileset( s ),
+                                                torrent_id, i, it );
 
     if( !o || ( writable && !o->is_writable ) )
         return -1;
@@ -558,14 +565,15 @@ tr_fdTorrentClose( tr_session * session, int torrent_id )
 int
 tr_fdFileCheckout( tr_session             * session,
                    int                      torrent_id,
-                   tr_file_index_t          i,
+                   uint32_t                 i,
+                   tr_fd_index_type         it,
                    const char             * filename,
                    tr_bool                  writable,
                    tr_preallocation_mode    allocation,
                    uint64_t                 file_size )
 {
     struct tr_fileset * set = get_fileset( session );
-    struct tr_cached_file * o = fileset_lookup( set, torrent_id, i );
+    struct tr_cached_file * o = fileset_lookup( set, torrent_id, i, it );
 
     if( o && writable && !o->is_writable )
         cached_file_close( o ); /* close it so we can reopen in rw mode */
@@ -586,7 +594,8 @@ tr_fdFileCheckout( tr_session             * session,
 
     dbgmsg( "checking out '%s'", filename );
     o->torrent_id = torrent_id;
-    o->file_index = i;
+    o->index_num = i;
+    o->index_type = it;
     o->used_at = tr_time( );
     return o->fd;
 }

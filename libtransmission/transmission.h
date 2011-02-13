@@ -1671,6 +1671,7 @@ typedef struct tr_file
     char *            name;        /* Path to the file */
     int8_t            priority;    /* TR_PRI_HIGH, _NORMAL, or _LOW */
     int8_t            dnd;         /* "do not download" flag */
+    int8_t            usept;       /* nonzero if using temporary piece files */
     tr_piece_index_t  firstPiece;  /* We need pieces [firstPiece... */
     tr_piece_index_t  lastPiece;   /* ...lastPiece] to dl this file */
     uint64_t          offset;      /* file begins at the torrent's nth byte */

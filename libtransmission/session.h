@@ -163,6 +163,7 @@ struct tr_session
     char *                       configDir;
     char *                       downloadDir;
     char *                       resumeDir;
+    char *                       pieceDir;
     char *                       torrentDir;
     char *                       incompleteDir;
 
