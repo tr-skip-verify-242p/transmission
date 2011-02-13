@@ -1815,6 +1815,7 @@ typedef struct tr_file
     tr_piece_index_t  firstPiece;  /* We need pieces [firstPiece... */
     tr_piece_index_t  lastPiece;   /* ...lastPiece] to dl this file */
     uint64_t          offset;      /* file begins at the torrent's nth byte */
+    int8_t            exists;      /* file should exist in filesystem */
 }
 tr_file;
 

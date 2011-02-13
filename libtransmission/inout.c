@@ -61,17 +61,21 @@ enum { TR_IO_READ, TR_IO_PREFETCH,
  * Set a torrent error if the operation given by @a mode
  * requires that the file exists.
  *
- * @return An errno value.
+ * @return Zero on success otherwise an errno value.
  *
- * @note This function assumes the file does not exist.
+ * @note This function assumes that it has already been
+ *       determined that the file does not exist in the
+ *       filesystem.
  */
 static int
-checkOperation( tr_torrent * tor, const char * path, int mode )
+checkOperation( tr_torrent * tor, const tr_file * file,
+                const char * path, int mode )
 {
+    const char * fmt = _( "Expected file not found: %s" );
+
     if( mode == TR_IO_READ )
     {
-        tr_torrentSetLocalError( tor,
-            _( "Expected file not found: %s" ), path );
+        tr_torrentSetLocalError( tor, fmt, path );
         return ENOENT;
     }
 
@@ -83,8 +87,11 @@ checkOperation( tr_torrent * tor, const char * path, int mode )
 
     assert( mode == TR_IO_WRITE );
 
-    /* FIXME: Distinguish between creating a new file
-     * and writing to an existing one. */
+    if( file->exists && !file->usept )
+    {
+        tr_torrentSetLocalError( tor, fmt, path );
+        return ENOENT;
+    }
 
     return 0;
 }
@@ -185,7 +192,8 @@ readOrWriteBytes( tr_session       * session,
 
         filename = tr_buildPath( base, subpath, NULL );
         if( !fileExists )
-            err = checkOperation( tor, filename, ioMode );
+            err = checkOperation( tor, file, filename, ioMode );
+
         if( !err && ( fd = tr_fdFileCheckout( session, tor->uniqueId,
                                               indexNum, indexType,
                                               filename, doWrite,
