@@ -350,30 +350,6 @@ tr_addressUnpack( tr_address * dst, int type, const void * addr )
 }
 
 int
-tr_netRecvFrom( int socket, uint8_t * buffer, size_t buflen,
-                tr_address * setme_addr, tr_port * setme_port )
-{
-    struct sockaddr_storage ss;
-    socklen_t sslen = sizeof( ss );
-    tr_address addr = tr_inaddr_any;
-    tr_port port = 0;
-    int rv;
-
-    rv = recvfrom( socket, buffer, buflen, 0,
-                   (struct sockaddr *) &ss, &sslen );
-
-    if( rv >= 0 )
-        tr_addressUnpackSockaddr( &addr, &port, &ss, sslen );
-
-    if( setme_addr )
-        *setme_addr = addr;
-    if( setme_port )
-        *setme_port = port;
-
-    return rv;
-}
-
-int
 tr_netSendTo( int socket, const void * buffer, size_t buflen,
               const tr_address * addr, tr_port port )
 {

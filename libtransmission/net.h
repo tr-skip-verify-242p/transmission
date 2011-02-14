@@ -123,9 +123,6 @@ int  tr_netSetTOS( int s,
 
 int tr_netSetCongestionControl( int s, const char *algorithm );
 
-int tr_netRecvFrom( int socket, uint8_t * buffer, size_t buflen,
-                    tr_address * setme_addr, tr_port * setme_port );
-
 int tr_netSendTo( int socket, const void * buffer, size_t buflen,
                   const tr_address * addr, tr_port port );
 
