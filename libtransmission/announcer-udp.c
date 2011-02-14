@@ -869,8 +869,10 @@ au_context_transmit( au_context * c, au_transaction * t )
     {
         const int err = evutil_socket_geterror( socket );
         const char * errstr = evutil_socket_error_to_string( err );
+        char astr[128];
         au_transaction_error( t,
-            _( "Failed to send UDP packet: %s" ), errstr );
+            _( "Failed to send UDP packet to %s:%d: %s" ),
+            tr_ntop( &addr, astr, sizeof( astr ) ), port, errstr );
         return;
     }
     au_transaction_sent( t );
