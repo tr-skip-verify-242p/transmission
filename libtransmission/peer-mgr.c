@@ -205,10 +205,12 @@ typedef struct tr_torrent_peers
     int                        maxPeers;
     time_t                     lastCancel;
 
-    /* Before the endgame this should be 0. In the endgame it is >0 and contains
-       the average number of pending request per peer. Only peers that have more
-       pending requests are considered 'fast' and are allowed download a block
-       that is already being downloaded by another (possibly slow) peer */
+    /* Before the endgame this should be 0. In the endgame
+     * it is >0 and contains the average number of pending
+     * request per peer. Only peers that have more pending
+     * requests are considered 'fast' and are allowed to
+     * download a block that is already being downloaded
+     * by another (possibly slow) peer. */
     int                        endgame;
 }
 Torrent;
@@ -726,10 +728,13 @@ requestListLookup( Torrent * t, tr_block_index_t block, const tr_peer * peer )
                     compareReqByBlock );
 }
 
-/* find the peers are we currently requesting this block from and return
-   the first count found. */
+/**
+ * Find the peers are we currently requesting the block
+ * with index @a block from and append them to @a peerArr.
+ */
 static void
-getBlockRequestPeers( Torrent * t, tr_block_index_t block, tr_ptrArray * peerArr )
+getBlockRequestPeers( Torrent * t, tr_block_index_t block,
+                      tr_ptrArray * peerArr )
 {
     tr_bool exact;
     int i, pos;
@@ -743,14 +748,12 @@ getBlockRequestPeers( Torrent * t, tr_block_index_t block, tr_ptrArray * peerArr
 
     assert( !exact ); /* shouldn't have a request with .peer == NULL */
 
-    for( i = pos; i < t->requestCount; i++ )
+    for( i = pos; i < t->requestCount; ++i )
     {
-        if( t->requests[i].block == block )
-            tr_ptrArrayAppend( peerArr, t->requests[i].peer );
-        else
+        if( t->requests[i].block != block )
             break;
+        tr_ptrArrayAppend( peerArr, t->requests[i].peer );
     }
-
 }
 
 static void
@@ -1149,10 +1152,10 @@ tr_peerMgrGetNextRequests( tr_torrent           * tor,
                     if( peer->pendingReqsToPeer + numwant - got < t->endgame )
                         continue;
                 }
-
                 tr_ptrArrayDestruct( &peerArr, FALSE );
                 /* update the caller's table */
                 setme[got++] = b;
+
                 /* update our own tables */
                 requestListAdd( t, b, peer );
                 ++p->requestCount;
@@ -1629,7 +1632,7 @@ ensureAtomExists( Torrent           * t,
     {
         if( from < a->fromBest )
             a->fromBest = from;
-
+        
         if( a->seedProbability == -1 )
             atomSetSeedProbability( a, seedProbability );
 

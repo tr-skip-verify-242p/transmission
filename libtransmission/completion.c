@@ -35,7 +35,7 @@ tr_completion *
 tr_cpConstruct( tr_completion * cp, tr_torrent * tor )
 {
     cp->tor = tor;
-    cp->completeBlocks = tr_new( uint16_t, tor->info.pieceCount );
+    cp->completeBlocks  = tr_new( uint16_t, tor->info.pieceCount );
     tr_bitfieldConstruct( &cp->blockBitfield, tor->blockCount );
     tr_bitfieldConstruct( &cp->pieceBitfield, tor->info.pieceCount );
     tr_cpReset( cp );
@@ -191,10 +191,10 @@ tr_cpBlockAdd( tr_completion * cp, tr_block_index_t block )
 
         tr_bitfieldAdd( &cp->blockBitfield, block );
 
+        cp->sizeNow += blockSize;
         if( !tor->info.pieces[piece].dnd )
             cp->blocksWantedCompleteLazy++;
 
-        cp->sizeNow += blockSize;
         cp->haveValidIsDirty = 1;
         cp->sizeWhenDoneIsDirty = 1;
     }
@@ -214,7 +214,6 @@ tr_cpSetHaveAll( tr_completion * cp )
     tr_bitfieldAddRange( &cp->pieceBitfield, 0, tor->info.pieceCount );
     for( i=0; i<tor->info.pieceCount; ++i )
         cp->completeBlocks[i] = tr_torPieceCountBlocks( tor, i );
-
     cp->sizeWhenDoneIsDirty = 1;
     cp->blocksWantedIsDirty = 1;
     cp->haveValidIsDirty = 1;
