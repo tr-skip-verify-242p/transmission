@@ -553,7 +553,7 @@ au_state_check_connection( au_state * s, time_t now )
         if( au_transaction_has_error( t ) )
         {
             errstr = tr_strdup_printf(
-                    _( "Connection error: %s" ), t->errstr );
+                _( "Connection error: %s" ), t->errstr );
         }
         else if( au_transaction_has_timeout( t ) )
         {
