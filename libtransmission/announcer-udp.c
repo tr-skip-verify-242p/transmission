@@ -188,7 +188,7 @@ static void au_state_error( au_state * s,
 
 #define au_transaction_error( t, ... ) do { \
     au_transaction_error_full( t, __LINE__, __VA_ARGS__ ); \
-} while ( 0 )
+} while( 0 )
 
 static void au_state_send( au_state * s, au_transaction * t );
 static tr_bool au_state_connect( au_state * s );
