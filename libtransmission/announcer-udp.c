@@ -168,16 +168,32 @@ typedef uint32_t annkey_t;
 typedef struct au_transaction au_transaction;
 typedef struct au_state au_state;
 
-static void au_transaction_error( au_transaction * t,
-                                  const char * fmt, ... )
-                                  TR_GNUC_PRINTF( 2, 3 );
+static void au_transaction_log_full( au_transaction * t,
+                                     tr_msg_level lev,
+                                     int line,
+                                     const char * fmt, ... )
+                                     TR_GNUC_PRINTF( 4, 5 );
+static void au_transaction_error_full( au_transaction * t,
+                                       int line,
+                                       const char * fmt, ... )
+                                       TR_GNUC_PRINTF( 3, 4 );
 static void au_state_error( au_state * s,
                             const char * fmt, ... )
                             TR_GNUC_PRINTF( 2, 3 );
 
+#define au_transaction_log( t, lev, ... ) do { \
+    if( tr_msgLoggingIsActive( lev ) ) \
+        au_transaction_log_full( t, lev, __LINE__, __VA_ARGS__ ); \
+} while( 0 )
+
+#define au_transaction_error( t, ... ) do { \
+    au_transaction_error_full( t, __LINE__, __VA_ARGS__ ); \
+} while ( 0 )
+
 static void au_state_send( au_state * s, au_transaction * t );
 static tr_bool au_state_connect( au_state * s );
 static tr_session * au_state_get_session( const au_state * s );
+static const char * au_state_get_endpoint( const au_state * s );
 
 static au_transaction * au_context_get_transaction( au_context * c, tnid_t id );
 static void au_context_add_transaction( au_context * c, au_transaction * t );
@@ -257,8 +273,64 @@ au_transaction_is_valid( const au_transaction * t )
     return t && t->id != 0 && t->state != 0;
 }
 
+static int
+au_transaction_get_action( au_transaction * t )
+{
+    const auP_request_header * hdr;
+    if( !au_transaction_is_valid( t ) || !t->pkt
+        || evbuffer_get_length( t->pkt ) < sizeof( *hdr ) )
+    {
+        return -1;
+    }
+    hdr = (const auP_request_header *) evbuffer_pullup( t->pkt, -1 );
+    return ntohl( hdr->action );
+}
+
 static void
-au_transaction_error( au_transaction * t, const char * fmt, ... )
+au_transaction_log_full( au_transaction * t, tr_msg_level lev,
+                         int line, const char * fmt, ... )
+{
+    char buf[1024], loc[256];
+    const char * endpoint, * mfmt;
+    va_list ap;
+
+    va_start( ap, fmt );
+    evutil_vsnprintf( buf, sizeof( buf ), fmt, ap );
+    va_end( ap );
+
+    endpoint = t ? au_state_get_endpoint( t->state ) : NULL;
+    if( endpoint )
+    {
+        tr_snprintf( loc, sizeof( loc ),
+                     _( "UDP Announcer (%s)" ), endpoint );
+    }
+    else
+    {
+        tr_strlcpy( loc, _( "UDP Announcer" ), sizeof( loc ) );
+    }
+
+    switch( au_transaction_get_action( t ) )
+    {
+        case AUC_ACTION_CONNECT:
+            mfmt = _( "Connect transaction (ID %08x): %s" );
+            break;
+        case AUC_ACTION_ANNOUNCE:
+            mfmt = _( "Announce transaction (ID %08x): %s" );
+            break;
+        case AUC_ACTION_SCRAPE:
+            mfmt = _( "Scrape transaction (ID %08x): %s" );
+            break;
+        default:
+            mfmt = _( "Transaction (ID %08x): %s" );
+            break;
+    }
+
+    tr_msg( __FILE__, line, lev, loc, mfmt, t ? t->id : 0, buf );
+}
+
+static void
+au_transaction_error_full( au_transaction * t, int line,
+                           const char * fmt, ... )
 {
     char buf[1024];
     va_list ap;
@@ -269,7 +341,7 @@ au_transaction_error( au_transaction * t, const char * fmt, ... )
 
     tr_free( t->errstr );
     t->errstr = tr_strdup( buf );
-    tr_nerr( "UDP Announcer", "Transaction error: %s", buf );
+    au_transaction_log_full( t, TR_MSG_ERR, line, "%s", t->errstr );
 }
 
 static tr_bool
@@ -284,14 +356,8 @@ au_transaction_has_timeout( const au_transaction * t )
     return t->retries >= AUC_MAXIMUM_RETRY_COUNT;
 }
 
-static void
-au_transaction_set_timeout( au_transaction * t )
-{
-    t->retries = AUC_MAXIMUM_RETRY_COUNT;
-}
-
 static tr_bool
-au_transaction_inactive( const au_transaction * t )
+au_transaction_is_inactive( const au_transaction * t )
 {
     return !au_transaction_is_valid( t )
         || au_transaction_has_error( t )
@@ -320,6 +386,12 @@ au_transaction_notify( au_transaction * t, const void * data, size_t len )
     t->cbdata = NULL;
 }
 
+static time_t
+au_transaction_get_ttl( const au_transaction * t )
+{
+    return AUC_RESPONSE_TIMEOUT_INIT * ( 1 << t->retries );
+}
+
 static void
 au_transaction_check_timeout( au_transaction * t, time_t now )
 {
@@ -335,15 +407,23 @@ au_transaction_check_timeout( au_transaction * t, time_t now )
     if( !t->send_ts )
         return;
 
-    if( now - t->send_ts < AUC_RESPONSE_TIMEOUT_INIT * ( 1 << t->retries ) )
+    if( now - t->send_ts < au_transaction_get_ttl( t ) )
         return;
 
     t->retries++;
 
     if( au_transaction_has_timeout( t ) )
+    {
         au_transaction_notify( t, NULL, 0 );
+    }
     else
+    {
+        au_transaction_log( t, TR_MSG_DBG,
+            _( "Retrying after timeout on attempt %d "
+               "(next timeout in %d seconds)" ),
+            t->retries, (int) au_transaction_get_ttl( t ) );
         au_state_send( t->state, t );
+    }
 }
 
 static void
@@ -415,6 +495,12 @@ au_state_get_session( const au_state * s )
     return au_context_get_session( s->context );
 }
 
+static const char *
+au_state_get_endpoint( const au_state * s )
+{
+    return s ? s->endpoint : NULL;
+}
+
 static tr_bool
 au_state_is_connecting( const au_state * s )
 {
@@ -443,23 +529,46 @@ au_state_flush( au_state * s )
 }
 
 static void
-au_state_check_connected( au_state * s, time_t now )
+au_state_check_connection( au_state * s, time_t now )
 {
+    au_transaction * t;
+    char * errstr = NULL;
+
     if( au_state_is_connected( s )
         && now - s->con_ts > AUC_CONNECTION_EXPIRE_TIME )
-        s->con_id = 0;
-
-    if( au_state_is_connecting( s ) )
     {
-        au_transaction * t;
-        t = au_context_get_transaction( s->context, s->con_tid );
-        if( au_transaction_inactive( t ) )
+        s->con_id = 0;
+        return;
+    }
+
+    if( !au_state_is_connecting( s ) )
+        return;
+
+    t = au_context_get_transaction( s->context, s->con_tid );
+    if( !au_transaction_is_inactive( t ) )
+        return;
+
+    if( au_transaction_is_valid( t ) )
+    {
+        if( au_transaction_has_error( t ) )
         {
-            s->con_tid = 0;
-            while( ( t = tr_list_pop_front( &s->queue ) ) )
-                au_transaction_set_timeout( t );
+            errstr = tr_strdup_printf(
+                    _( "Connection error: %s" ), t->errstr );
+        }
+        else if( au_transaction_has_timeout( t ) )
+        {
+            errstr = tr_strdup( _( "Connection timed out" ) );
         }
     }
+    else
+    {
+        errstr = tr_strdup( _( "Connection failed" ) );
+    }
+
+    while( ( t = tr_list_pop_front( &s->queue ) ) )
+        au_transaction_error( t, "%s", errstr );
+    tr_free( errstr );
+    s->con_tid = 0;
 }
 
 static void
@@ -699,20 +808,20 @@ au_context_periodic( au_context * c )
     au_transaction * t;
     int i;
 
-    for( i = 0; i < tr_ptrArraySize( &c->states ); ++i )
-    {
-        au_state * s = tr_ptrArrayNth( &c->states, i );
-        au_state_check_connected( s, now );
-    }
-
     for( i = 0; i < tr_ptrArraySize( &c->transactions ); ++i )
     {
         t = tr_ptrArrayNth( &c->transactions, i );
         au_transaction_check_timeout( t, now );
         if( au_transaction_has_error( t ) )
             au_transaction_notify( t, NULL, 0 );
-        if( au_transaction_inactive( t ) )
+        if( au_transaction_is_inactive( t ) )
             tr_list_append( &inactive, t );
+    }
+
+    for( i = 0; i < tr_ptrArraySize( &c->states ); ++i )
+    {
+        au_state * s = tr_ptrArrayNth( &c->states, i );
+        au_state_check_connection( s, now );
     }
 
     while( ( t = tr_list_pop_front( &inactive ) ) )
