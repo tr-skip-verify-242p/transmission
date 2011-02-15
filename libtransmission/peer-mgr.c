@@ -860,10 +860,10 @@ pieceListSort( Torrent * t, int mode )
 static int
 isInEndgame( const Torrent * t )
 {
-    const tr_torrent * tor = t->tor;
+    tr_torrent * tor = t->tor;
     tr_block_index_t blocksMissing;
-    int numDownloading = 0, size, i;
-    tr_peer ** peers;
+    int numDownloading = 0, i;
+    const tr_peer ** peers;
 
     blocksMissing = tr_cpBlocksMissing( &tor->completion );
     assert( t->requestCount >= 0 );
@@ -876,10 +876,9 @@ isInEndgame( const Torrent * t )
         return t->endgame;
 
     /* count number of downloading peers */
-    peers = (tr_peer **) tr_ptrArrayBase( &t->peers );
-    size = tr_ptrArraySize( &t->peers );
+    peers = (const tr_peer **) tr_ptrArrayBase( &t->peers );
 
-    for( i = 0; i < size; ++i )
+    for( i = 0; i < tr_ptrArraySize( &t->peers ); ++i )
         numDownloading += clientIsDownloadingFrom( tor, peers[i] );
 
     /* average number of pending requests per downloading peer */
@@ -1153,7 +1152,7 @@ tr_peerMgrGetNextRequests( tr_torrent           * tor,
                     rate = peer->pendingReqsToPeer + numwant - got;
                     passed = passed && rate >= t->endgame;
                 }
-                tr_ptrArrayDestruct( &peerArr, FALSE );
+                tr_ptrArrayDestruct( &peerArr, NULL );
                 if( !passed )
                     continue;
                 /* update the caller's table */
@@ -1468,21 +1467,22 @@ peerCallbackFunc( tr_peer * peer, const tr_peer_event * e, void * vt )
             tr_torrent * tor = t->tor;
             tr_block_index_t block = _tr_block( tor, e->pieceIndex, e->offset );
             int i, peerCount;
-            tr_peer ** peers;
+            const tr_peer ** peers;
             tr_ptrArray peerArr = TR_PTR_ARRAY_INIT;
 
             removeRequestFromTables( t, block, peer );
             getBlockRequestPeers( t, block, &peerArr );
-            peers = (tr_peer **) tr_ptrArrayPeek( &peerArr, &peerCount );
+            peers = (const tr_peer **) tr_ptrArrayPeek( &peerArr, &peerCount );
 
             /* remove additional block requests and send cancel to peers */
-            for( i = 0; i < peerCount; i++ ) {
+            for( i = 0; i < peerCount; ++i )
+            {
                 tr_historyAdd( peers[i]->cancelsSentToPeer, tr_time( ), 1 );
                 tr_peerMsgsCancel( peer->msgs, block );
                 removeRequestFromTables( t, block, peers[i] );
             }
 
-            tr_ptrArrayDestruct( &peerArr, FALSE );
+            tr_ptrArrayDestruct( &peerArr, NULL );
 
             if( peer && peer->blocksSentToClient )
                 tr_historyAdd( peer->blocksSentToClient, tr_time( ), 1 );
