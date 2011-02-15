@@ -447,6 +447,37 @@ decrReplicationFromBitset( Torrent * t, const tr_bitset * bitset )
     }
 }
 
+#if 0
+static void
+assertReplicationCountIsExact( Torrent * t )
+{
+    const tr_piece_index_t pieceCount = t->tor->info.pieceCount;
+    const int peerCount = tr_ptrArraySize( &t->peers );
+    size_t * replicationCount = tr_new0( size_t, pieceCount );
+    tr_piece_index_t itPiece;
+    int itPeer;
+
+    for( itPiece = 0; itPiece < pieceCount; ++itPiece )
+    {
+        for( itPeer = 0; itPeer < peerCount; ++itPeer )
+        {
+            const tr_peer * peer = tr_ptrArrayNth( &t->peers, itPeer );
+            const tr_bitset * b = &peer->have;
+            assert( ( b->haveAll && !b->haveNone )
+                    || ( !b->haveAll && b->haveNone )
+                    || b->bitfield.bitCount == pieceCount );
+            if( tr_bitsetHasFast( b, itPiece ) )
+                ++replicationCount[itPiece];
+        }
+        assert( t->pieceReplication[itPiece] == replicationCount[itPiece] );
+
+    }
+    tr_free( replicationCount );
+}
+#else
+#define assertReplicationCountIsExact( t )
+#endif
+
 /**
 ***
 **/
@@ -635,8 +666,6 @@ peerDestructor( Torrent * t, tr_peer * peer )
 
     tr_free( peer );
 }
-
-static void assertReplicationCountIsExact( Torrent * t );
 
 static void
 removePeer( Torrent * t, tr_peer * peer )
@@ -1139,11 +1168,11 @@ isInEndgame( Torrent * t )
 }
 
 /**
- * These functions are useful for sanity checking, but are too
- * expensive even for nightly builds. Let's leave them disabled
- * but add an easy hook to compile them back in.
+ * This function is useful for sanity checking,
+ * but is too expensive even for nightly builds...
+ * let's leave it disabled but add an easy hook to compile it back in
  */
-#if 1
+#if 0
 static void
 assertWeightedPiecesAreSorted( Torrent * t )
 {
@@ -1155,36 +1184,8 @@ assertWeightedPiecesAreSorted( Torrent * t )
             assert( comparePieceByWeight( &t->pieces[i], &t->pieces[i+1] ) <= 0 );
     }
 }
-
-static void
-assertReplicationCountIsExact( Torrent * t )
-{
-    const tr_piece_index_t pieceCount = t->tor->info.pieceCount;
-    const int peerCount = tr_ptrArraySize( &t->peers );
-    size_t * replicationCount = tr_new0( size_t, pieceCount );
-    tr_piece_index_t itPiece;
-    int itPeer;
-
-    for( itPiece = 0; itPiece < pieceCount; ++itPiece )
-    {
-        for( itPeer = 0; itPeer < peerCount; ++itPeer )
-        {
-            const tr_peer * peer = tr_ptrArrayNth( &t->peers, itPeer );
-            const tr_bitset * b = &peer->have;
-            assert( ( b->haveAll && !b->haveNone )
-                    || ( !b->haveAll && b->haveNone )
-                    || b->bitfield.bitCount == pieceCount );
-            if( tr_bitsetHasFast( b, itPiece ) )
-                ++replicationCount[itPiece];
-        }
-        assert( t->pieceReplication[itPiece] == replicationCount[itPiece] );
-
-    }
-    tr_free( replicationCount );
-}
 #else
 #define assertWeightedPiecesAreSorted(t)
-#define assertReplicationCountIsExact(t)
 #endif
 
 static struct weighted_piece *
