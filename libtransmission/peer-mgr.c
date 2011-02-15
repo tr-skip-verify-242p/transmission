@@ -1121,38 +1121,41 @@ tr_peerMgrGetNextRequests( tr_torrent           * tor,
 
             for( ; b!=e && got<numwant; ++b )
             {
-                int peerCount;
-                tr_peer ** peers;
                 tr_ptrArray peerArr = TR_PTR_ARRAY_INIT;
+                const tr_peer ** peers;
+                tr_bool passed = TRUE;
+                int peerCount;
 
                 /* don't request blocks we've already got */
                 if( tr_cpBlockIsCompleteFast( &tor->completion, b ) )
                     continue;
 
                 getBlockRequestPeers( t, b, &peerArr );
-                peers = (tr_peer **) tr_ptrArrayPeek( &peerArr, &peerCount );
+                peers = (const tr_peer **) tr_ptrArrayPeek( &peerArr, &peerCount );
+
                 /* always add peer if this block has no peers yet */
                 if( peerCount != 0 )
                 {
+                    int rate;
+
                     /* don't make a second block request until the endgame */
-                    if( !t->endgame )
-                        continue;
+                    passed = passed && t->endgame;
 
                     /* don't have more than two peers requesting this block */
-                    if( peerCount > 1 )
-                        continue;
+                    passed = passed && peerCount <= 1;
 
                     /* don't send the same request to the same peer twice */
-                    if( peer == peers[0] )
-                        continue;
+                    passed = passed && peer != peers[0];
 
                     /* in the endgame allow an additional peer to download a
                        block but only if the peer seems to be handling requests
                        relatively fast */
-                    if( peer->pendingReqsToPeer + numwant - got < t->endgame )
-                        continue;
+                    rate = peer->pendingReqsToPeer + numwant - got;
+                    passed = passed && rate >= t->endgame;
                 }
                 tr_ptrArrayDestruct( &peerArr, FALSE );
+                if( !passed )
+                    continue;
                 /* update the caller's table */
                 setme[got++] = b;
 
