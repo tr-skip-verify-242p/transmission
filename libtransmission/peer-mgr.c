@@ -205,12 +205,10 @@ typedef struct tr_torrent_peers
     int                        maxPeers;
     time_t                     lastCancel;
 
-    /* Before the endgame this should be 0. In the endgame
-     * it is >0 and contains the average number of pending
-     * request per peer. Only peers that have more pending
-     * requests are considered 'fast' and are allowed to
-     * download a block that is already being downloaded
-     * by another (possibly slow) peer. */
+    /* Before the endgame this should be 0. In endgame, is contains the average
+     * number of pending requests per peer. Only peers which have more pending
+     * requests are considered 'fast' are allowed to request a block that's
+     * already been requested from another (slower?) peer. */
     int                        endgame;
 }
 Torrent;
@@ -1170,6 +1168,7 @@ tr_peerMgrGetNextRequests( tr_torrent           * tor,
                     if( peer->pendingReqsToPeer + numwant - got < t->endgame )
                         continue;
                 }
+
                 /* update the caller's table */
                 setme[got++] = b;
 
