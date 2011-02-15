@@ -1135,7 +1135,7 @@ tr_peerMgrGetNextRequests( tr_torrent           * tor,
                 /* always add peer if this block has no peers yet */
                 if( peerCount != 0 )
                 {
-                    int rate;
+                    int rate, j;
 
                     /* don't make a second block request until the endgame */
                     passed = passed && t->endgame;
@@ -1144,7 +1144,8 @@ tr_peerMgrGetNextRequests( tr_torrent           * tor,
                     passed = passed && peerCount <= 1;
 
                     /* don't send the same request to the same peer twice */
-                    passed = passed && peer != peers[0];
+                    for( j = 0; passed && j < peerCount; ++j )
+                        passed = passed && peer != peers[j];
 
                     /* in the endgame allow an additional peer to download a
                        block but only if the peer seems to be handling requests
