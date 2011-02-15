@@ -186,15 +186,14 @@ static void
 accept_incoming_peer( int fd, short what UNUSED, void * vsession )
 {
     int clientSocket;
-    tr_port clientPort;
-    tr_address clientAddr;
+    tr_endpoint endpoint;
     tr_session * session = vsession;
 
-    clientSocket = tr_netAccept( session, fd, &clientAddr, &clientPort );
+    clientSocket = tr_netAccept( session, fd, &endpoint );
     if( clientSocket > 0 ) {
         tr_deepLog( __FILE__, __LINE__, NULL, "new incoming connection %d (%s)",
-                   clientSocket, tr_peerIoAddrStr( &clientAddr, clientPort ) );
-        tr_peerMgrAddIncoming( session->peerMgr, &clientAddr, clientPort, clientSocket );
+                   clientSocket, tr_peerIoEndpointStr( &endpoint ) );
+        tr_peerMgrAddIncoming( session->peerMgr, &endpoint, clientSocket );
     }
 }
 

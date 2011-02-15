@@ -153,7 +153,7 @@ enum
 #define dbgmsg( handshake, ... ) \
     do { \
         if( tr_deepLoggingIsActive( ) ) \
-            tr_deepLog( __FILE__, __LINE__, tr_peerIoGetAddrStr( handshake->io ), __VA_ARGS__ ); \
+            tr_deepLog( __FILE__, __LINE__, tr_peerIoGetEndpointStr( handshake->io ), __VA_ARGS__ ); \
     } while( 0 )
 
 static const char*
@@ -843,7 +843,7 @@ readCryptoProvide( tr_handshake *    handshake,
     if(( tor = tr_torrentFindFromObfuscatedHash( handshake->session, obfuscatedTorrentHash )))
     {
         const tr_bool clientIsSeed = tr_torrentIsSeed( tor );
-        const tr_bool peerIsSeed = tr_peerMgrPeerIsSeed( tor, tr_peerIoGetAddress( handshake->io, NULL ) );
+        const tr_bool peerIsSeed = tr_peerMgrPeerIsSeed( tor, tr_peerIoGetEndpoint( handshake->io ) );
         dbgmsg( handshake, "got INCOMING connection's encrypted handshake for torrent [%s]",
                 tr_torrentName( tor ) );
         tr_peerIoSetTorrentHash( handshake->io, tor->info.hash );
@@ -1226,13 +1226,12 @@ tr_handshakeStealIO( tr_handshake * handshake )
     return io;
 }
 
-const tr_address *
-tr_handshakeGetAddr( const struct tr_handshake * handshake,
-                     tr_port                   * port )
+const tr_endpoint *
+tr_handshakeGetEndpoint( const tr_handshake * handshake )
 {
     assert( handshake );
     assert( handshake->io );
 
-    return tr_peerIoGetAddress( handshake->io, port );
+    return tr_peerIoGetEndpoint( handshake->io );
 }
 

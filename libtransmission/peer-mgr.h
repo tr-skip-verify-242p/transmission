@@ -139,14 +139,16 @@ tr_isPex( const tr_pex * pex )
 
 const tr_address * tr_peerAddress( const tr_peer * );
 
+const tr_endpoint * tr_peerEndpoint( const tr_peer * );
+
 int tr_pexCompare( const void * a, const void * b );
 
 tr_peerMgr* tr_peerMgrNew( tr_session * );
 
 void tr_peerMgrFree( tr_peerMgr * manager );
 
-tr_bool tr_peerMgrPeerIsSeed( const tr_torrent * tor,
-                              const tr_address * addr );
+tr_bool tr_peerMgrPeerIsSeed( const tr_torrent  * tor,
+                              const tr_endpoint * endpoint );
 
 void tr_peerMgrGetNextRequests( tr_torrent          * torrent,
                                 tr_peer             * peer,
@@ -160,10 +162,9 @@ tr_bool tr_peerMgrDidPeerRequest( const tr_torrent  * torrent,
 
 void tr_peerMgrRebuildRequests( tr_torrent * torrent );
 
-void tr_peerMgrAddIncoming( tr_peerMgr  * manager,
-                            tr_address  * addr,
-                            tr_port       port,
-                            int           socket );
+void tr_peerMgrAddIncoming( tr_peerMgr        * manager,
+                            const tr_endpoint * endpoint,
+                            int                 socket );
 
 tr_pex * tr_peerMgrCompactToPex( const void    * compact,
                                  size_t          compactLen,

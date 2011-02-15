@@ -549,24 +549,25 @@ publishPeersDict( tr_tier * tier, int seeds, int leechers, tr_benc * peerList )
     {
         int64_t port;
         const char * ip;
-        tr_address addr;
+        tr_endpoint endpoint;
         tr_benc * peer = tr_bencListChild( peerList, i );
 
         if( peer == NULL )
             continue;
         if( !tr_bencDictFindStr( peer, "ip", &ip ) )
             continue;
-        if( tr_pton( ip, &addr ) == NULL )
+        if( tr_pton( ip, &endpoint.addr ) == NULL )
             continue;
         if( !tr_bencDictFindInt( peer, "port", &port ) )
             continue;
         if( ( port < 0 ) || ( port > USHRT_MAX ) )
             continue;
-        if( !tr_isValidPeerAddress( &addr, port ) )
+        endpoint.port = htons( (tr_port) port );
+        if( !tr_isValidPeerEndpoint( &endpoint ) )
             continue;
 
-        pex[n].addr = addr;
-        pex[n].port = htons( (uint16_t)port );
+        pex[n].addr = endpoint.addr;
+        pex[n].port = endpoint.port;
         ++n;
     }
 

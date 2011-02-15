@@ -221,6 +221,19 @@ tr_compareAddresses( const tr_address * a, const tr_address * b)
     return memcmp( &a->addr, &b->addr, sizes[a->type] );
 }
 
+int
+tr_compareEndpoints( const tr_endpoint * a, const tr_endpoint * b )
+{
+    int acmp = tr_compareAddresses( &a->addr, &b->addr );
+    if( acmp )
+        return acmp;
+    if( a->port < b->port )
+        return -1;
+    if( a->port > b->port )
+        return 1;
+    return 0;
+}
+
 /***********************************************************************
  * TCP sockets
  **********************************************************************/
@@ -279,8 +292,7 @@ setup_sockaddr( const tr_address        * addr,
 
 int
 tr_netOpenPeerSocket( tr_session        * session,
-                      const tr_address  * addr,
-                      tr_port             port,
+                      const tr_endpoint * endpoint,
                       tr_bool             clientIsSeed )
 {
     static const int domains[NUM_TR_AF_INET_TYPES] = { AF_INET, AF_INET6 };
@@ -291,12 +303,12 @@ tr_netOpenPeerSocket( tr_session        * session,
     socklen_t               sourcelen;
     struct sockaddr_storage source_sock;
 
-    assert( tr_isAddress( addr ) );
+    assert( tr_isEndpoint( endpoint ) );
 
-    if( !tr_isValidPeerAddress( addr, port ) )
+    if( !tr_isValidPeerEndpoint( endpoint ) )
         return -EINVAL;
 
-    s = tr_fdSocketCreate( session, domains[addr->type], SOCK_STREAM );
+    s = tr_fdSocketCreate( session, domains[endpoint->addr.type], SOCK_STREAM );
     if( s < 0 )
         return -1;
 
@@ -312,10 +324,10 @@ tr_netOpenPeerSocket( tr_session        * session,
         return -1;
     }
 
-    addrlen = setup_sockaddr( addr, port, &sock );
+    addrlen = setup_sockaddr( &endpoint->addr, endpoint->port, &sock );
 
     /* set source address */
-    source_addr = tr_sessionGetPublicAddress( session, addr->type, NULL );
+    source_addr = tr_sessionGetPublicAddress( session, endpoint->addr.type, NULL );
     assert( source_addr );
     sourcelen = setup_sockaddr( source_addr, 0, &source_sock );
     if( bind( s, ( struct sockaddr * ) &source_sock, sourcelen ) )
@@ -335,16 +347,16 @@ tr_netOpenPeerSocket( tr_session        * session,
         int tmperrno;
         tmperrno = sockerrno;
         if( ( tmperrno != ENETUNREACH && tmperrno != EHOSTUNREACH )
-                || addr->type == TR_AF_INET )
+            || endpoint->addr.type == TR_AF_INET )
             tr_err( _( "Couldn't connect socket %d to %s, port %d (errno %d - %s)" ),
-                    s, tr_ntop_non_ts( addr ), (int)ntohs( port ), tmperrno,
+                    s, tr_ntop_non_ts( &endpoint->addr ), (int)ntohs( endpoint->port ), tmperrno,
                     tr_strerror( tmperrno ) );
         tr_netClose( session, s );
         s = -tmperrno;
     }
 
     tr_deepLog( __FILE__, __LINE__, NULL, "New OUTGOING connection %d (%s)",
-               s, tr_peerIoAddrStr( addr, port ) );
+               s, tr_peerIoEndpointStr( endpoint ) );
 
     return s;
 }
@@ -452,10 +464,9 @@ tr_net_hasIPv6( tr_port port )
 int
 tr_netAccept( tr_session  * session,
               int           b,
-              tr_address  * addr,
-              tr_port     * port )
+              tr_endpoint * endpoint )
 {
-    int fd = tr_fdSocketAccept( session, b, addr, port );
+    int fd = tr_fdSocketAccept( session, b, endpoint );
 
     if( fd>=0 && evutil_make_socket_nonblocking(fd)<0 ) {
         tr_netClose( session, fd );
@@ -682,11 +693,10 @@ isMartianAddr( const struct tr_address * a )
 }
 
 tr_bool
-tr_isValidPeerAddress( const tr_address * addr, tr_port port )
+tr_isValidPeerEndpoint( const tr_endpoint * endpoint )
 {
-    return ( port != 0 )
-        && ( tr_isAddress( addr ) )
-        && ( !isIPv6LinkLocalAddress( addr ) )
-        && ( !isIPv4MappedAddress( addr ) )
-        && ( !isMartianAddr( addr ) );
+    return tr_isEndpoint( endpoint )
+        && !isIPv6LinkLocalAddress( &endpoint->addr )
+        && !isIPv4MappedAddress( &endpoint->addr )
+        && !isMartianAddr( &endpoint->addr );
 }

@@ -81,7 +81,6 @@ typedef struct tr_peerIo
     uint32_t              encryptionMode;
     tr_bool               isSeed;
 
-    tr_port               port;
     int                   socket;
 
     int                   refCount;
@@ -91,7 +90,7 @@ typedef struct tr_peerIo
 
     tr_session          * session;
 
-    tr_address            addr;
+    tr_endpoint           endpoint;
 
     tr_can_read_cb        canRead;
     tr_did_write_cb       didWrite;
@@ -114,18 +113,16 @@ tr_peerIo;
 ***
 **/
 
-tr_peerIo*  tr_peerIoNewOutgoing( tr_session              * session,
-                                  struct tr_bandwidth     * parent,
-                                  const struct tr_address * addr,
-                                  tr_port                   port,
-                                  const  uint8_t          * torrentHash,
-                                  tr_bool                   isSeed );
+tr_peerIo*  tr_peerIoNewOutgoing( tr_session               * session,
+                                  struct tr_bandwidth      * parent,
+                                  const struct tr_endpoint * endpoint,
+                                  const  uint8_t           * torrentHash,
+                                  tr_bool                    isSeed );
 
-tr_peerIo*  tr_peerIoNewIncoming( tr_session              * session,
-                                  struct tr_bandwidth     * parent,
-                                  const struct tr_address * addr,
-                                  tr_port                   port,
-                                  int                       socket );
+tr_peerIo*  tr_peerIoNewIncoming( tr_session               * session,
+                                  struct tr_bandwidth      * parent,
+                                  const struct tr_endpoint * endpoint,
+                                  int                        socket );
 
 void tr_peerIoRefImpl           ( const char              * file,
                                   int                       line,
@@ -185,13 +182,12 @@ static inline tr_session* tr_peerIoGetSession ( tr_peerIo * io )
     return io->session;
 }
 
-const char* tr_peerIoAddrStr( const struct tr_address * addr,
-                              tr_port                   port );
+const char * tr_peerIoEndpointStr( const tr_endpoint * endpoint );
 
-const char* tr_peerIoGetAddrStr( const tr_peerIo * io );
+/** @note Not thread safe. */
+const char * tr_peerIoGetEndpointStr( const tr_peerIo * io );
 
-const struct tr_address * tr_peerIoGetAddress( const tr_peerIo * io,
-                                               tr_port         * port );
+const struct tr_endpoint * tr_peerIoGetEndpoint( const tr_peerIo * io );
 
 const uint8_t*       tr_peerIoGetTorrentHash( tr_peerIo * io );
 

@@ -88,28 +88,43 @@ tr_address *tr_pton( const char * src,
 int tr_compareAddresses( const tr_address * a,
                          const tr_address * b);
 
-tr_bool tr_isValidPeerAddress( const tr_address * addr, tr_port port );
-
 static inline tr_bool tr_isAddress( const tr_address * a ) { return ( a != NULL ) && ( a->type==TR_AF_INET || a->type==TR_AF_INET6 ); }
 
 tr_bool tr_net_hasIPv6( tr_port );
 
+/** @brief A network socket communication endpoint. */
+typedef struct tr_endpoint
+{
+    tr_address addr;
+    tr_port port; /** @note Network byte order. */
+}
+tr_endpoint;
+
+static inline tr_bool
+tr_isEndpoint( const tr_endpoint * e )
+{
+    return e && tr_isAddress( &e->addr ) && e->port != 0;
+}
+
+int tr_compareEndpoints( const tr_endpoint * a,
+                         const tr_endpoint * b );
+
+tr_bool tr_isValidPeerEndpoint( const tr_endpoint * endpoint );
+
 /***********************************************************************
  * Sockets
  **********************************************************************/
-int  tr_netOpenPeerSocket( tr_session       * session,
-                           const tr_address * addr,
-                           tr_port            port,
-                           tr_bool            clientIsSeed );
+int  tr_netOpenPeerSocket( tr_session        * session,
+                           const tr_endpoint * endpoint,
+                           tr_bool             clientIsSeed );
 
 int  tr_netBindTCP( const tr_address * addr,
                     tr_port            port,
                     tr_bool            suppressMsgs );
 
-int  tr_netAccept( tr_session * session,
-                   int          bound,
-                   tr_address * setme_addr,
-                   tr_port    * setme_port );
+int  tr_netAccept( tr_session  * session,
+                   int           bound,
+                   tr_endpoint * setme_endpoint );
 
 int  tr_netSetTOS( int s,
                    int tos );

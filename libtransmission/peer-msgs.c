@@ -272,7 +272,7 @@ myDebug( const char * file, int line,
         evbuffer_add_printf( buf, "[%s] %s - %s [%s]: ",
                              tr_getLogTimeStr( timestr, sizeof( timestr ) ),
                              tr_torrentName( msgs->torrent ),
-                             tr_peerIoGetAddrStr( msgs->peer->io ),
+                             tr_peerIoGetEndpointStr( msgs->peer->io ),
                              msgs->peer->client );
         va_start( args, fmt );
         evbuffer_add_vprintf( buf, fmt, args );
@@ -2349,10 +2349,9 @@ tr_peerMsgsNew( struct tr_torrent    * torrent,
     if( tr_dhtEnabled( torrent->session ) && tr_peerIoSupportsDHT( peer->io ))
     {
         /* Only send PORT over IPv6 when the IPv6 DHT is running (BEP-32). */
-        const struct tr_address *addr = tr_peerIoGetAddress( peer->io, NULL );
-        if( addr->type == TR_AF_INET || tr_globalIPv6() ) {
+        const tr_endpoint * endpoint = tr_peerIoGetEndpoint( peer->io );
+        if( endpoint->addr.type == TR_AF_INET || tr_globalIPv6() )
             protocolSendPort( m, tr_dhtPort( torrent->session ) );
-        }
     }
 
     tr_peerIoSetIOFuncs( m->peer->io, canRead, didWrite, gotError, m );
