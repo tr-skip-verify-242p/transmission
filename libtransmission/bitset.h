@@ -20,7 +20,11 @@
 #include "transmission.h"
 #include "bitfield.h"
 
-/** @brief like a tr_bitfield, but supports haveAll and haveNone */
+/**
+ * @brief Like a tr_bitfield, but supports haveAll and haveNone.
+ *
+ * @note You should never set the fields directly.
+ */
 typedef struct tr_bitset
 {
     tr_bool haveAll;
@@ -33,9 +37,8 @@ static inline void
 tr_bitsetConstructor( tr_bitset * b, size_t size )
 {
     tr_bitfieldConstruct( &b->bitfield, size );
-
-    b->haveAll = 0;
-    b->haveNone = 0;
+    b->haveAll = FALSE;
+    b->haveNone = ( size == 0 );
 }
 
 static inline void
@@ -45,6 +48,8 @@ tr_bitsetDestructor( tr_bitset * b )
 }
 
 void tr_bitsetReserve( tr_bitset * b, size_t size );
+
+void tr_bitsetResize( tr_bitset * b, size_t size );
 
 static inline tr_bool
 tr_bitsetHasFast( const tr_bitset * b, const size_t nth )
@@ -62,17 +67,16 @@ tr_bitsetHasFast( const tr_bitset * b, const size_t nth )
 static inline tr_bitset *
 tr_bitsetDup( const tr_bitset * b )
 {
-    tr_bitset * dup = tr_malloc( sizeof( tr_bitset ) );
-    tr_bitfieldConstruct( &dup->bitfield, 0 );
+    tr_bitset * dup = tr_new0( tr_bitset, 1 );
+    tr_bitfieldConstruct( &dup->bitfield, b->bitfield.bitCount );
 
     dup->haveAll = b->haveAll;
     dup->haveNone = b->haveNone;
 
-    if( !dup->haveAll && !dup->haveNone )
+    if( b->bitfield.bits && b->bitfield.byteCount > 0 )
     {
-        tr_bitsetReserve( dup, b->bitfield.bitCount );
-        if( b->bitfield.bits && b->bitfield.byteCount > 0 )
-            memcpy( dup->bitfield.bits, b->bitfield.bits, b->bitfield.byteCount );
+        memcpy( dup->bitfield.bits, b->bitfield.bits,
+                b->bitfield.byteCount );
     }
     return dup;
 }
@@ -129,15 +133,15 @@ tr_bitsetPercent( const tr_bitset * b )
 static inline void
 tr_bitsetSetHaveAll( tr_bitset * b )
 {
-    b->haveAll = 1;
-    b->haveNone = 0;
+    b->haveAll = TRUE;
+    b->haveNone = FALSE;
 }
 
 static inline void
 tr_bitsetSetHaveNone( tr_bitset * b )
 {
-    b->haveAll = 0;
-    b->haveNone = 1;
+    b->haveAll = FALSE;
+    b->haveNone = TRUE;
 }
 
 static inline void
@@ -159,7 +163,6 @@ tr_bitsetAdd( tr_bitset * b, size_t i )
 {
     int ret = 0;
     if( !b->haveAll ) {
-        b->haveNone = 0;
         tr_bitsetReserve( b, i+1 );
         ret = tr_bitfieldAdd( &b->bitfield, i );
     }
@@ -187,7 +190,6 @@ tr_bitsetXor( tr_bitset * a, const tr_bitset * b )
         tr_bitsetInverse( a );
         return;
     }
-    a->haveNone = a->haveAll = 0;
     tr_bitsetReserve( a, b->bitfield.bitCount );
     tr_bitfieldXor( &a->bitfield, &b->bitfield );
 }

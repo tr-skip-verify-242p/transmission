@@ -57,6 +57,8 @@ int          tr_bitfieldRemRange( tr_bitfield*, size_t begin, size_t end );
 
 void         tr_bitfieldDifference( tr_bitfield *, const tr_bitfield * );
 
+void         tr_bitfieldSetAll( tr_bitfield * );
+
 void         tr_bitfieldInverse( tr_bitfield * );
 
 void         tr_bitfieldXor( tr_bitfield *, const tr_bitfield * );

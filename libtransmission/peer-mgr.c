@@ -254,9 +254,8 @@ setPiecesSorted( Torrent * t, const tr_bool areSorted )
 static inline tr_bool
 bitsetMatchesMetadata( const tr_torrent * tor, const tr_bitset * bitset )
 {
-    return bitset && ( bitset->haveAll || bitset->haveNone
-                       || ( ( tor->info.pieceCount + 7u ) / 8u
-                            == bitset->bitfield.byteCount ) );
+    return tor->info.pieceCount == bitset->bitfield.bitCount
+        || bitset->haveAll || bitset->haveNone;
 }
 
 /**
@@ -325,7 +324,7 @@ getBitfield( const tr_bitset * bs, size_t size, tr_bitfield ** freerv )
     bf = tr_bitfieldNew( size );
     *freerv = bf;
     if( bs->haveAll )
-        tr_bitfieldInverse( bf );
+        tr_bitfieldSetAll( bf );
     return bf;
 }
 
@@ -346,6 +345,7 @@ pieceListLookup( Torrent * t, tr_piece_index_t index );
 static void
 incrReplicationOfPiece( Torrent * t, const tr_piece_index_t i )
 {
+    assert( t->pieceReplication != NULL );
     assert( tr_torrentHasMetadata( t->tor ) );
     assert( i < t->tor->info.pieceCount );
 
@@ -366,9 +366,9 @@ incrReplicationOfPiece( Torrent * t, const tr_piece_index_t i )
 static void
 incrReplicationFromBitset( Torrent * t, const tr_bitset * bitset )
 {
+    assert( t->pieceReplication != NULL );
     assert( tr_torrentHasMetadata( t->tor ) );
     assert( bitsetMatchesMetadata( t->tor, bitset ) );
-    assert( t->pieceReplication != NULL );
 
     if( bitset->haveAll )
         incrReplication( t );
@@ -393,8 +393,8 @@ updateReplicationFromBitset( Torrent         * t,
     tr_bitfield * fcurfree = NULL, * fchgfree = NULL;
     size_t bitcount;
 
-    assert( tr_torrentHasMetadata( t->tor ) );
     assert( t->pieceReplication != NULL );
+    assert( tr_torrentHasMetadata( t->tor ) );
     assert( bitsetMatchesMetadata( t->tor, current ) );
     assert( bitsetMatchesMetadata( t->tor, changed ) );
 
@@ -419,6 +419,7 @@ decrReplicationFromBitset( Torrent * t, const tr_bitset * bitset )
 {
     tr_piece_index_t i;
 
+    assert( t->pieceReplication != NULL );
     assert( tr_torrentHasMetadata( t->tor ) );
     assert( bitsetMatchesMetadata( t->tor, bitset ) );
 
@@ -430,13 +431,19 @@ decrReplicationFromBitset( Torrent * t, const tr_bitset * bitset )
     else if( !bitset->haveNone )
     {
         const tr_bitfield * bitfield = &bitset->bitfield;
+        size_t count = 0;
+
         assert( tr_bitfieldTestFast( bitfield, t->tor->info.pieceCount - 1 ) );
         for( i = 0; i < t->tor->info.pieceCount; ++i )
         {
             if( tr_bitfieldHasFast( bitfield, i ) )
+            {
                 --t->pieceReplication[i];
+                ++count;
+            }
         }
-        setPiecesSorted( t, FALSE );
+        if( count )
+            setPiecesSorted( t, FALSE );
     }
 }
 
@@ -572,9 +579,6 @@ peerConstructor( struct peer_atom * atom )
 
     tr_bitsetConstructor( &peer->have, 0 );
 
-    /* As long as we know the peer doesn't have any piece. */
-    tr_bitsetSetHaveNone( &peer->have );
-
     peer->atom = atom;
     atom->peer = peer;
 
@@ -632,6 +636,8 @@ peerDestructor( Torrent * t, tr_peer * peer )
     tr_free( peer );
 }
 
+static void assertReplicationCountIsExact( Torrent * t );
+
 static void
 removePeer( Torrent * t, tr_peer * peer )
 {
@@ -646,10 +652,10 @@ removePeer( Torrent * t, tr_peer * peer )
     removed = tr_ptrArrayRemoveSorted( &t->peers, peer, peerCompare );
 
     if( t->pieceReplication != NULL
-        && tr_torrentHasMetadata( t->tor )
-        && bitsetMatchesMetadata( t->tor, &peer->have ) )
+        && tr_torrentHasMetadata( t->tor ) )
     {
         decrReplicationFromBitset( t, &peer->have );
+        assertReplicationCountIsExact( t );
     }
 
     assert( removed == peer );
@@ -704,11 +710,14 @@ tr_peerMgrGotTorrentMetadata( const tr_torrent * tor )
     for( i = 0; i < tr_ptrArraySize( &t->peers ); ++i )
     {
         tr_peer * peer = tr_ptrArrayNth( &t->peers, i );
-        tr_bitsetReserve( &peer->have, pieceCount );
-        incrReplicationFromBitset( t, &peer->have );
+        tr_bitset * have = &peer->have;
+        if( !have->haveAll && !have->haveNone )
+            tr_bitsetResize( have, pieceCount );
+        incrReplicationFromBitset( t, have );
     }
     if( tr_ptrArraySize( &t->peers ) )
         setPiecesSorted( t, FALSE );
+    assertReplicationCountIsExact( t );
 }
 
 static void peerCallbackFunc( tr_peer *, const tr_peer_event *, void * );
@@ -1155,17 +1164,19 @@ assertReplicationCountIsExact( Torrent * t )
     size_t * replicationCount = tr_new0( size_t, pieceCount );
     tr_piece_index_t itPiece;
     int itPeer;
-    tr_peer * peer;
 
     for( itPiece = 0; itPiece < pieceCount; ++itPiece )
     {
         for( itPeer = 0; itPeer < peerCount; ++itPeer )
         {
-            peer = tr_ptrArrayNth( &t->peers, itPeer );
-            if( tr_bitsetHasFast( &peer->have, itPiece ) )
+            const tr_peer * peer = tr_ptrArrayNth( &t->peers, itPeer );
+            const tr_bitset * b = &peer->have;
+            assert( ( b->haveAll && !b->haveNone )
+                    || ( !b->haveAll && b->haveNone )
+                    || b->bitfield.bitCount == pieceCount );
+            if( tr_bitsetHasFast( b, itPiece ) )
                 ++replicationCount[itPiece];
         }
-
         assert( t->pieceReplication[itPiece] == replicationCount[itPiece] );
 
     }
@@ -1663,17 +1674,26 @@ peerCallbackFunc( tr_peer * peer, const tr_peer_event * e, void * vt )
 
         case TR_PEER_PEER_GOT_HAVE:
             if( tr_torrentHasMetadata( t->tor ) )
+            {
                 incrReplicationOfPiece( t, e->pieceIndex );
+                assertReplicationCountIsExact( t );
+            }
             break;
 
         case TR_PEER_PEER_GOT_HAVE_ALL:
             if( tr_torrentHasMetadata( t->tor ) )
+            {
                 incrReplicationFromBitset( t, e->changed );
+                assertReplicationCountIsExact( t );
+            }
             break;
 
         case TR_PEER_PEER_GOT_BITSET:
             if( tr_torrentHasMetadata( t->tor ) )
+            {
                 updateReplicationFromBitset( t, e->bitset, e->changed );
+                assertReplicationCountIsExact( t );
+            }
             break;
 
         case TR_PEER_CLIENT_GOT_REJ:

@@ -187,6 +187,12 @@ tr_bitfieldDifference( tr_bitfield * a, const tr_bitfield * b )
 }
 
 void
+tr_bitfieldSetAll( tr_bitfield * b )
+{
+    tr_bitfieldAddRange( b, 0, b->bitCount );
+}
+
+void
 tr_bitfieldInverse( tr_bitfield * b )
 {
     uint8_t * pbyte = b->bits;
@@ -243,16 +249,51 @@ tr_bitfieldCountTrueBits( const tr_bitfield* b )
 void
 tr_bitsetReserve( tr_bitset * b, size_t size )
 {
-    if( b->bitfield.bitCount < size )
+    tr_bitfield * tmp;
+    if( b->bitfield.bitCount >= size )
+        return;
+
+    tmp = tr_bitfieldDup( &b->bitfield );
+    tr_bitfieldDestruct( &b->bitfield );
+    tr_bitfieldConstruct( &b->bitfield, size );
+
+    if( b->haveAll )
+        tr_bitfieldSetAll( &b->bitfield );
+    else if( !b->haveNone && tmp->bits && tmp->byteCount > 0 )
+        memcpy( b->bitfield.bits, tmp->bits, tmp->byteCount );
+
+    b->haveAll = FALSE;
+    b->haveNone = FALSE;
+    tr_bitfieldFree( tmp );
+}
+
+void
+tr_bitsetResize( tr_bitset * b, size_t bitCount )
+{
+    tr_bitfield * tmp;
+
+    if( b->bitfield.bitCount == bitCount )
+        return;
+
+    if( b->bitfield.byteCount == ( bitCount + 7u ) / 8u )
     {
-        tr_bitfield * tmp = tr_bitfieldDup( &b->bitfield );
-
-        tr_bitfieldDestruct( &b->bitfield );
-        tr_bitfieldConstruct( &b->bitfield, size );
-
-        if( ( tmp->bits != NULL ) && ( tmp->byteCount > 0 ) )
-            memcpy( b->bitfield.bits, tmp->bits, tmp->byteCount );
-
-        tr_bitfieldFree( tmp );
+        b->bitfield.bitCount = bitCount;
+        return;
     }
+
+    tmp = tr_bitfieldDup( &b->bitfield );
+    tr_bitfieldDestruct( &b->bitfield );
+    tr_bitfieldConstruct( &b->bitfield, bitCount );
+
+    if( b->haveAll )
+        tr_bitfieldSetAll( &b->bitfield );
+    else if( !b->haveNone && tmp->bits && tmp->byteCount > 0 )
+    {
+        size_t len = MIN( tmp->byteCount, b->bitfield.byteCount );
+        memcpy( b->bitfield.bits, tmp->bits, len );
+    }
+
+    b->haveAll = FALSE;
+    b->haveNone = FALSE;
+    tr_bitfieldFree( tmp );
 }

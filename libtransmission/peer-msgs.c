@@ -95,6 +95,10 @@ enum
     /* number of pieces we'll allow in our fast set */
     MAX_FAST_SET_SIZE = 3,
 
+    /* when torrents have incomplete metadata never accept
+     * HAVE or BITFIELD messages with more pieces than this */
+    MAX_UNKNOWN_PIECE_COUNT = 1 << 20,
+
     /* defined in BEP #9 */
     METADATA_MSG_TYPE_REQUEST = 0,
     METADATA_MSG_TYPE_DATA = 1,
@@ -1297,6 +1301,8 @@ messageLengthIsCorrect( const tr_peermsgs * msg, uint8_t id, uint32_t len )
             return len == 5;
 
         case BT_BITFIELD:
+            if( !tr_torrentHasMetadata( msg->torrent ) )
+                return len <= ( MAX_UNKNOWN_PIECE_COUNT + 7u ) / 8u + 1u;
             return len == ( msg->torrent->info.pieceCount + 7u ) / 8u + 1u;
 
         case BT_REQUEST:
@@ -1439,50 +1445,54 @@ readBtMessage( tr_peermsgs * msgs, struct evbuffer * inbuf, size_t inlen )
             break;
 
         case BT_HAVE:
+        {
+            tr_bitset * have = &msgs->peer->have;
+            const tr_torrent * tor = msgs->torrent;
+            const uint32_t count = tr_torrentHasMetadata( tor )
+                ? tor->info.pieceCount : MAX_UNKNOWN_PIECE_COUNT;
+
             tr_peerIoReadUint32( msgs->peer->io, inbuf, &ui32 );
             dbgmsg( msgs, "got Have: %u", ui32 );
-            if( tr_torrentHasMetadata( msgs->torrent )
-                    && ( ui32 >= msgs->torrent->info.pieceCount ) )
+
+            if( ui32 >= count )
             {
                 fireError( msgs, ERANGE );
                 return READ_ERR;
             }
 
             /* A peer may send the same HAVE message more than once. */
-            if( !tr_bitsetHas( &msgs->peer->have, ui32 ) )
+            if( !tr_bitsetHas( have, ui32 ) )
             {
-                if( tr_bitsetAdd( &msgs->peer->have, ui32 ) )
+                if( tr_torrentHasMetadata( tor ) && !have->haveAll )
+                    tr_bitsetReserve( have, count );
+
+                if( tr_bitsetAdd( have, ui32 ) )
                 {
                     fireError( msgs, ERANGE );
                     return READ_ERR;
                 }
-                else
-                {
-                    firePeerGotHave( msgs, ui32 );
-                }
-
+                firePeerGotHave( msgs, ui32 );
+                updatePeerProgress( msgs );
             }
-            updatePeerProgress( msgs );
             break;
+        }
 
         case BT_BITFIELD:
         {
             const tr_torrent * tor = msgs->torrent;
-            tr_bitset * cur = &msgs->peer->have, * old, * chg;
-            const size_t bitCount = tr_torrentHasMetadata( tor )
+            tr_bitset * have = &msgs->peer->have, * old, * chg;
+            const uint32_t count = tr_torrentHasMetadata( tor )
                 ? tor->info.pieceCount : msglen * 8;
 
             dbgmsg( msgs, "got a bitfield" );
-            old = tr_bitsetDup( cur );
-            tr_bitsetReserve( cur, bitCount );
+            old = tr_bitsetDup( have );
+            tr_bitsetReserve( have, count );
             tr_peerIoReadBytes( msgs->peer->io, inbuf,
-                                cur->bitfield.bits, msglen );
-            cur->haveAll = 0;
-            cur->haveNone = 0;
+                                have->bitfield.bits, msglen );
 
-            chg = tr_bitsetDup( cur );
+            chg = tr_bitsetDup( have );
             tr_bitsetXor( chg, old );
-            firePeerGotBitset( msgs, cur, chg );
+            firePeerGotBitset( msgs, have, chg );
             updatePeerProgress( msgs );
 
             tr_bitsetFree( chg );
@@ -1560,15 +1570,18 @@ readBtMessage( tr_peermsgs * msgs, struct evbuffer * inbuf, size_t inlen )
 
         case BT_FEXT_HAVE_ALL:
             dbgmsg( msgs, "Got a BT_FEXT_HAVE_ALL" );
-            if( fext ) {
-                tr_bitset * cur = &msgs->peer->have, * chg;
-                chg = tr_bitsetDup( cur );
-                tr_bitsetSetHaveAll( cur );
+            if( fext )
+            {
+                tr_bitset * have = &msgs->peer->have, * chg;
+                chg = tr_bitsetDup( have );
+                tr_bitsetSetHaveAll( have );
                 tr_bitsetInverse( chg );
                 firePeerGotHaveAll( msgs, chg );
                 updatePeerProgress( msgs );
                 tr_bitsetFree( chg );
-            } else {
+            }
+            else
+            {
                 fireError( msgs, EMSGSIZE );
                 return READ_ERR;
             }
