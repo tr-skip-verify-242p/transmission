@@ -2913,7 +2913,7 @@ shouldPeerBeClosed( const Torrent    * t,
 /*fprintf( stderr, "strictness is %.3f, limit is %d seconds... time since connect is %d, time since piece is %d ... idleTime is %d, doPurge is %d\n", (double)strictness, limit, (int)(now - atom->time), (int)(now - atom->piece_data_time), idleTime, idleTime > limit );*/
         if( idleTime > limit ) {
             tordbg( t, "purging peer %s because it's been %d secs since we shared anything",
-                       tr_atomEndpointStr( atom ), idleTime );
+                    tr_atomEndpointStr( atom ), idleTime );
             return TR_CAN_CLOSE;
         }
     }

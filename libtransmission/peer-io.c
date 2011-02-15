@@ -200,7 +200,7 @@ tr_isPeerIo( const tr_peerIo * io )
         && ( io->magicNumber == MAGIC_NUMBER )
         && ( io->refCount >= 0 )
         && ( tr_isBandwidth( &io->bandwidth ) )
-        && ( tr_isAddress( &io->endpoint.addr ) );
+        && ( tr_isEndpoint( &io->endpoint ) );
 }
 
 static void

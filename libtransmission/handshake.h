@@ -43,7 +43,7 @@ tr_handshake *         tr_handshakeNew( struct tr_peerIo * io,
                                         handshakeDoneCB    doneCB,
                                         void *             doneUserData );
 
-const tr_endpoint *    tr_handshakeGetEndpoint( const struct tr_handshake  * handshake );
+const tr_endpoint *    tr_handshakeGetEndpoint( const struct tr_handshake * handshake );
 
 void                   tr_handshakeAbort( tr_handshake * handshake );
 
