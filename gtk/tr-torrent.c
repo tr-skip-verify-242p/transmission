@@ -227,8 +227,7 @@ tr_torrent_open_folder( TrTorrent * gtor )
 
     if( tor != NULL )
     {
-        const tr_info * info = tr_torrent_info( gtor );
-        const gboolean single = info->fileCount == 1;
+        const gboolean single = tr_torrent_info( gtor )->fileCount == 1;
         const char * currentDir = tr_torrentGetCurrentDir( tor );
         if( single )
             gtr_open_file( currentDir );
