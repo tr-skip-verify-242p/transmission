@@ -80,7 +80,7 @@ tr_completeness            tr_cpGetStatus( const tr_completion * );
 
 uint64_t                   tr_cpHaveValid( const tr_completion * );
 
-tr_block_index_t           tr_cpBlocksMissing( const tr_completion * );
+tr_block_index_t           tr_cpBlocksMissing( tr_completion * );
 
 uint64_t                   tr_cpSizeWhenDone( const tr_completion * );
 
