@@ -59,14 +59,16 @@ tr_cpInvalidateDND( tr_completion * cp )
 }
 
 tr_block_index_t
-tr_cpBlocksMissing( tr_completion * cp )
+tr_cpBlocksMissing( const tr_completion * ccp )
 {
-    if( cp->blocksWantedIsDirty )
+    if( ccp->blocksWantedIsDirty )
     {
+        tr_completion *    cp = (tr_completion *) ccp; /* mutable */
         const tr_torrent * tor = cp->tor;
-        const tr_info * info = &tor->info;
-        tr_block_index_t wanted = 0, complete = 0;
-        tr_piece_index_t i;
+        const tr_info *    info = &tor->info;
+        tr_piece_index_t   i;
+        tr_block_index_t   wanted = 0;
+        tr_block_index_t   complete = 0;
 
         for( i = 0; i < info->pieceCount; ++i )
         {
@@ -82,7 +84,7 @@ tr_cpBlocksMissing( tr_completion * cp )
         cp->blocksWantedIsDirty = FALSE;
     }
 
-    return cp->blocksWantedLazy - cp->blocksWantedCompleteLazy;
+    return ccp->blocksWantedLazy - ccp->blocksWantedCompleteLazy;
 }
 
 uint64_t
