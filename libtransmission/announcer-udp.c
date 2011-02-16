@@ -907,6 +907,8 @@ create_announce( tr_announcer     * announcer,
     auP_announce_request * req;
     struct evbuffer * pkt;
     int numwant, event;
+    const char * ipaddr;
+    tr_address addr;
     tr_port port;
 
     assert( tor->peer_id != NULL );
@@ -924,7 +926,11 @@ create_announce( tr_announcer     * announcer,
 
     event = get_event_id( evstr );
     req->event = htonl( event );
-    req->ip_address = 0; /* Have tracker use packet sender. */
+    if( ( ipaddr = tr_sessionGetExternalIPAddress( announcer->session ) )
+        && tr_pton( ipaddr, &addr ) && addr.type == TR_AF_INET )
+        req->ip_address = addr.addr.addr4.s_addr;
+    else
+        req->ip_address = 0; /* Have tracker use packet sender. */
     req->key = htonl( s->key );
 
     if( !strcmp( evstr, "stopped" ) )
