@@ -1514,6 +1514,8 @@ sessionSet( tr_session               * session,
         else
             tr_sessionSetEncryption( session, TR_ENCRYPTION_PREFERRED );
     }
+    if( tr_bencDictFindStr( args_in, TR_PREFS_KEY_EXTERNAL_IP_ADDRESS, &str ) )
+        tr_sessionSetExternalIPAddress( session, str );
 
     notify( session, TR_RPC_SESSION_CHANGED, NULL );
 
@@ -1624,6 +1626,7 @@ sessionGet( tr_session               * s,
         default: str = "preferred"; break;
     }
     tr_bencDictAddStr( d, TR_PREFS_KEY_ENCRYPTION, str );
+    tr_bencDictAddStr( d, TR_PREFS_KEY_EXTERNAL_IP_ADDRESS, tr_sessionGetExternalIPAddress( s ) );
     
     return NULL;
 }
