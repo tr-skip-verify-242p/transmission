@@ -2565,8 +2565,8 @@ gtr_torrent_details_dialog_set_torrents( GtkWidget * w, GSList * ids )
         const int id = GPOINTER_TO_INT( ids->data );
         tr_session * session = tr_core_session( di->core );
         tr_torrent * tor = tr_torrentFindFromId( session, id );
-        const tr_info * inf = tr_torrentInfo( tor );
-        g_snprintf( title, sizeof( title ), _( "%s Properties" ), inf->name );
+        g_snprintf( title, sizeof( title ), _( "%s Properties" ),
+                    tr_torrentName( tor ) );
 
         gtr_file_list_set_torrent( di->file_list, id );
         gtk_widget_show( di->file_list );

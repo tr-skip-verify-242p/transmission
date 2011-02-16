@@ -125,11 +125,12 @@ gtr_notify_send( TrTorrent *tor )
 
     if( gtr_pref_flag_get( PREF_KEY_SHOW_DESKTOP_NOTIFICATION ) )
     {
+        const tr_torrent * torrent = tr_torrent_handle( tor );
         const tr_info * info = tr_torrent_info( tor );
         NotifyNotification * n;
 
         n = notify_notification_new( _( "Torrent Complete" ),
-                                     tr_torrentName( tr_torrent_handle( tor ) ), NULL
+                                     tr_torrentName( torrent ), NULL
 /* the fourth argument was removed in libnotify 0.7.0 */
 #if !defined(NOTIFY_VERSION_MINOR) || (NOTIFY_VERSION_MAJOR == 0 && NOTIFY_VERSION_MINOR < 7)
                                                      , NULL
