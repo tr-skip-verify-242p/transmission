@@ -131,6 +131,42 @@ inet_pton( int af, const char * src, void * dst )
 }
 #endif
 
+const char *
+tr_netGetAddress( const char * node, const char * service, tr_address * addr )
+{
+    struct addrinfo hints, * res, * p;
+    struct sockaddr_storage * ss;
+    int rv, family = AF_UNSPEC;
+    const char * err = NULL;
+
+    if( !addr )
+        return _( "Invalid address argument" );
+
+    memset( &hints, 0, sizeof( hints ) );
+    if( addr->type == TR_AF_INET )
+        family = AF_INET;
+    else if( addr->type == TR_AF_INET6 )
+        family = AF_INET6;
+    hints.ai_family = family;
+
+    if( ( rv = getaddrinfo( node, service, &hints, &res ) ) != 0 )
+        return gai_strerror( rv );
+
+    for( p = res; p; p = p->ai_next )
+    {
+        if( family != AF_UNSPEC && p->ai_family != family )
+            continue;
+        ss = (struct sockaddr_storage *) p->ai_addr;
+        tr_addressUnpackSockaddr( addr, NULL, ss, p->ai_addrlen );
+        break;
+    }
+
+    if( p == NULL )
+        err = _( "No matching addresses found" );
+    freeaddrinfo( res );
+    return err;
+}
+
 void
 tr_netInit( void )
 {
@@ -275,6 +311,57 @@ setup_sockaddr( const tr_address        * addr,
         memcpy( sockaddr, &sock6, sizeof( sock6 ) );
         return sizeof( struct sockaddr_in6 );
     }
+}
+
+void
+tr_addressUnpackSockaddr( tr_address * setme_addr, tr_port * setme_port,
+                          const struct sockaddr_storage * ss, socklen_t sslen )
+{
+    if( ss->ss_family == AF_INET )
+    {
+        const struct sockaddr_in * sock4 = (const struct sockaddr_in *) ss;
+        assert( sslen == sizeof( struct sockaddr_in ) );
+        setme_addr->type = TR_AF_INET;
+        setme_addr->addr.addr4.s_addr = sock4->sin_addr.s_addr;
+        if( setme_port )
+            *setme_port = ntohs( sock4->sin_port );
+    }
+    else
+    {
+        const struct sockaddr_in6 * sock6 = (const struct sockaddr_in6 *) ss;
+        assert( sslen == sizeof( struct sockaddr_in6 ) );
+        setme_addr->type = TR_AF_INET6;
+        setme_addr->addr.addr6 = sock6->sin6_addr;
+        if( setme_port )
+            *setme_port = ntohs( sock6->sin6_port );
+    }
+}
+
+void
+tr_addressUnpack( tr_address * dst, int type, const void * addr )
+{
+    dst->type = type;
+    if( type == TR_AF_INET )
+        memcpy( &dst->addr.addr4, addr, sizeof( dst->addr.addr4 ) );
+    else if( type == TR_AF_INET6 )
+        memcpy( &dst->addr.addr6, addr, sizeof( dst->addr.addr6 ) );
+    else
+        assert( FALSE /* Unsupported address type. */ );
+}
+
+int
+tr_netSendTo( int socket, const void * buffer, size_t buflen,
+              const tr_address * addr, tr_port port )
+{
+    struct sockaddr_storage ss;
+    socklen_t sslen;
+    int rv;
+
+    sslen = setup_sockaddr( addr, htons( port ), &ss );
+
+    rv = sendto( socket, buffer, buflen, 0,
+                 (const struct sockaddr *) &ss, sslen );
+    return rv;
 }
 
 int
@@ -689,4 +776,13 @@ tr_isValidPeerAddress( const tr_address * addr, tr_port port )
         && ( !isIPv6LinkLocalAddress( addr ) )
         && ( !isIPv4MappedAddress( addr ) )
         && ( !isMartianAddr( addr ) );
+}
+
+tr_bool
+tr_isValidTrackerAddress( const tr_address * addr )
+{
+    return tr_isAddress( addr )
+        && !isIPv6LinkLocalAddress( addr )
+        && !isIPv4MappedAddress( addr )
+        && !isMartianAddr( addr );
 }

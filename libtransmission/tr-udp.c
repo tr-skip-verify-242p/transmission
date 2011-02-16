@@ -27,6 +27,7 @@ THE SOFTWARE.
 #include <event2/event.h>
 
 #include "transmission.h"
+#include "announcer.h"
 #include "net.h"
 #include "session.h"
 #include "tr-dht.h"
@@ -111,6 +112,16 @@ rebind_ipv6(tr_session *ss, tr_bool force)
     }
 }
 
+static tr_bool
+check_udp_tracker( tr_session * s, const uint8_t * data, size_t len,
+                   const struct sockaddr_storage * ss, socklen_t sslen )
+{
+    tr_address addr;
+    tr_port port;
+    tr_addressUnpackSockaddr( &addr, &port, ss, sslen );
+    return tr_announcerHandleUDP( s->announcer, data, len, &addr, port );
+}
+
 static void
 event_callback(int s, short type UNUSED, void *sv)
 {
@@ -134,7 +145,12 @@ event_callback(int s, short type UNUSED, void *sv)
     if(rc <= 0)
         return;
 
-    if(buf[0] == 'd') {
+    if( check_udp_tracker( sv, buf, rc, &from, fromlen ) )
+    {
+        /* Packet was UDP tracker communication. */
+    }
+    else if( buf[0] == 'd' )
+    {
         /* DHT packet. */
         buf[rc] = '\0';
         tr_dhtCallback(buf, rc, (struct sockaddr*)&from, fromlen, sv);

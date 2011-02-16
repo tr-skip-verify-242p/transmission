@@ -17,6 +17,7 @@ noinst_LIBRARIES = libtransmission.a
 
 libtransmission_a_SOURCES = \
     announcer.c \
+    announcer-udp.c \
     bandwidth.c \
     bencode.c \
     bitfield.c \
@@ -45,6 +46,7 @@ libtransmission_a_SOURCES = \
     port-forwarding.c \
     ptrarray.c \
     ratecontrol.c \
+    resolver.c \
     resume.c \
     rpcimpl.c \
     rpc-server.c \
@@ -67,6 +69,8 @@ libtransmission_a_SOURCES = \
 
 noinst_HEADERS = \
     announcer.h \
+    announcer-common.h \
+    announcer-udp.h \
     bandwidth.h \
     bencode.h \
     bitfield.h \
@@ -97,6 +101,7 @@ noinst_HEADERS = \
     port-forwarding.h \
     ptrarray.h \
     ratecontrol.h \
+    resolver.h \
     resume.h \
     rpcimpl.h \
     rpc-server.h \

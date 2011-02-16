@@ -95,6 +95,7 @@ fi
 AC_SEARCH_LIBS(cos, [m])
 AC_SEARCH_LIBS([socket], [socket net])
 AC_SEARCH_LIBS([gethostbyname], [nsl bind])
+AC_CHECK_FUNCS([htonll ntohll])
 PKG_CHECK_MODULES(OPENSSL, [openssl >= $OPENSSL_MINIMUM], , [CHECK_SSL()])
 PKG_CHECK_MODULES(LIBCURL, [libcurl >= $CURL_MINIMUM])
 PKG_CHECK_MODULES(LIBEVENT, [libevent >= $LIBEVENT_MINIMUM])
