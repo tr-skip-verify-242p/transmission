@@ -204,12 +204,10 @@ typedef struct tr_torrent_peers
     int                        maxPeers;
     time_t                     lastCancel;
 
-    /* Before the endgame this should be 0. In the endgame
-     * it is >0 and contains the average number of pending
-     * request per peer. Only peers that have more pending
-     * requests are considered 'fast' and are allowed to
-     * download a block that is already being downloaded
-     * by another (possibly slow) peer. */
+    /* Before the endgame this should be 0. In endgame, is contains the average
+     * number of pending requests per peer. Only peers which have more pending
+     * requests are considered 'fast' are allowed to request a block that's
+     * already been requested from another (slower?) peer. */
     int                        endgame;
 }
 Torrent;
@@ -862,31 +860,49 @@ pieceListSort( Torrent * t, int mode )
 }
 
 static int
-isInEndgame( const Torrent * t )
+countActiveWebseeds( const Torrent * t )
 {
-    tr_torrent * tor = t->tor;
-    tr_block_index_t blocksMissing;
-    int numDownloading = 0, i;
-    const tr_peer ** peers;
+    int activeCount = 0;
+    const tr_webseed ** w = (const tr_webseed **) tr_ptrArrayBase( &t->webseeds );
+    const tr_webseed ** const wend = w + tr_ptrArraySize( &t->webseeds );
 
-    blocksMissing = tr_cpBlocksMissing( &tor->completion );
+    for( ; w!=wend; ++w )
+        if( tr_webseedIsActive( *w ) )
+            ++activeCount;
+
+    return activeCount;
+}
+
+static void
+updateEndgame( Torrent * t )
+{
+    const tr_torrent * tor = t->tor;
+    const tr_block_index_t missing = tr_cpBlocksMissing( &tor->completion );
+
     assert( t->requestCount >= 0 );
 
-    /* return 0 if endgame not reached */
-    if( (tr_block_index_t) t->requestCount < blocksMissing )
-        return 0;
-    /* only calculate if we are not already in endgame */
-    else if( t->endgame )
-        return t->endgame;
+    if( (tr_block_index_t) t->requestCount < missing )
+    {
+        /* not in endgame */
+        t->endgame = 0;
+    }
+    else if( !t->endgame ) /* only recalculate when endgame first begins */
+    {
+        int numDownloading = 0;
+        const tr_peer ** p = (const tr_peer **) tr_ptrArrayBase( &t->peers );
+        const tr_peer ** const pend = p + tr_ptrArraySize( &t->peers );
 
-    /* count number of downloading peers */
-    peers = (const tr_peer **) tr_ptrArrayBase( &t->peers );
+        /* add the active bittorrent peers... */
+        for( ; p!=pend; ++p )
+            if( (*p)->pendingReqsToPeer > 0 )
+                ++numDownloading;
 
-    for( i = 0; i < tr_ptrArraySize( &t->peers ); ++i )
-        numDownloading += clientIsDownloadingFrom( tor, peers[i] );
+        /* add the active webseeds... */
+        numDownloading += countActiveWebseeds( t );
 
-    /* average number of pending requests per downloading peer */
-    return MIN( 1, t->requestCount / numDownloading );
+        /* average number of pending requests per downloading peer */
+        t->endgame = t->requestCount / MAX( numDownloading, 1 );
+    }
 }
 
 /**
@@ -1110,7 +1126,7 @@ tr_peerMgrGetNextRequests( tr_torrent           * tor,
     if( t->pieces == NULL )
         pieceListRebuild( t );
 
-    t->endgame = isInEndgame( t );
+    updateEndgame( t );
     pieces = t->pieces;
     for( i=0; i<t->pieceCount && got<numwant; ++i )
     {
@@ -1121,45 +1137,42 @@ tr_peerMgrGetNextRequests( tr_torrent           * tor,
         {
             tr_block_index_t b = tr_torPieceFirstBlock( tor, p->index );
             const tr_block_index_t e = b + tr_torPieceCountBlocks( tor, p->index );
+            tr_ptrArray peerArr = TR_PTR_ARRAY_INIT;
 
             for( ; b!=e && got<numwant; ++b )
             {
-                tr_ptrArray peerArr = TR_PTR_ARRAY_INIT;
-                const tr_peer ** peers;
-                tr_bool passed = TRUE;
                 int peerCount;
+                tr_peer ** peers;
 
                 /* don't request blocks we've already got */
                 if( tr_cpBlockIsCompleteFast( &tor->completion, b ) )
                     continue;
 
-                getBlockRequestPeers( t, b, &peerArr );
-                peers = (const tr_peer **) tr_ptrArrayPeek( &peerArr, &peerCount );
-
                 /* always add peer if this block has no peers yet */
+                tr_ptrArrayClear( &peerArr );
+                getBlockRequestPeers( t, b, &peerArr );
+                peers = (tr_peer **) tr_ptrArrayPeek( &peerArr, &peerCount );
                 if( peerCount != 0 )
                 {
-                    int rate, j;
-
                     /* don't make a second block request until the endgame */
-                    passed = passed && t->endgame;
+                    if( !t->endgame )
+                        continue;
 
                     /* don't have more than two peers requesting this block */
-                    passed = passed && peerCount <= 1;
+                    if( peerCount > 1 )
+                        continue;
 
                     /* don't send the same request to the same peer twice */
-                    for( j = 0; passed && j < peerCount; ++j )
-                        passed = passed && peer != peers[j];
+                    if( peer == peers[0] )
+                        continue;
 
                     /* in the endgame allow an additional peer to download a
                        block but only if the peer seems to be handling requests
                        relatively fast */
-                    rate = peer->pendingReqsToPeer + numwant - got;
-                    passed = passed && rate >= t->endgame;
+                    if( peer->pendingReqsToPeer + numwant - got < t->endgame )
+                        continue;
                 }
-                tr_ptrArrayDestruct( &peerArr, NULL );
-                if( !passed )
-                    continue;
+
                 /* update the caller's table */
                 setme[got++] = b;
 
@@ -1167,6 +1180,8 @@ tr_peerMgrGetNextRequests( tr_torrent           * tor,
                 requestListAdd( t, b, peer );
                 ++p->requestCount;
             }
+
+            tr_ptrArrayDestruct( &peerArr, NULL );
         }
     }
 
@@ -1472,22 +1487,25 @@ peerCallbackFunc( tr_peer * peer, const tr_peer_event * e, void * vt )
             tr_torrent * tor = t->tor;
             tr_block_index_t block = _tr_block( tor, e->pieceIndex, e->offset );
             int i, peerCount;
-            const tr_peer ** peers;
+            tr_peer ** peers;
             tr_ptrArray peerArr = TR_PTR_ARRAY_INIT;
 
             removeRequestFromTables( t, block, peer );
             getBlockRequestPeers( t, block, &peerArr );
-            peers = (const tr_peer **) tr_ptrArrayPeek( &peerArr, &peerCount );
+            peers = (tr_peer **) tr_ptrArrayPeek( &peerArr, &peerCount );
 
             /* remove additional block requests and send cancel to peers */
-            for( i = 0; i < peerCount; ++i )
-            {
-                tr_historyAdd( peers[i]->cancelsSentToPeer, tr_time( ), 1 );
-                tr_peerMsgsCancel( peer->msgs, block );
-                removeRequestFromTables( t, block, peers[i] );
+            for( i=0; i<peerCount; i++ ) {
+                tr_peer * p = peers[i];
+                assert( p != peer );
+                if( p->msgs ) {
+                    tr_historyAdd( p->cancelsSentToPeer, tr_time( ), 1 );
+                    tr_peerMsgsCancel( p->msgs, block );
+                }
+                removeRequestFromTables( t, block, p );
             }
 
-            tr_ptrArrayDestruct( &peerArr, NULL );
+            tr_ptrArrayDestruct( &peerArr, FALSE );
 
             if( peer && peer->blocksSentToClient )
                 tr_historyAdd( peer->blocksSentToClient, tr_time( ), 1 );
@@ -2237,7 +2255,6 @@ tr_peerMgrTorrentStats( tr_torrent  * tor,
     int i, size;
     const Torrent * t = tor->torrentPeers;
     const tr_peer ** peers;
-    const tr_webseed ** webseeds;
 
     assert( tr_torrentIsLocked( tor ) );
 
@@ -2276,11 +2293,7 @@ tr_peerMgrTorrentStats( tr_torrent  * tor,
             ++*setmeSeedsConnected;
     }
 
-    webseeds = (const tr_webseed**) tr_ptrArrayBase( &t->webseeds );
-    size = tr_ptrArraySize( &t->webseeds );
-    for( i=0; i<size; ++i )
-        if( tr_webseedIsActive( webseeds[i] ) )
-            ++*setmeWebseedsSendingToUs;
+    *setmeWebseedsSendingToUs = countActiveWebseeds( t );
 }
 
 int

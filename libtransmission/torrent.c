@@ -69,6 +69,14 @@
 ****
 ***/
 
+const char *
+tr_torrentName( const tr_torrent * tor )
+{
+    assert( tr_isTorrent( tor ) );
+
+    return tor->info.rename ? tor->info.rename : tor->info.name;
+}
+
 int
 tr_torrentId( const tr_torrent * tor )
 {
@@ -139,14 +147,6 @@ tr_torrentFindFromObfuscatedHash( tr_session * session,
             return tor;
 
     return NULL;
-}
-
-const char *
-tr_torrentName( const tr_torrent * tor )
-{
-    assert( tr_isTorrent( tor ) );
-
-    return tor->info.rename ? tor->info.rename : tor->info.name;
 }
 
 tr_bool
