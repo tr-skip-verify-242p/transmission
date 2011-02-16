@@ -732,6 +732,7 @@ void
 tr_torrentGotNewInfoDict( tr_torrent * tor )
 {
     torrentInitFromInfo( tor );
+    tr_peerMgrGotTorrentMetadata( tor );
 
     tr_torrentFireMetadataCompleted( tor );
 }
@@ -836,6 +837,7 @@ torrentInit( tr_torrent * tor, const tr_ctor * ctor )
 
     tor->finishedSeedingByIdle = FALSE;
 
+    torrentInitFromInfo( tor );
     tr_peerMgrAddTorrent( session->peerMgr, tor );
 
     assert( !tor->downloadedCur );
@@ -844,7 +846,6 @@ torrentInit( tr_torrent * tor, const tr_ctor * ctor )
     tr_torrentSetAddedDate( tor, tr_time( ) ); /* this is a default value to be
                                                   overwritten by the resume file */
 
-    torrentInitFromInfo( tor );
     loaded = tr_torrentLoadResume( tor, ~0, ctor );
     tor->completeness = tr_cpGetStatus( &tor->completion );
     updateFileExistence( tor );

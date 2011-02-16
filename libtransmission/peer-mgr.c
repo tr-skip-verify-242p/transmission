@@ -200,6 +200,12 @@ typedef struct tr_torrent_peers
     struct weighted_piece    * pieces;
     int                        pieceCount;
 
+    /* How many peers have a given piece. */
+    size_t                   * pieceReplication;
+
+    /* TRUE if the 'pieces' array is sorted. */
+    tr_bool                    arePiecesSorted;
+
     int                        interestedCount;
     int                        maxPeers;
     time_t                     lastCancel;
@@ -235,6 +241,249 @@ struct tr_peerMgr
         if( tr_deepLoggingIsActive( ) ) \
             tr_deepLog( __FILE__, __LINE__, NULL, __VA_ARGS__ ); \
     } while( 0 )
+
+
+/**
+ * Return TRUE if the piece list is sorted, FALSE otherwise.
+ */
+static inline tr_bool
+arePiecesSorted( const Torrent * t )
+{
+    return t->arePiecesSorted;
+}
+
+static inline void
+setPiecesSorted( Torrent * t, const tr_bool areSorted )
+{
+    t->arePiecesSorted = areSorted;
+}
+
+static inline tr_bool
+bitsetMatchesMetadata( const tr_torrent * tor, const tr_bitset * bitset )
+{
+    return tor->info.pieceCount == bitset->bitfield.bitCount
+        || bitset->haveAll || bitset->haveNone;
+}
+
+/**
+*** Replication count internal functions
+**/
+
+static void
+incrReplication( Torrent * t )
+{
+    tr_piece_index_t i;
+    for( i = 0; i < t->tor->info.pieceCount; ++i )
+        ++t->pieceReplication[i];
+    setPiecesSorted( t, FALSE );
+}
+
+static void
+incrReplicationFromBitfield( Torrent * t,
+                             const tr_bitfield * bitfield )
+{
+    tr_piece_index_t i;
+    size_t count = 0;
+
+    for( i = 0; i < t->tor->info.pieceCount; ++i )
+    {
+        if( tr_bitfieldHasFast( bitfield, i ) )
+        {
+            ++t->pieceReplication[i];
+            ++count;
+        }
+    }
+    if( count )
+        setPiecesSorted( t, FALSE );
+}
+
+static void
+updateReplicationFromBitfield( Torrent           * t,
+                               const tr_bitfield * current,
+                               const tr_bitfield * changed )
+{
+    tr_piece_index_t i;
+    size_t count = 0;
+
+    for( i = 0; i < t->tor->info.pieceCount; ++i )
+    {
+        if( !tr_bitfieldHasFast( changed, i ) )
+            continue;
+        if( tr_bitfieldHasFast( current, i ) )
+            ++t->pieceReplication[i];
+        else
+            --t->pieceReplication[i];
+        ++count;
+    }
+    if( count )
+        setPiecesSorted( t, FALSE );
+}
+
+static const tr_bitfield *
+getBitfield( const tr_bitset * bs, size_t size, tr_bitfield ** freerv )
+{
+    tr_bitfield * bf;
+    if( !bs->haveAll && !bs->haveNone )
+    {
+        *freerv = NULL;
+        return &bs->bitfield;
+    }
+    bf = tr_bitfieldNew( size );
+    *freerv = bf;
+    if( bs->haveAll )
+        tr_bitfieldSetAll( bf );
+    return bf;
+}
+
+/**
+*** Replication count manipulation functions
+**/
+
+static void
+pieceListResortPiece( Torrent * t, struct weighted_piece * p );
+
+static struct weighted_piece *
+pieceListLookup( Torrent * t, tr_piece_index_t index );
+
+/**
+ * Increase the replication count of this piece and sort it if the
+ * piece list is already sorted.
+ */
+static void
+incrReplicationOfPiece( Torrent * t, const tr_piece_index_t i )
+{
+    assert( t->pieceReplication != NULL );
+    assert( tr_torrentHasMetadata( t->tor ) );
+    assert( i < t->tor->info.pieceCount );
+
+    /* One more replication of this piece is present in the swarm. */
+    ++t->pieceReplication[i];
+
+    /* We only resort the piece if the list is already sorted. */
+    if( arePiecesSorted( t ) )
+        pieceListResortPiece( t, pieceListLookup( t, i ) );
+}
+
+/**
+ * Increase the replication count of pieces present in the bitset.
+ *
+ * If the piece list needs to be resorted, it sets the
+ * @a arePiecesSorted field in @a t to @a FALSE.
+ */
+static void
+incrReplicationFromBitset( Torrent * t, const tr_bitset * bitset )
+{
+    assert( t->pieceReplication != NULL );
+    assert( tr_torrentHasMetadata( t->tor ) );
+    assert( bitsetMatchesMetadata( t->tor, bitset ) );
+
+    if( bitset->haveAll )
+        incrReplication( t );
+    else if( !bitset->haveNone )
+        incrReplicationFromBitfield( t, &bitset->bitfield );
+}
+
+/**
+ * Update the replication count of all pieces for which bits
+ * are set in @a changed. If a bit in @a current is 0, the
+ * count is decreased, otherwise it is increased.
+ *
+ * If the piece list needs to be resorted, it sets the
+ * @a arePiecesSorted field in @a t to @a FALSE.
+ */
+static void
+updateReplicationFromBitset( Torrent         * t,
+                             const tr_bitset * current,
+                             const tr_bitset * changed )
+{
+    const tr_bitfield * fcur, * fchg;
+    tr_bitfield * fcurfree = NULL, * fchgfree = NULL;
+    size_t bitcount;
+
+    assert( t->pieceReplication != NULL );
+    assert( tr_torrentHasMetadata( t->tor ) );
+    assert( bitsetMatchesMetadata( t->tor, current ) );
+    assert( bitsetMatchesMetadata( t->tor, changed ) );
+
+    if( changed->haveNone )
+        return;
+
+    bitcount = t->tor->info.pieceCount;
+    fcur = getBitfield( current, bitcount, &fcurfree );
+    fchg = getBitfield( changed, bitcount, &fchgfree );
+    updateReplicationFromBitfield( t, fcur, fchg );
+    tr_bitfieldFree( fcurfree );
+    tr_bitfieldFree( fchgfree );
+}
+
+/**
+ * Decrease the replication count of pieces present in the bitset.
+ * If the piece list needs to be resorted, it sets the
+ * @a arePiecesSorted field in @a t to @a FALSE.
+ */
+static void
+decrReplicationFromBitset( Torrent * t, const tr_bitset * bitset )
+{
+    tr_piece_index_t i;
+
+    assert( t->pieceReplication != NULL );
+    assert( tr_torrentHasMetadata( t->tor ) );
+    assert( bitsetMatchesMetadata( t->tor, bitset ) );
+
+    if( bitset->haveAll )
+    {
+        for( i = 0; i < t->tor->info.pieceCount; ++i )
+            --t->pieceReplication[i];
+    }
+    else if( !bitset->haveNone )
+    {
+        const tr_bitfield * bitfield = &bitset->bitfield;
+        size_t count = 0;
+
+        assert( tr_bitfieldTestFast( bitfield, t->tor->info.pieceCount - 1 ) );
+        for( i = 0; i < t->tor->info.pieceCount; ++i )
+        {
+            if( tr_bitfieldHasFast( bitfield, i ) )
+            {
+                --t->pieceReplication[i];
+                ++count;
+            }
+        }
+        if( count )
+            setPiecesSorted( t, FALSE );
+    }
+}
+
+#if 0
+static void
+assertReplicationCountIsExact( Torrent * t )
+{
+    const tr_piece_index_t pieceCount = t->tor->info.pieceCount;
+    const int peerCount = tr_ptrArraySize( &t->peers );
+    size_t * replicationCount = tr_new0( size_t, pieceCount );
+    tr_piece_index_t itPiece;
+    int itPeer;
+
+    for( itPiece = 0; itPiece < pieceCount; ++itPiece )
+    {
+        for( itPeer = 0; itPeer < peerCount; ++itPeer )
+        {
+            const tr_peer * peer = tr_ptrArrayNth( &t->peers, itPeer );
+            const tr_bitset * b = &peer->have;
+            assert( ( b->haveAll && !b->haveNone )
+                    || ( !b->haveAll && b->haveNone )
+                    || b->bitfield.bitCount == pieceCount );
+            if( tr_bitsetHasFast( b, itPiece ) )
+                ++replicationCount[itPiece];
+        }
+        assert( t->pieceReplication[itPiece] == replicationCount[itPiece] );
+
+    }
+    tr_free( replicationCount );
+}
+#else
+#define assertReplicationCountIsExact( t )
+#endif
 
 /**
 ***
@@ -437,6 +686,14 @@ removePeer( Torrent * t, tr_peer * peer )
     atom->time = tr_time( );
 
     removed = tr_ptrArrayRemoveSorted( &t->peers, peer, peerCompare );
+
+    if( t->pieceReplication != NULL
+        && tr_torrentHasMetadata( t->tor ) )
+    {
+        decrReplicationFromBitset( t, &peer->have );
+        assertReplicationCountIsExact( t );
+    }
+
     assert( removed == peer );
     peerDestructor( t, removed );
 }
@@ -464,9 +721,39 @@ torrentDestructor( void * vt )
     tr_ptrArrayDestruct( &t->outgoingHandshakes, NULL );
     tr_ptrArrayDestruct( &t->peers, NULL );
 
+    tr_free( t->pieceReplication );
     tr_free( t->requests );
     tr_free( t->pieces );
     tr_free( t );
+}
+
+void
+tr_peerMgrGotTorrentMetadata( const tr_torrent * tor )
+{
+    tr_piece_index_t pieceCount;
+    Torrent * t;
+    int i;
+
+    assert( tr_isTorrent( tor ) );
+    assert( tor->torrentPeers != NULL );
+    assert( tr_torrentHasMetadata( tor ) );
+
+    pieceCount = tor->info.pieceCount;
+    t = tor->torrentPeers;
+    tr_free( t->pieceReplication );
+    t->pieceReplication = tr_new0( size_t, pieceCount );
+
+    for( i = 0; i < tr_ptrArraySize( &t->peers ); ++i )
+    {
+        tr_peer * peer = tr_ptrArrayNth( &t->peers, i );
+        tr_bitset * have = &peer->have;
+        if( !have->haveAll && !have->haveNone )
+            tr_bitsetResize( have, pieceCount );
+        incrReplicationFromBitset( t, have );
+    }
+    if( tr_ptrArraySize( &t->peers ) )
+        setPiecesSorted( t, FALSE );
+    assertReplicationCountIsExact( t );
 }
 
 static void peerCallbackFunc( tr_peer *, const tr_peer_event *, void * );
@@ -485,6 +772,7 @@ torrentConstructor( tr_peerMgr * manager,
     t->peers = TR_PTR_ARRAY_INIT;
     t->webseeds = TR_PTR_ARRAY_INIT;
     t->outgoingHandshakes = TR_PTR_ARRAY_INIT;
+    t->pieceReplication = tr_new0( size_t, tor->info.pieceCount );
 
     for( i = 0; i < tor->info.webseedCount; ++i )
     {
@@ -808,6 +1096,7 @@ comparePieceByWeight( const void * va, const void * vb )
     const struct weighted_piece * b = vb;
     int ia, ib, missing, pending;
     const tr_torrent * tor = weightTorrent;
+    const size_t * repl = tor->torrentPeers->pieceReplication;
 
     /* primary key: weight */
     missing = tr_cpMissingBlocksInPiece( &tor->completion, a->index );
@@ -827,7 +1116,11 @@ comparePieceByWeight( const void * va, const void * vb )
     if( ia > ib ) return -1;
     if( ia < ib ) return 1;
 
-    /* tertiary key: random */
+    /* tertiary key: rarest first */
+    if( repl[a->index] < repl[b->index] ) return -1;
+    if( repl[a->index] > repl[b->index] ) return 1;
+
+    /* quaternary key: random */
     if( a->salt < b->salt ) return -1;
     if( a->salt > b->salt ) return 1;
 
@@ -854,7 +1147,10 @@ pieceListSort( Torrent * t, int mode )
     weightTorrent = t->tor;
 
     if( mode == PIECES_SORTED_BY_WEIGHT )
+    {
         qsort( t->pieces, t->pieceCount, sizeof( struct weighted_piece ), comparePieceByWeight );
+        setPiecesSorted( t, TRUE );
+    }
     else
         qsort( t->pieces, t->pieceCount, sizeof( struct weighted_piece ), comparePieceByIndex );
 }
@@ -941,7 +1237,6 @@ pieceListLookup( Torrent * t, tr_piece_index_t index )
 static void
 pieceListRebuild( Torrent * t )
 {
-    assertWeightedPiecesAreSorted( t );
 
     if( !tr_torrentIsSeed( t->tor ) )
     {
@@ -1006,8 +1301,6 @@ pieceListRemovePiece( Torrent * t, tr_piece_index_t piece )
 {
     struct weighted_piece * p;
 
-    assertWeightedPiecesAreSorted( t );
-
     if(( p = pieceListLookup( t, piece )))
     {
         const int pos = p - t->pieces;
@@ -1023,26 +1316,32 @@ pieceListRemovePiece( Torrent * t, tr_piece_index_t piece )
             t->pieces = NULL;
         }
     }
-
-    assertWeightedPiecesAreSorted( t );
 }
 
 static void
 pieceListResortPiece( Torrent * t, struct weighted_piece * p )
 {
-    int pos;
     tr_bool isSorted = TRUE;
+    int pos;
 
     if( p == NULL )
         return;
 
-    /* is the torrent already sorted? */
     pos = p - t->pieces;
     weightTorrent = t->tor;
-    if( isSorted && ( pos > 0 ) && ( comparePieceByWeight( p-1, p ) > 0 ) )
-        isSorted = FALSE;
-    if( isSorted && ( pos < t->pieceCount - 1 ) && ( comparePieceByWeight( p, p+1 ) > 0 ) )
-        isSorted = FALSE;
+
+    if( arePiecesSorted( t ) )
+    {
+        /* is the torrent already sorted? */
+        if( isSorted && ( pos > 0 ) && ( comparePieceByWeight( p-1, p ) > 0 ) )
+            isSorted = FALSE;
+        if( isSorted && ( pos < t->pieceCount - 1 ) && ( comparePieceByWeight( p, p+1 ) > 0 ) )
+            isSorted = FALSE;
+    }
+    else
+    {
+        pieceListSort( t, PIECES_SORTED_BY_WEIGHT);
+    }
 
     /* if it's not sorted, move it around */
     if( !isSorted )
@@ -1075,15 +1374,11 @@ pieceListRemoveRequest( Torrent * t, tr_block_index_t block )
     struct weighted_piece * p;
     const tr_piece_index_t index = tr_torBlockPiece( t->tor, block );
 
-    assertWeightedPiecesAreSorted( t );
-
     if( ((p = pieceListLookup( t, index ))) && ( p->requestCount > 0 ) )
     {
         --p->requestCount;
         pieceListResortPiece( t, p );
     }
-
-    assertWeightedPiecesAreSorted( t );
 }
 
 /**
@@ -1120,11 +1415,16 @@ tr_peerMgrGetNextRequests( tr_torrent           * tor,
     /* walk through the pieces and find blocks that should be requested */
     got = 0;
     t = tor->torrentPeers;
-    assertWeightedPiecesAreSorted( t );
 
     /* prep the pieces list */
     if( t->pieces == NULL )
         pieceListRebuild( t );
+
+    if( !arePiecesSorted( t ) )
+        pieceListSort( t, PIECES_SORTED_BY_WEIGHT );
+
+    assertReplicationCountIsExact( t );
+    assertWeightedPiecesAreSorted( t );
 
     updateEndgame( t );
     pieces = t->pieces;
@@ -1422,6 +1722,30 @@ peerCallbackFunc( tr_peer * peer, const tr_peer_event * e, void * vt )
 
             break;
         }
+
+        case TR_PEER_PEER_GOT_HAVE:
+            if( tr_torrentHasMetadata( t->tor ) )
+            {
+                incrReplicationOfPiece( t, e->pieceIndex );
+                assertReplicationCountIsExact( t );
+            }
+            break;
+
+        case TR_PEER_PEER_GOT_HAVE_ALL:
+            if( tr_torrentHasMetadata( t->tor ) )
+            {
+                incrReplicationFromBitset( t, e->changed );
+                assertReplicationCountIsExact( t );
+            }
+            break;
+
+        case TR_PEER_PEER_GOT_BITSET:
+            if( tr_torrentHasMetadata( t->tor ) )
+            {
+                updateReplicationFromBitset( t, e->bitset, e->changed );
+                assertReplicationCountIsExact( t );
+            }
+            break;
 
         case TR_PEER_CLIENT_GOT_REJ:
             removeRequestFromTables( t, _tr_block( t->tor, e->pieceIndex, e->offset ), peer );
@@ -2137,6 +2461,14 @@ tr_peerMgrStartTorrent( tr_torrent * tor )
 
     ensureMgrTimersExist( t->manager );
 
+    if( tr_torrentHasMetadata( t->tor ) )
+    {
+        memset( t->pieceReplication, 0,
+                sizeof( *t->pieceReplication )
+                * t->tor->info.pieceCount );
+        setPiecesSorted( t, FALSE );
+    }
+
     t->isRunning = TRUE;
     t->maxPeers = t->tor->maxConnectedPeers;
 
@@ -2149,6 +2481,14 @@ stopTorrent( Torrent * t )
     int i, n;
 
     t->isRunning = FALSE;
+
+    if( tr_torrentHasMetadata( t->tor ) )
+    {
+        memset( t->pieceReplication, 0,
+                sizeof( *t->pieceReplication )
+                * t->tor->info.pieceCount );
+        setPiecesSorted( t, FALSE );
+    }
 
     /* disconnect the peers. */
     for( i=0, n=tr_ptrArraySize( &t->peers ); i<n; ++i )
@@ -2874,7 +3214,7 @@ shouldPeerBeClosed( const Torrent    * t,
         else
         {
             tr_bitfield * tmp = tr_bitfieldDup( tr_cpPieceBitfield( &tor->completion ) );
-            tr_bitsetDifference( tmp, &peer->have );
+            tr_bitsetFieldDifference( tmp, &peer->have );
             peerHasEverything = tr_bitfieldCountTrueBits( tmp ) == 0;
             tr_bitfieldFree( tmp );
         }
