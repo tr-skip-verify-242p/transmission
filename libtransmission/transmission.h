@@ -173,6 +173,7 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_PREFETCH_ENABLED              "prefetch-enabled"
 #define TR_PREFS_KEY_DOWNLOAD_DIR                  "download-dir"
 #define TR_PREFS_KEY_ENCRYPTION                    "encryption"
+#define TR_PREFS_KEY_EXTERNAL_IP_ADDRESS           "external-ip-address"
 #define TR_PREFS_KEY_IDLE_LIMIT                    "idle-seeding-limit"
 #define TR_PREFS_KEY_IDLE_LIMIT_ENABLED            "idle-seeding-limit-enabled"
 #define TR_PREFS_KEY_INCOMPLETE_DIR                "incomplete-dir"
@@ -638,6 +639,10 @@ tr_bool  tr_sessionIsLazyBitfieldEnabled( const tr_session * session );
 tr_encryption_mode tr_sessionGetEncryption( tr_session * session );
 void               tr_sessionSetEncryption( tr_session * session,
                                             tr_encryption_mode    mode );
+
+const char * tr_sessionGetExternalIPAddress( const tr_session * session );
+void         tr_sessionSetExternalIPAddress( tr_session * session,
+                                             const char * ipAddress );
 
 
 /***********************************************************************
