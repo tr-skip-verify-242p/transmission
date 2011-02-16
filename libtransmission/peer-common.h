@@ -66,22 +66,31 @@ typedef enum
     TR_PEER_CLIENT_GOT_REJ,
     TR_PEER_PEER_GOT_DATA,
     TR_PEER_PEER_PROGRESS,
+    TR_PEER_PEER_GOT_HAVE,
+    TR_PEER_PEER_GOT_HAVE_ALL, /** @see firePeerGotHaveAll */
+    TR_PEER_PEER_GOT_BITSET,   /** @see firePeerGotBitset */
     TR_PEER_ERROR
 }
 PeerEventType;
 
+struct tr_bitset;
+
 typedef struct
 {
     PeerEventType    eventType;
-    uint32_t         pieceIndex;   /* for GOT_BLOCK, CANCEL, ALLOWED, SUGGEST */
+    uint32_t         pieceIndex;   /* for GOT_BLOCK, GOT_HAVE, CANCEL, ALLOWED, SUGGEST */
     uint32_t         offset;       /* for GOT_BLOCK */
     uint32_t         length;       /* for GOT_BLOCK + GOT_DATA */
     float            progress;     /* for PEER_PROGRESS */
     int              err;          /* errno for GOT_ERROR */
     tr_bool          wasPieceData; /* for GOT_DATA */
     tr_port          port;         /* for GOT_PORT */
+    const struct tr_bitset * bitset;  /* for GOT_BITSET */
+    const struct tr_bitset * changed; /* for GOT_BITSET, GOT_HAVE_ALL */
 }
 tr_peer_event;
+
+#define TR_PEER_EVENT_INIT { 0, 0, 0, 0, 0.0f, 0, FALSE, 0, NULL, NULL }
 
 struct tr_peer;
 
