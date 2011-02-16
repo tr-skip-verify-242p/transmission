@@ -1391,6 +1391,10 @@ on_prefs_changed( TrCore * core UNUSED, const char * key, gpointer data )
     {
         tr_sessionSetEncryption( tr, gtr_pref_int_get( key ) );
     }
+    else if( !strcmp( key, TR_PREFS_KEY_EXTERNAL_IP_ADDRESS ) )
+    {
+        tr_sessionSetExternalIPAddress( tr, gtr_pref_string_get( key ) );
+    }
     else if( !strcmp( key, TR_PREFS_KEY_DOWNLOAD_DIR ) )
     {
         tr_sessionSetDownloadDir( tr, gtr_pref_string_get( key ) );

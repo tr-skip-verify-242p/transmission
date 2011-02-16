@@ -167,6 +167,39 @@ tr_sessionSetEncryption( tr_session *       session,
 ****
 ***/
 
+const char *
+tr_sessionGetExternalIPAddress( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+    return session->externalAddress[0] != '\0'
+        ? session->externalAddress : NULL;
+}
+
+void
+tr_sessionSetExternalIPAddress( tr_session * session,
+                                const char * ipAddress )
+{
+    tr_address addr;
+
+    assert( tr_isSession( session ) );
+    tr_sessionLock( session );
+    if( tr_pton( ipAddress, &addr ) )
+    {
+        tr_strlcpy( session->externalAddress, ipAddress,
+                    sizeof( session->externalAddress ) );
+    }
+    else
+    {
+        memset( session->externalAddress, 0,
+                sizeof( session->externalAddress ) );
+    }
+    tr_sessionUnlock( session );
+}
+
+/***
+****
+***/
+
 struct tr_bindinfo
 {
     int socket;
@@ -361,6 +394,7 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_DSPEED_KBps,              100 );
     tr_bencDictAddBool( d, TR_PREFS_KEY_DSPEED_ENABLED,           FALSE );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_ENCRYPTION,               TR_DEFAULT_ENCRYPTION );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_EXTERNAL_IP_ADDRESS,      "" );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_IDLE_LIMIT,               30 );
     tr_bencDictAddBool( d, TR_PREFS_KEY_IDLE_LIMIT_ENABLED,       FALSE );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_INCOMPLETE_DIR,           tr_getDefaultDownloadDir( ) );
@@ -444,6 +478,7 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_DSPEED_KBps,              tr_sessionGetSpeedLimit_KBps( s, TR_DOWN ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_DSPEED_ENABLED,           tr_sessionIsSpeedLimited( s, TR_DOWN ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_ENCRYPTION,               s->encryptionMode );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_EXTERNAL_IP_ADDRESS,      tr_sessionGetExternalIPAddress( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_IDLE_LIMIT,               tr_sessionGetIdleLimit( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_IDLE_LIMIT_ENABLED,       tr_sessionIsIdleLimited( s ) );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_INCOMPLETE_DIR,           tr_sessionGetIncompleteDir( s ) );
@@ -852,6 +887,8 @@ sessionSetImpl( void * vdata )
         tr_sessionSetLPDEnabled( session, boolVal );
     if( tr_bencDictFindInt( settings, TR_PREFS_KEY_ENCRYPTION, &i ) )
         tr_sessionSetEncryption( session, i );
+    if( tr_bencDictFindStr( settings, TR_PREFS_KEY_EXTERNAL_IP_ADDRESS, &str ) )
+        tr_sessionSetExternalIPAddress( session, str );
     if( tr_bencDictFindStr( settings, TR_PREFS_KEY_PEER_SOCKET_TOS, &str ) )
         session->peerSocketTOS = parse_tos( str );
     if( tr_bencDictFindStr( settings, TR_PREFS_KEY_PEER_SOCKET_INTERFACE, &str ) )

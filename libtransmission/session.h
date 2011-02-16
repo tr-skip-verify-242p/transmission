@@ -133,6 +133,8 @@ struct tr_session
 
     tr_encryption_mode           encryptionMode;
 
+    char                         externalAddress[64];
+
     tr_preallocation_mode        preallocationMode;
 
     struct event_base          * event_base;

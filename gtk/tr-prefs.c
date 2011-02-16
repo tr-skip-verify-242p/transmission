@@ -1532,6 +1532,18 @@ networkPage( GObject * core )
     gtr_widget_set_tooltip_text( w, tooltip );
     hig_workarea_add_row( t, &row, s, w, NULL );
 
+    s = _( "_External IP address sent to trackers" );
+    w = new_entry( TR_PREFS_KEY_EXTERNAL_IP_ADDRESS, core );
+    gtr_widget_set_tooltip_text( w,
+        _( "This is the IPv4 dotted quad or IPv6 colon formatted "
+           "address that will be sent to trackers in all announce "
+           "requests. Note that not all trackers support this "
+           "extra information or handle it in the same way. If "
+           "left blank, no address information is sent, and trackers "
+           "will most likely determine your address based on the "
+           "source address of the connection." ) );
+    hig_workarea_add_row( t, &row, s, w, NULL );
+
     hig_workarea_add_section_divider( t, &row );
     hig_workarea_add_section_title( t, &row, _( "Peer Limits" ) );
 

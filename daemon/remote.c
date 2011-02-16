@@ -245,6 +245,7 @@ static tr_option opts[] =
     { 910, "encryption-required",    "Encrypt all peer connections", "er", 0, NULL },
     { 911, "encryption-preferred",   "Prefer encrypted peer connections", "ep", 0, NULL },
     { 912, "encryption-tolerated",   "Prefer unencrypted peer connections", "et", 0, NULL }, 
+    { 917, "external-address",       "IP Address to send in tracker announces", "ea", 1, "<IP address>" },
     { 850, "exit",                   "Tell the transmission session to shut down", NULL, 0, NULL },
     { 940, "files",                  "List the current torrent(s)' files", "f",  0, NULL },
     { 'g', "get",                    "Mark files for download", "g",  1, "<files>" },
@@ -399,6 +400,7 @@ getOptMode( int val )
         case 910: /* encryption-required */
         case 911: /* encryption-preferred */
         case 912: /* encryption-tolerated */
+        case 917: /* external-address */
         case 953: /* global-seedratio */
         case 954: /* no-global-seedratio */
         case 990: /* start-paused */
@@ -1500,6 +1502,8 @@ printSession( tr_benc * top )
             printf( "  Peer exchange allowed: %s\n", ( boolVal ? "Yes" : "No" ) );
         if( tr_bencDictFindStr( args,  TR_PREFS_KEY_ENCRYPTION, &str ) )
             printf( "  Encryption: %s\n", str );
+        if( tr_bencDictFindStr( args, TR_PREFS_KEY_EXTERNAL_IP_ADDRESS, &str ) )
+            printf( "  External IP Address: %s\n", str );
         if( tr_bencDictFindInt( args, TR_PREFS_KEY_MAX_CACHE_SIZE_MB, &i ) )
             printf( "  Maximum memory cache size: %s\n", tr_formatter_mem_MB( buf, i, sizeof( buf ) ) );
         printf( "\n" );
@@ -2008,6 +2012,8 @@ processArgs( const char * rpcurl, int argc, const char ** argv )
                 case 911: tr_bencDictAddStr( args, TR_PREFS_KEY_ENCRYPTION, "preferred" );
                           break;
                 case 912: tr_bencDictAddStr( args, TR_PREFS_KEY_ENCRYPTION, "tolerated" );
+                          break;
+                case 917: tr_bencDictAddStr( args, TR_PREFS_KEY_EXTERNAL_IP_ADDRESS, optarg );
                           break;
                 case 'm': tr_bencDictAddBool( args, TR_PREFS_KEY_PORT_FORWARDING, TRUE );
                           break;

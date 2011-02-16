@@ -572,6 +572,10 @@ createAnnounceURL( const tr_announcer     * announcer,
     if( tier->byteCounts[TR_ANN_CORRUPT] )
         evbuffer_add_printf( buf, "&corrupt=%" PRIu64, tier->byteCounts[TR_ANN_CORRUPT] );
 
+    str = tr_sessionGetExternalIPAddress( announcer->session );
+    if( str && *str )
+        evbuffer_add_printf( buf, "&ip=%s", str );
+
     str = eventName;
     if( str && *str )
         evbuffer_add_printf( buf, "&event=%s", str );

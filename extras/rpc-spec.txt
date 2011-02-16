@@ -421,6 +421,7 @@
    "download-dir-free-space"        | number     | number of free bytes available in download-dir, or -1 if it can't be calculated
    "dht-enabled"                    | boolean    | true means allow dht in public torrents
    "encryption"                     | string     | "required", "preferred", "tolerated"
+   "external-ip-address"            | string     | IP address to announce to trackers
    "idle-seeding-limit"             | number     | the default seed inactivity limit for torrents to use
    "idle-seeding-limit-enabled"     | boolean    | true if the seeding inactivity limit is honored by default
    "incomplete-dir"                 | string     | path for incomplete torrents, when enabled

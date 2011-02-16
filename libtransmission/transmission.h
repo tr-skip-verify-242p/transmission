@@ -174,6 +174,7 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_PREFETCH_ENABLED              "prefetch-enabled"
 #define TR_PREFS_KEY_DOWNLOAD_DIR                  "download-dir"
 #define TR_PREFS_KEY_ENCRYPTION                    "encryption"
+#define TR_PREFS_KEY_EXTERNAL_IP_ADDRESS           "external-ip-address"
 #define TR_PREFS_KEY_IDLE_LIMIT                    "idle-seeding-limit"
 #define TR_PREFS_KEY_IDLE_LIMIT_ENABLED            "idle-seeding-limit-enabled"
 #define TR_PREFS_KEY_INCOMPLETE_DIR                "incomplete-dir"
@@ -693,6 +694,11 @@ void               tr_sessionSetEncryption( tr_session * session,
 const char * tr_sessionGetBindInterface( const tr_session * session );
 void         tr_sessionSetBindInterface( tr_session * session,
                                          const char * ifname );
+
+const char * tr_sessionGetExternalIPAddress( const tr_session * session );
+void         tr_sessionSetExternalIPAddress( tr_session * session,
+                                             const char * ipAddress );
+
 
 /***********************************************************************
 ** Incoming Peer Connections Port
