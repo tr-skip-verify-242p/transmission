@@ -810,7 +810,7 @@ sendLtepHandshake( tr_peermsgs * msgs )
     char * buf;
     int len;
     tr_bool allow_pex;
-    int tex;
+    tr_bool allow_tex;
     tr_bool allow_metadata_xfer;
     struct evbuffer * out = msgs->outMessages;
     const unsigned char * ipv6 = tr_globalIPv6();
@@ -834,8 +834,14 @@ sendLtepHandshake( tr_peermsgs * msgs )
         allow_pex = msgs->peerSupportsPex ? 1 : 0;
     else
         allow_pex = 1;
-    tex = ( tr_torrentAllowsTex( msgs->torrent)
-        || ( msgs->peerSentLtepHandshake && msgs->peerSupportsTex ) ? 1 : 0 );
+
+    /* decide if we want to advertise tex support (BEP 28) */
+    if( !tr_torrentAllowsTex( msgs->torrent ) )
+        allow_tex = 0;
+    else if( msgs->peerSentLtepHandshake )
+        allow_tex = msgs->peerSupportsTex ? 1 : 0;
+    else
+        allow_tex = 1;
 
     tr_bencInitDict( &val, 8 );
     tr_bencDictAddInt( &val, "e", getSession(msgs)->encryptionMode != TR_CLEAR_PREFERRED );
@@ -853,7 +859,7 @@ sendLtepHandshake( tr_peermsgs * msgs )
         tr_bencDictAddInt( m, "ut_metadata", UT_METADATA_ID );
     if( allow_pex )
         tr_bencDictAddInt( m, "ut_pex", UT_PEX_ID );
-    if( tex )
+    if( allow_tex )
     {
         tr_bencDictAddInt( m, "ut_tex", UT_TEX_ID );
         tr_bencDictAddStr( &val, "tr", (char*)tr_torrentTEXCalculateHash( msgs->torrent ));
