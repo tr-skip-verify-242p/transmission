@@ -98,6 +98,7 @@ void             tr_torrentSave( tr_torrent * tor );
 
 void             tr_torrentSetLocalError( tr_torrent * tor, const char * fmt, ... ) TR_GNUC_PRINTF( 2, 3 );
 
+uint8_t*         tr_torrentTEXCalculateHash( tr_torrent * tor);
 
 
 typedef enum
@@ -247,6 +248,8 @@ struct tr_torrent
     uint16_t                   idleLimitMinutes;
     tr_idlelimit               idleLimitMode;
     tr_bool                    finishedSeedingByIdle;
+
+    uint8_t                    trackerListHash[SHA_DIGEST_LENGTH];
 };
 
 static inline tr_torrent*
@@ -329,6 +332,13 @@ static inline tr_bool tr_torrentAllowsPex( const tr_torrent * tor )
 {
     return ( tor != NULL )
         && ( tor->session->isPexEnabled )
+        && ( !tr_torrentIsPrivate( tor ) );
+}
+
+static TR_INLINE tr_bool tr_torrentAllowsTex( const tr_torrent * tor )
+{
+    return ( tor != NULL )
+        && ( tor->session->isTexEnabled )
         && ( !tr_torrentIsPrivate( tor ) );
 }
 

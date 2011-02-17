@@ -699,10 +699,12 @@ tr_sessionInitImpl( void * vdata )
 
     session->shared = tr_sharedInit( session );
 
+    /* BEP 28 */
+    session->isTexEnabled = 1;
+
     /**
     ***  Blocklist
     **/
-
     {
         char * filename = tr_buildPath( session->configDir, "blocklists", NULL );
         tr_mkdirp( filename, 0777 );
