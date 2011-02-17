@@ -28,10 +28,8 @@ void        gtr_actions_handler( const char * action_name, gpointer user_data );
 void        gtr_action_activate      ( const char * action_name );
 void        gtr_action_set_sensitive ( const char * action_name, gboolean is_sensitive );
 void        gtr_action_set_toggled   ( const char * action_name, gboolean is_toggled );
-void       action_set_toggle( const char * name,
-                              gboolean     b );
-
-gboolean   action_get_toggle( const char * name );
+void        gtr_action_set_toggled_nocb( const char * action_name, gboolean is_toggled );
+gboolean    gtr_action_get_toggled   ( const char * action_name );
 void        gtr_action_set_important ( const char * action_name, gboolean is_important );
 GtkWidget*  gtr_action_get_widget    ( const char * path );
 

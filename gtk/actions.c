@@ -334,8 +334,7 @@ gtr_action_set_toggled( const char * name, gboolean b )
 }
 
 void
-action_set_toggle( const char * name,
-                   gboolean     b )
+gtr_action_set_toggled_nocb( const char * name, gboolean b )
 {
     GtkAction * action = get_action( name );
 
@@ -345,7 +344,7 @@ action_set_toggle( const char * name,
 }
 
 gboolean
-action_get_toggle( const char * name )
+gtr_action_get_toggled( const char * name )
 {
     GtkAction * action = get_action( name );
 

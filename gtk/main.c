@@ -350,7 +350,7 @@ refresh_actions( gpointer gdata )
     gtr_action_set_sensitive( "open-torrent-folder", sel_counts.total_count == 1 );
     gtr_action_set_sensitive( "copy-magnet-link-to-clipboard", sel_counts.total_count == 1 );
 
-    action_set_toggle( "force-start-torrent", sel_counts.forcedCount != 0 );
+    gtr_action_set_toggled_nocb( "force-start-torrent", sel_counts.forcedCount != 0 );
 
     canUpdate = 0;
     gtk_tree_selection_selected_foreach( data->sel, count_updatable_foreach, &canUpdate );
@@ -1991,7 +1991,7 @@ gtr_actions_handler( const char * action_name, gpointer user_data )
     }
     else if( !strcmp( action_name, "force-start-torrent" ) )
     {
-        if( action_get_toggle( action_name ) )
+        if( gtr_action_get_toggled( action_name ) )
             changed |= rpcOnSelectedTorrents( data, "torrent-force-start" );
         else
         {
