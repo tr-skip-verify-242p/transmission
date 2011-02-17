@@ -3110,7 +3110,7 @@ tr_torrentTEXCalculateHash( tr_torrent * tor )
             trackerIndex++;
         }
         
-        tr_sha1( tor->trackerListHash, trackerList, trackerListLength );
+        tr_sha1( tor->trackerListHash, trackerList, trackerListLength, NULL );
         
         free( trackerList );
     }
