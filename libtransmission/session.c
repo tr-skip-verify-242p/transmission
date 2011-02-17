@@ -705,6 +705,7 @@ tr_sessionInitImpl( void * vdata )
     /**
     ***  Blocklist
     **/
+
     {
         char * filename = tr_buildPath( session->configDir, "blocklists", NULL );
         tr_mkdirp( filename, 0777 );

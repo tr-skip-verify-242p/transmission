@@ -909,8 +909,9 @@ parseLtepHandshake( tr_peermsgs *     msgs,
 
     /* check supported extensions */
     msgs->peerSupportsPex = 0;
-    msgs->peerSupportsMetadataXfer = 0;
     msgs->peerSupportsTex = 0;
+    msgs->peerSupportsMetadataXfer = 0;
+
     if( tr_bencDictFindDict( &val, "m", &sub ) ) {
         /* Peer Exchange extension */
         if( tr_bencDictFindInt( sub, "ut_pex", &i ) ) {
