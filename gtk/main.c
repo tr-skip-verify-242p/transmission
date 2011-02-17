@@ -259,9 +259,9 @@ struct counts_data
     int total_count;
     int active_count;
     int inactive_count;
-    int queuedCount;
-    int inactiveAndQueuedCount;
-    int forcedCount;
+    int queued_count;
+    int inactive_and_queued_count;
+    int forced_count;
 };
 
 static void
@@ -281,16 +281,16 @@ get_selected_torrent_counts_foreach( GtkTreeModel * model, GtkTreePath * path UN
     {
         ++counts->inactive_count;
         if( tr_torrentIsQueued( tor ) )
-            ++counts->inactiveAndQueuedCount;
+            ++counts->inactive_and_queued_count;
     }
     else
     {
         ++counts->active_count;
         if( !tr_torrentIsQueued( tor ) )
-            ++counts->forcedCount;
+            ++counts->forced_count;
     }
     if( tr_torrentIsQueued( tor ) )
-        ++counts->queuedCount;
+        ++counts->queued_count;
 }
 
 static void
@@ -299,9 +299,9 @@ get_selected_torrent_counts( struct cbdata * data, struct counts_data * counts )
     counts->active_count = 0;
     counts->inactive_count = 0;
     counts->total_count = 0;
-    counts->queuedCount = 0;
-    counts->inactiveAndQueuedCount = 0;
-    counts->forcedCount = 0;
+    counts->queued_count = 0;
+    counts->inactive_and_queued_count = 0;
+    counts->forced_count = 0;
 
     gtk_tree_selection_selected_foreach( data->sel, get_selected_torrent_counts_foreach, counts );
 }
@@ -335,8 +335,8 @@ refresh_actions( gpointer gdata )
 
     get_selected_torrent_counts( data, &sel_counts );
     sort_queue = sort_queue && ( sel_counts.total_count != 0 );
-    gtr_action_set_sensitive( "pause-torrent", sel_counts.active_count != 0 || sel_counts.inactiveAndQueuedCount != 0 );
-    gtr_action_set_sensitive( "start-torrent", sel_counts.inactive_count != 0 && sel_counts.inactive_count != sel_counts.inactiveAndQueuedCount );
+    gtr_action_set_sensitive( "pause-torrent", sel_counts.active_count != 0 || sel_counts.inactive_and_queued_count != 0 );
+    gtr_action_set_sensitive( "start-torrent", sel_counts.inactive_count != 0 && sel_counts.inactive_count != sel_counts.inactive_and_queued_count );
     gtr_action_set_sensitive( "force-start-torrent", sel_counts.total_count != 0 );
     gtr_action_set_sensitive( "remove-torrent", sel_counts.total_count != 0 );
     gtr_action_set_sensitive( "delete-torrent", sel_counts.total_count != 0 );
@@ -350,7 +350,7 @@ refresh_actions( gpointer gdata )
     gtr_action_set_sensitive( "open-torrent-folder", sel_counts.total_count == 1 );
     gtr_action_set_sensitive( "copy-magnet-link-to-clipboard", sel_counts.total_count == 1 );
 
-    gtr_action_set_toggled_nocb( "force-start-torrent", sel_counts.forcedCount != 0 );
+    gtr_action_set_toggled_nocb( "force-start-torrent", sel_counts.forced_count != 0 );
 
     canUpdate = 0;
     gtk_tree_selection_selected_foreach( data->sel, count_updatable_foreach, &canUpdate );
