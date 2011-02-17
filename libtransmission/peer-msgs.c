@@ -864,6 +864,7 @@ sendLtepHandshake( tr_peermsgs * msgs )
         tr_bencDictAddInt( m, "ut_tex", UT_TEX_ID );
         tr_bencDictAddStr( &val, "tr", (char*)tr_torrentTEXCalculateHash( msgs->torrent ));
     }
+
     buf = tr_bencToStr( &val, TR_FMT_BENC, &len );
 
     evbuffer_add_uint32( out, 2 * sizeof( uint8_t ) + len );
