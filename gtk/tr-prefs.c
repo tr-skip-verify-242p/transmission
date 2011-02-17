@@ -357,14 +357,14 @@ queuePage( GObject * core )
         s = _( "Maxiumum _downloads active:" );
         w = new_check_button( s, TR_PREFS_KEY_QUEUE_ENABLED_DOWNLOAD, core );
         w2 = new_spin_button( TR_PREFS_KEY_QUEUE_MAX_DOWNLOAD_ACTIVE, core, 0, 9999, 1 );
-        gtk_widget_set_sensitive( GTK_WIDGET( w2 ), pref_flag_get( TR_PREFS_KEY_QUEUE_ENABLED_DOWNLOAD ) );
+        gtk_widget_set_sensitive( GTK_WIDGET( w2 ), gtr_pref_flag_get( TR_PREFS_KEY_QUEUE_ENABLED_DOWNLOAD ) );
         g_signal_connect( w, "toggled", G_CALLBACK( target_cb ), w2 );
         hig_workarea_add_row_w( t, &row, w, w2, NULL );
 
         s = _( "Maxiumum _seeds active:" );
         w = new_check_button( s, TR_PREFS_KEY_QUEUE_ENABLED_SEED, core );
         w2 = new_spin_button( TR_PREFS_KEY_QUEUE_MAX_SEED_ACTIVE, core, 0, 9999, 1 );
-        gtk_widget_set_sensitive( GTK_WIDGET( w2 ), pref_flag_get( TR_PREFS_KEY_QUEUE_ENABLED_SEED ) );
+        gtk_widget_set_sensitive( GTK_WIDGET( w2 ), gtr_pref_flag_get( TR_PREFS_KEY_QUEUE_ENABLED_SEED ) );
         g_signal_connect( w, "toggled", G_CALLBACK( target_cb ), w2 );
         hig_workarea_add_row_w( t, &row, w, w2, NULL );
 
@@ -374,13 +374,13 @@ queuePage( GObject * core )
         s = _( "Skip torrent if slow for _N minutes:" );
         w = new_check_button( s, TR_PREFS_KEY_QUEUE_SKIP_SLOW_TORRENTS, core );
         w2 = new_spin_button( TR_PREFS_KEY_QUEUE_SLOW_COUNT, core, 0, 9999, 1 );
-        gtk_widget_set_sensitive( GTK_WIDGET( w2 ), pref_flag_get( TR_PREFS_KEY_QUEUE_SKIP_SLOW_TORRENTS ) );
+        gtk_widget_set_sensitive( GTK_WIDGET( w2 ), gtr_pref_flag_get( TR_PREFS_KEY_QUEUE_SKIP_SLOW_TORRENTS ) );
         g_signal_connect( w, "toggled", G_CALLBACK( target_cb ), w2 );
         hig_workarea_add_row_w( t, &row, w, w2, NULL );
 
         g_snprintf( buf, sizeof( buf ), _( "Slow torrent cutoff sp_eed (%s):" ), _(speed_K_str) );
         w2 = new_spin_button( TR_PREFS_KEY_QUEUE_SLOW_CUTOFF_KBps, core, 0, 9999, 1 );
-        gtk_widget_set_sensitive( GTK_WIDGET( w2 ), pref_flag_get( TR_PREFS_KEY_QUEUE_SKIP_SLOW_TORRENTS ) );
+        gtk_widget_set_sensitive( GTK_WIDGET( w2 ), gtr_pref_flag_get( TR_PREFS_KEY_QUEUE_SKIP_SLOW_TORRENTS ) );
         g_signal_connect( w, "toggled", G_CALLBACK( target_cb ), w2 );
         hig_workarea_add_row( t, &row, buf, w2, NULL );
 
