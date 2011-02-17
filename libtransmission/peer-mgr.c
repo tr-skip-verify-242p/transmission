@@ -296,7 +296,6 @@ getExistingHandshake( tr_ptrArray * handshakes, const tr_endpoint * endpoint )
 }
 
 static int
-//comparePeerAtomToAddress( const void * va, const void * vb )
 comparePeerAtomToEndpoint( const void * va, const void * vb )
 {
     const struct peer_atom * a = va;
@@ -305,7 +304,6 @@ comparePeerAtomToEndpoint( const void * va, const void * vb )
 }
 
 static int
-//compareAtomsByAddress( const void * va, const void * vb )
 compareAtomsByEndpoint( const void * va, const void * vb )
 {
     const struct peer_atom * b = vb;
