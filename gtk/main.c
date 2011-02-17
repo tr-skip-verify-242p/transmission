@@ -259,9 +259,9 @@ struct counts_data
     int total_count;
     int active_count;
     int inactive_count;
-    int    queuedCount;
-    int    inactiveAndQueuedCount;
-    int    forcedCount;
+    int queuedCount;
+    int inactiveAndQueuedCount;
+    int forcedCount;
 };
 
 static void

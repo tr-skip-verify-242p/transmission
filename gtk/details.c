@@ -573,7 +573,7 @@ activityString( const tr_torrent * tor, const tr_stat * torStat )
             else
                 return _( "Downloading" );
         }
-        case TR_STATUS_SEED:       
+        case TR_STATUS_SEED:
         {
             if( !tr_torrentIsQueued( tor ) && tr_torrentCouldQueue( tor ) )
                 return _( "Forced seeding" );
@@ -737,7 +737,7 @@ refreshInfo( struct DetailsImpl * di, tr_torrent ** torrents, int n )
     else {
         const char * baseline = activityString( torrents[0], stats[0] );
         for( i=1; i<n; ++i )
-            if( strcmp( baseline,  activityString( torrents[i], stats[i] ) ) )
+            if( strcmp( baseline, activityString( torrents[i], stats[i] ) ) )
                 break;
         str = i<n ? mixed : baseline;
     }
