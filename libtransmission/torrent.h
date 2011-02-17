@@ -335,7 +335,7 @@ static inline tr_bool tr_torrentAllowsPex( const tr_torrent * tor )
         && ( !tr_torrentIsPrivate( tor ) );
 }
 
-static TR_INLINE tr_bool tr_torrentAllowsTex( const tr_torrent * tor )
+static inline tr_bool tr_torrentAllowsTex( const tr_torrent * tor )
 {
     return ( tor != NULL )
         && ( tor->session->isTexEnabled )
