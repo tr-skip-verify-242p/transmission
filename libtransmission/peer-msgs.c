@@ -948,7 +948,7 @@ parseLtepHandshake( tr_peermsgs *     msgs,
                 if( memcmp( msgs->peerTexHash, trackerHash, SHA_DIGEST_LENGTH) != 0 )
                 {
                     msgs->peerTexHash = tr_memdup( trackerHash, SHA_DIGEST_LENGTH );
-                    msgs->peerTexHashChangedAt = time( NULL );
+                    msgs->peerTexHashChangedAt = tr_time( );
                 }
                 else
                     msgs->peerTexHashChangedAt = 0;
