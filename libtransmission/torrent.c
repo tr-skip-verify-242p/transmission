@@ -3101,7 +3101,7 @@ tr_torrentTEXCalculateHash( tr_torrent * tor )
             char * announceURL = tor->info.trackers[trackerIndex].announce;
             size_t announceLen = strlen( announceURL ) + 1; /* for ending NULL */
 
-            trackerList = realloc( trackerList, trackerListLength + announceLen );
+            trackerList = tr_renew( uint8_t, trackerList, trackerListLength + announceLen );
 
             /* BEP 28 : Normalize */
             tr_strlcpy( (char *) trackerList + trackerListLength, announceURL, announceLen );
@@ -3112,7 +3112,7 @@ tr_torrentTEXCalculateHash( tr_torrent * tor )
 
         tr_sha1( tor->trackerListHash, trackerList, trackerListLength, NULL );
 
-        free( trackerList );
+        tr_free( trackerList );
     }
 
     return tor->trackerListHash;
