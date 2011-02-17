@@ -1034,8 +1034,7 @@ tr_sessionInitImpl( void * vdata )
 
     assert( tr_isSession( session ) );
 
-    session->queueTimer = tr_new0( struct event, 1 );
-    evtimer_set( session->queueTimer, onQueueTimer, session );
+    session->queueTimer = evtimer_new( session->event_base, onQueueTimer, session );
     tr_timerAdd( session->queueTimer, QUEUE_INTERVAL_SECS, 0 );
 
     session->saveTimer = evtimer_new( session->event_base, onSaveTimer, session );
@@ -2112,8 +2111,7 @@ sessionCloseImpl( void * vsession )
 
     tr_udpUninit( session );
 
-    evtimer_del( session->queueTimer );
-    tr_free( session->queueTimer );
+    event_free( session->queueTimer );
     session->queueTimer = NULL;
 
     event_free( session->saveTimer );
