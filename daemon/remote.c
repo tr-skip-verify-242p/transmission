@@ -2294,7 +2294,7 @@ processArgs( const char * rpcurl, int argc, const char ** argv )
                     tr_bencInitDict( top, 2 );
                     tr_bencDictAddStr( top, "method", "torrent-force-start" );
                     addIdArg( tr_bencDictAddDict( top, ARGUMENTS, 1 ), id );
-                    status |= flush( host, port, &top );
+                    status |= flush( rpcurl, &top );
                 }
                 break;
             }
