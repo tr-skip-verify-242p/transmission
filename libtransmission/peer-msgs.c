@@ -231,7 +231,7 @@ struct tr_peermsgs
        supplied a reqq argument, it's stored here. Otherwise, the
        value is zero and should be ignored. */
     int64_t               reqq;
-    
+
     uint8_t             * peerTexHash;
     time_t                peerTexHashChangedAt;
 
@@ -927,16 +927,16 @@ parseLtepHandshake( tr_peermsgs *     msgs,
         if( tr_bencDictFindInt( sub, "ut_tex", &i ) ) {
             const uint8_t *trackerHash;
             size_t trackerHashLen;
-            
+
             msgs->ut_tex_id = (uint8_t) i;
             msgs->peerSupportsTex = msgs->ut_tex_id == 0 ? 0 : 1;
             dbgmsg( msgs, "msgs->ut_tex is %d", (int)msgs->ut_tex_id );
-            
+
             /* Parse the 'tr' key, and act accordingly */
             if( tr_bencDictFindRaw( &val, "tr", &trackerHash, &trackerHashLen ) )
             {
                 assert( trackerHashLen == SHA_DIGEST_LENGTH );
-                
+
                 if( memcmp( msgs->peerTexHash, trackerHash, SHA_DIGEST_LENGTH) != 0 )
                 {
                     msgs->peerTexHash = tr_memdup( trackerHash, SHA_DIGEST_LENGTH );
@@ -2380,14 +2380,14 @@ sendTex( struct tr_peermsgs * msgs )
         int bencLen;
         tr_peerIo       * io  = msgs->peer->io;
         struct evbuffer * out = msgs->outMessages;
-        
+
         tr_bencInitDict( &val, 2 );
         addedList = tr_bencDictAddList( &val, "added", 2 );
         while( 0 )
         {
             /* BEP 28 : TODO */
         }
-        
+
         /* write the pex message */
 /*        benc = tr_bencToStr( &val, TR_FMT_BENC, &bencLen );
         tr_peerIoWriteUint32( io, out, 2 * sizeof( uint8_t ) + bencLen );
@@ -2405,9 +2405,9 @@ static void
 texPulse( int foo UNUSED, short bar UNUSED, void * vmsgs )
 {
     struct tr_peermsgs * msgs = vmsgs;
-    
+
     sendTex( msgs );
-    
+
     tr_timerAdd( msgs->texTimer, TEX_INTERVAL_SECS, 0 );
 }
 

@@ -3094,26 +3094,26 @@ tr_torrentTEXCalculateHash( tr_torrent * tor )
         int trackerIndex = 0;
         int trackerListLength = 0;
         uint8_t * trackerList = NULL;
-        
+
         while( trackerIndex < tor->info.trackerCount )
         {
             /* Fetch the tracker announce URL */
             char * announceURL = tor->info.trackers[trackerIndex].announce;
             size_t announceLen = strlen( announceURL ) + 1; /* for ending NULL */
-            
+
             trackerList = realloc( trackerList, trackerListLength + announceLen );
-            
+
             /* BEP 28 : Normalize */
             tr_strlcpy((char *)trackerList + trackerListLength, announceURL, announceLen );
-            
+
             trackerListLength += announceLen;
             trackerIndex++;
         }
-        
+
         tr_sha1( tor->trackerListHash, trackerList, trackerListLength, NULL );
-        
+
         free( trackerList );
     }
-    
+
     return tor->trackerListHash;
 }
