@@ -98,7 +98,7 @@ void             tr_torrentSave( tr_torrent * tor );
 
 void             tr_torrentSetLocalError( tr_torrent * tor, const char * fmt, ... ) TR_GNUC_PRINTF( 2, 3 );
 
-uint8_t*         tr_torrentTEXCalculateHash( tr_torrent * tor);
+uint8_t *        tr_torrentTEXCalculateHash( tr_torrent * tor );
 
 
 typedef enum

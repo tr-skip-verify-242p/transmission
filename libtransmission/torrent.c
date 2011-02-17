@@ -3086,7 +3086,7 @@ tr_torrentBuildPartial( const tr_torrent * tor, tr_file_index_t fileNum )
     return tr_strdup_printf( "%s.part", tor->info.files[fileNum].name );
 }
 
-uint8_t*
+uint8_t *
 tr_torrentTEXCalculateHash( tr_torrent * tor )
 {
     if( tr_torrentAllowsTex( tor ) && tor->trackerListHash[0] == '\0' )
@@ -3104,7 +3104,7 @@ tr_torrentTEXCalculateHash( tr_torrent * tor )
             trackerList = realloc( trackerList, trackerListLength + announceLen );
 
             /* BEP 28 : Normalize */
-            tr_strlcpy((char *)trackerList + trackerListLength, announceURL, announceLen );
+            tr_strlcpy( (char *) trackerList + trackerListLength, announceURL, announceLen );
 
             trackerListLength += announceLen;
             trackerIndex++;
