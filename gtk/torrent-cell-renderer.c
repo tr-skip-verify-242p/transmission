@@ -235,10 +235,20 @@ getShortStatusString( const tr_torrent  * tor,
     switch( st->activity )
     {
         case TR_STATUS_STOPPED:
-            if( st->finished )
-                g_string_assign( gstr, _( "Finished" ) );
+            if( tr_torrentIsQueued( tor ) && tr_torrentCouldQueue( tor ) )
+            {
+                if( st->leftUntilDone )
+                    g_string_assign( gstr, _( "Queued to download" ) );
+                else
+                    g_string_assign( gstr, _( "Queued to seed" ) );
+            }
             else
-                g_string_assign( gstr, _( "Paused" ) );
+            {
+                if( st->finished )
+                    g_string_assign( gstr, _( "Finished" ) );
+                else
+                    g_string_assign( gstr, _( "Paused" ) );
+            }
             break;
 
         case TR_STATUS_CHECK_WAIT:
@@ -265,23 +275,6 @@ getShortStatusString( const tr_torrent  * tor,
             g_string_append( gstr, buf );
             break;
         }
-
-        case TR_STATUS_STOPPED:
-            if( tr_torrentIsQueued( tor ) && tr_torrentCouldQueue( tor ) )
-            {
-                if( torStat->leftUntilDone )
-                    g_string_assign( gstr, _( "Queued to download" ) );
-                else
-                    g_string_assign( gstr, _( "Queued to seed" ) );
-            }
-            else
-            {
-                if( torStat->finished )
-                    g_string_assign( gstr, _( "Finished" ) );
-                else
-                    g_string_assign( gstr, _( "Paused" ) );
-            }
-            break;
 
         default:
             break;
@@ -323,35 +316,46 @@ getStatusString( const tr_torrent  * tor,
 
         case TR_STATUS_DOWNLOAD:
         {
+            /* FIXME: Translated strings should not be assembled. */
+            char * pch = getActivityString( tor, st );
             if( tr_torrentHasMetadata( tor ) )
             {
                 g_string_append_printf( gstr,
-                    gtr_ngettext( "Downloading from %1$'d of %2$'d connected peer",
-                                  "Downloading from %1$'d of %2$'d connected peers",
+                    gtr_ngettext( "%1$s from %2$'d of %3$'d connected peer",
+                                  "%1$s from %2$'d of %3$'d connected peers",
                                   st->webseedsSendingToUs + st->peersSendingToUs ),
+                    pch,
                     st->webseedsSendingToUs + st->peersSendingToUs,
                     st->webseedsSendingToUs + st->peersConnected );
             }
             else
             {
                 g_string_append_printf( gstr,
-                    gtr_ngettext( "Downloading metadata from %1$'d peer (%2$d%% done)",
-                                  "Downloading metadata from %1$'d peers (%2$d%% done)",
+                    gtr_ngettext( "%1$s metadata from %2$'d peer (%3$d%% done)",
+                                  "%1$s metadata from %2$'d peers (%3$d%% done)",
                                   st->peersConnected + st->peersConnected ),
+                    pch,
                     st->peersConnected + st->webseedsSendingToUs,
                     (int)(100.0*st->metadataPercentComplete) );
             }
+            g_free( pch );
             break;
         }
 
         case TR_STATUS_SEED:
+        {
+            /* FIXME: Translated strings should not be assembled. */
+            char * pch = getActivityString( tor, st );
             g_string_append_printf( gstr,
-                gtr_ngettext( "Seeding to %1$'d of %2$'d connected peer",
-                              "Seeding to %1$'d of %2$'d connected peers",
+                gtr_ngettext( "%1$s to %2$'d of %3$'d connected peer",
+                              "%1$s to %2$'d of %3$'d connected peers",
                               st->peersConnected ),
+                pch,
                 st->peersGettingFromUs,
                 st->peersConnected );
-                break;
+            g_free( pch );
+            break;
+        }
     }
 
     if( isActive && !isChecking )
