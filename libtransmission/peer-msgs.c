@@ -236,7 +236,7 @@ struct tr_peermsgs
     time_t                peerTexHashChangedAt;
 
     struct event        * pexTimer;
-    struct event          texTimer;
+    struct event        * texTimer;
 };
 
 /**
@@ -1131,11 +1131,13 @@ parseUtPex( tr_peermsgs * msgs, int msglen, struct evbuffer * inbuf )
     tr_free( tmp );
 }
 
+#if 0
 static void
 parseUtTex( tr_peermsgs * msgs, int msglen, struct evbuffer * inbuf )
 {
     /* BEP 28 : TODO */
 }
+#endif
 
 static void sendPex( tr_peermsgs * msgs );
 static void sendTex( tr_peermsgs * msgs );
@@ -1175,7 +1177,7 @@ parseLtep( tr_peermsgs * msgs, int msglen, struct evbuffer  * inbuf )
     {
         dbgmsg( msgs, "got ut tex" );
         msgs->peerSupportsTex = 1;
-        parseUtTex( msgs, msglen, inbuf );
+        /* FIXME: parseUtTex( msgs, msglen, inbuf ); */
     }
     else
     {
@@ -2372,6 +2374,7 @@ sendTex( struct tr_peermsgs * msgs )
 {
     if( msgs->peerSupportsTex && tr_torrentAllowsTex( msgs->torrent ) )
     {
+#if 0
         tr_benc val, *addedList;
         char *benc;
         int bencLen;
@@ -2394,6 +2397,7 @@ sendTex( struct tr_peermsgs * msgs )
         pokeBatchPeriod( msgs, HIGH_PRIORITY_INTERVAL_SECS );
         dbgmsg( msgs, "sending a tex message; outMessage size is now %zu", EVBUFFER_LENGTH( out ) );
         dbgOutMessageLen( msgs );*/
+#endif
     }
 }
 
@@ -2404,7 +2408,7 @@ texPulse( int foo UNUSED, short bar UNUSED, void * vmsgs )
     
     sendTex( msgs );
     
-    tr_timerAdd( &msgs->texTimer, TEX_INTERVAL_SECS, 0 );
+    tr_timerAdd( msgs->texTimer, TEX_INTERVAL_SECS, 0 );
 }
 
 /**
@@ -2436,11 +2440,11 @@ tr_peerMsgsNew( struct tr_torrent    * torrent,
     m->outMessagesBatchedAt = 0;
     m->outMessagesBatchPeriod = LOW_PRIORITY_INTERVAL_SECS;
     m->incoming.block = evbuffer_new( );
-    m->pexTimer = evtimer_new( torrent->session->event_base, pexPulse, m );
-    evtimer_set( &m->texTimer, texPulse, m );
-    tr_timerAdd( &m->texTimer, TEX_INTERVAL_SECS, 0 );
     peer->msgs = m;
+    m->pexTimer = evtimer_new( torrent->session->event_base, pexPulse, m );
     tr_timerAdd( m->pexTimer, PEX_INTERVAL_SECS, 0 );
+    m->texTimer = evtimer_new( torrent->session->event_base, texPulse, m );
+    tr_timerAdd( m->texTimer, TEX_INTERVAL_SECS, 0 );
 
     if( tr_peerIoSupportsLTEP( peer->io ) )
         sendLtepHandshake( m );
