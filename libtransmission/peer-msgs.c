@@ -68,7 +68,7 @@ enum
     LTEP_HANDSHAKE          = 0,
 
     UT_PEX_ID               = 1,
-    TR_LTEP_TEX             = 2,
+    UT_TEX_ID               = 2,
     UT_METADATA_ID          = 3,
 
     MAX_PEX_PEER_COUNT      = 50,
@@ -855,7 +855,7 @@ sendLtepHandshake( tr_peermsgs * msgs )
         tr_bencDictAddInt( m, "ut_pex", UT_PEX_ID );
     if( tex )
     {
-        tr_bencDictAddInt( m, "ut_tex", TR_LTEP_TEX );
+        tr_bencDictAddInt( m, "ut_tex", UT_TEX_ID );
         tr_bencDictAddStr( &val, "tr", (char*)tr_torrentTEXCalculateHash( msgs->torrent ));
     }
     buf = tr_bencToStr( &val, TR_FMT_BENC, &len );
@@ -1173,7 +1173,7 @@ parseLtep( tr_peermsgs * msgs, int msglen, struct evbuffer  * inbuf )
         msgs->peerSupportsMetadataXfer = 1;
         parseUtMetadata( msgs, msglen, inbuf );
     }
-    else if( ltep_msgid == TR_LTEP_TEX )
+    else if( ltep_msgid == UT_TEX_ID )
     {
         dbgmsg( msgs, "got ut tex" );
         msgs->peerSupportsTex = 1;
