@@ -353,15 +353,6 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PROXY_TYPE,               TR_PROXY_HTTP );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_PROXY_USERNAME,           "" );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PREFETCH_ENABLED,         DEFAULT_PREFETCH_ENABLED );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_ENABLED_DOWNLOAD,   FALSE );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_ENABLED_SEED,       FALSE );
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_QUEUE_MAX_DOWNLOAD_ACTIVE,2 );
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_QUEUE_MAX_SEED_ACTIVE,    2 );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_NEW_TORRENTS_TOP,   FALSE );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_SKIP_SLOW_TORRENTS, FALSE );
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_QUEUE_SLOW_COUNT,         5 );
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_QUEUE_SLOW_CUTOFF_KBps,   5 );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_SPEED_LIMIT,        FALSE );
     tr_bencDictAddReal( d, TR_PREFS_KEY_RATIO,                    2.0 );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RATIO_ENABLED,            FALSE );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RENAME_PARTIAL_FILES,     TRUE );
@@ -376,6 +367,15 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddStr ( d, TR_PREFS_KEY_RPC_URL,                  TR_DEFAULT_RPC_URL_STR );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_SCRIPT_TORRENT_DONE_FILENAME, "" );
     tr_bencDictAddBool( d, TR_PREFS_KEY_SCRIPT_TORRENT_DONE_ENABLED, FALSE );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_ENABLED_DOWNLOAD,   FALSE );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_ENABLED_SEED,       FALSE );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_QUEUE_MAX_DOWNLOAD_ACTIVE,2 );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_QUEUE_MAX_SEED_ACTIVE,    2 );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_NEW_TORRENTS_TOP,   FALSE );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_SKIP_SLOW_TORRENTS, FALSE );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_QUEUE_SLOW_COUNT,         5 );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_QUEUE_SLOW_CUTOFF_KBps,   5 );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_SPEED_LIMIT,        FALSE );
     tr_bencDictAddBool( d, TR_PREFS_KEY_ALT_SPEED_ENABLED,        FALSE );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_ALT_SPEED_UP_KBps,        50 ); /* half the regular */
     tr_bencDictAddInt ( d, TR_PREFS_KEY_ALT_SPEED_DOWN_KBps,      50 ); /* half the regular */
@@ -434,15 +434,6 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PROXY_TYPE,               s->proxyType );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_PROXY_USERNAME,           s->proxyUsername );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PREFETCH_ENABLED,         s->isPrefetchEnabled );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_ENABLED_DOWNLOAD,   tr_sessionIsQueueEnabledDownload( s ) );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_ENABLED_SEED,       tr_sessionIsQueueEnabledSeed( s ) );
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_QUEUE_MAX_DOWNLOAD_ACTIVE,tr_sessionGetQueueMaxDownloadActive( s ) );
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_QUEUE_MAX_SEED_ACTIVE,    tr_sessionGetQueueMaxSeedActive( s ) );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_NEW_TORRENTS_TOP,   tr_sessionGetQueueNewTorrentsTop( s ) );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_SKIP_SLOW_TORRENTS, tr_sessionIsQueueSkipSlowTorrentsEnabled( s ) );
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_QUEUE_SLOW_COUNT,         tr_sessionGetQueueSlowCount( s ) );
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_QUEUE_SLOW_CUTOFF_KBps,   tr_sessionGetQueueSlowCutoff( s ) );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_SPEED_LIMIT,        tr_sessionIsQueueSpeedLimitEnabled( s ) );
     tr_bencDictAddReal( d, TR_PREFS_KEY_RATIO,                    s->desiredRatio );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RATIO_ENABLED,            s->isRatioLimited );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RENAME_PARTIAL_FILES,     tr_sessionIsIncompleteFileNamingEnabled( s ) );
@@ -457,6 +448,15 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddBool( d, TR_PREFS_KEY_RPC_WHITELIST_ENABLED,    tr_sessionGetRPCWhitelistEnabled( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_SCRIPT_TORRENT_DONE_ENABLED, tr_sessionIsTorrentDoneScriptEnabled( s ) );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_SCRIPT_TORRENT_DONE_FILENAME, tr_sessionGetTorrentDoneScript( s ) );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_ENABLED_DOWNLOAD,   tr_sessionIsQueueEnabledDownload( s ) );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_ENABLED_SEED,       tr_sessionIsQueueEnabledSeed( s ) );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_QUEUE_MAX_DOWNLOAD_ACTIVE,tr_sessionGetQueueMaxDownloadActive( s ) );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_QUEUE_MAX_SEED_ACTIVE,    tr_sessionGetQueueMaxSeedActive( s ) );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_NEW_TORRENTS_TOP,   tr_sessionGetQueueNewTorrentsTop( s ) );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_SKIP_SLOW_TORRENTS, tr_sessionIsQueueSkipSlowTorrentsEnabled( s ) );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_QUEUE_SLOW_COUNT,         tr_sessionGetQueueSlowCount( s ) );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_QUEUE_SLOW_CUTOFF_KBps,   tr_sessionGetQueueSlowCutoff( s ) );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_SPEED_LIMIT,        tr_sessionIsQueueSpeedLimitEnabled( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_ALT_SPEED_ENABLED,        tr_sessionUsesAltSpeed( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_ALT_SPEED_UP_KBps,        tr_sessionGetAltSpeed_KBps( s, TR_UP ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_ALT_SPEED_DOWN_KBps,      tr_sessionGetAltSpeed_KBps( s, TR_DOWN ) );
@@ -1156,6 +1156,11 @@ sessionSetImpl( void * vdata )
     if( tr_bencDictFindStr( settings, TR_PREFS_KEY_PROXY_PASSWORD, &str ) )
         tr_sessionSetProxyPassword( session, str );
 
+    /* rpc server */
+    if( session->rpcServer != NULL ) /* close the old one */
+        tr_rpcClose( &session->rpcServer );
+    session->rpcServer = tr_rpcInit( session, settings );
+
     /* torrent queueing */
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_QUEUE_ENABLED_DOWNLOAD, &boolVal ) )
         session->queueEnabledDownload = boolVal;
@@ -1176,11 +1181,6 @@ sessionSetImpl( void * vdata )
         session->queueSlowCutoff = i;
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_QUEUE_SPEED_LIMIT, &boolVal ) )
         tr_sessionSetQueueSpeedLimitEnabled( session, boolVal );
-
-    /* rpc server */
-    if( session->rpcServer != NULL ) /* close the old one */
-        tr_rpcClose( &session->rpcServer );
-    session->rpcServer = tr_rpcInit( session, settings );
 
     /* public addresses */
 
