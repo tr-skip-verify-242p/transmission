@@ -93,6 +93,7 @@ class Session: public QObject
         QNetworkAccessManager * networkAccessManager( );
 
     public:
+        void torrentSet( const QList<int>& ids, const QString& key, int val );
         void torrentSet( const QSet<int>& ids, const QString& key, bool val );
         void torrentSet( const QSet<int>& ids, const QString& key, int val );
         void torrentSet( const QSet<int>& ids, const QString& key, double val );
@@ -105,6 +106,7 @@ class Session: public QObject
     public slots:
         void pauseTorrents( const QSet<int>& torrentIds = QSet<int>() );
         void startTorrents( const QSet<int>& torrentIds = QSet<int>() );
+        void forceStartTorrents( const QSet<int>& torrentIds = QSet<int>() );
         void refreshSessionInfo( );
         void refreshSessionStats( );
         void refreshActiveTorrents( );

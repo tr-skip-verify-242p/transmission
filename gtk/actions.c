@@ -34,6 +34,8 @@
 static TrCore * myCore = NULL;
 static GtkActionGroup * myGroup = NULL;
 
+static struct cbdata  * myCbdata = NULL;
+
 static void
 action_cb( GtkAction * a, gpointer user_data )
 {
@@ -57,7 +59,8 @@ static GtkRadioActionEntry sort_radio_entries[] =
     { "sort-by-state",     NULL, N_( "Sort by Stat_e" ),     NULL, NULL, 4 },
     { "sort-by-age",       NULL, N_( "Sort by A_ge" ),       NULL, NULL, 5 },
     { "sort-by-time-left", NULL, N_( "Sort by Time _Left" ), NULL, NULL, 6 },
-    { "sort-by-size",      NULL, N_( "Sort by Si_ze" ),      NULL, NULL, 7 }
+    { "sort-by-size",      NULL, N_( "Sort by Si_ze" ),      NULL, NULL, 7 },
+    { "sort-by-queue",     NULL, N_( "Sort by _Queue" ),     NULL, NULL, 8 }
 };
 
 static void
@@ -74,6 +77,7 @@ sort_changed_cb( GtkAction            * action UNUSED,
 
 static GtkToggleActionEntry show_toggle_entries[] =
 {
+    { "force-start-torrent", GTK_STOCK_MEDIA_FORWARD, N_( "_Force Start" ), "<control>F", N_( "Force start torrent" ), G_CALLBACK( action_cb ), FALSE },
     { "toggle-main-window", NULL, N_( "_Show Transmission" ), NULL, NULL, G_CALLBACK( action_cb ), TRUE },
     { "toggle-message-log", NULL, N_( "Message _Log" ), NULL, NULL, G_CALLBACK( action_cb ), FALSE }
 };
@@ -119,6 +123,10 @@ static GtkActionEntry entries[] =
     { "start-all-torrents", GTK_STOCK_MEDIA_PLAY, N_( "_Start All" ), NULL, N_( "Start all torrents" ), G_CALLBACK( action_cb ) },
     { "relocate-torrent", NULL, N_("Set _Location..." ), NULL, NULL, G_CALLBACK( action_cb ) },
     { "remove-torrent", GTK_STOCK_REMOVE, NULL, "Delete", N_( "Remove torrent" ), G_CALLBACK( action_cb ) },
+    { "queue-up", GTK_STOCK_GO_UP, NULL, NULL, N_( "Move torrent up queue" ), G_CALLBACK( action_cb ) },
+    { "queue-down", GTK_STOCK_GO_DOWN, NULL, NULL, N_( "Move torrent down queue " ), G_CALLBACK( action_cb ) },
+    { "queue-top", GTK_STOCK_GOTO_TOP, NULL, NULL, N_( "Move torrent to of top queue" ), G_CALLBACK( action_cb ) },
+    { "queue-bottom", GTK_STOCK_GOTO_BOTTOM, NULL, NULL, N_( "Move torrent to of bottom queue" ), G_CALLBACK( action_cb ) },
     { "delete-torrent", GTK_STOCK_DELETE, N_( "_Delete Files and Remove" ), "<shift>Delete", NULL, G_CALLBACK( action_cb ) },
     { "new-torrent", GTK_STOCK_NEW, N_( "_New..." ), NULL, N_( "Create a torrent" ), G_CALLBACK( action_cb ) },
     { "quit", GTK_STOCK_QUIT, N_( "_Quit" ), NULL, NULL, G_CALLBACK( action_cb ) },
@@ -206,6 +214,8 @@ gtr_actions_init( GtkUIManager * ui_manager, gpointer callback_user_data )
     GtkActionGroup * action_group;
 
     myUIManager = ui_manager;
+
+    myCbdata = callback_user_data;
 
     register_my_icons( );
 
@@ -321,6 +331,25 @@ gtr_action_set_toggled( const char * name, gboolean b )
     GtkAction * action = get_action( name );
 
     gtk_toggle_action_set_active( GTK_TOGGLE_ACTION( action ), b );
+}
+
+void
+action_set_toggle( const char * name,
+                   gboolean     b )
+{
+    GtkAction * action = get_action( name );
+
+    g_signal_handlers_block_by_func( action, action_cb, myCbdata );
+    gtk_toggle_action_set_active( GTK_TOGGLE_ACTION( action ), b );
+    g_signal_handlers_unblock_by_func( action, action_cb, myCbdata );
+}
+
+gboolean
+action_get_toggle( const char * name )
+{
+    GtkAction * action = get_action( name );
+
+    return gtk_toggle_action_get_active( GTK_TOGGLE_ACTION( action ) );
 }
 
 GtkWidget*

@@ -41,7 +41,7 @@ Torrent._MetaDataFields = [ 'addedDate', 'comment', 'creator', 'dateCreated',
 Torrent._DynamicFields = [ 'downloadedEver', 'error', 'errorString', 'eta',
     'haveUnchecked', 'haveValid', 'leftUntilDone', 'metadataPercentComplete', 'peers',
     'peersConnected', 'peersGettingFromUs', 'peersSendingToUs', 'rateDownload', 'rateUpload',
-    'recheckProgress', 'sizeWhenDone', 'status', 'trackerStats', 'desiredAvailable',
+    'recheckProgress', 'sizeWhenDone', 'status', 'trackerStats', 'desiredAvailable', 'queueRank', 'queued',
     'uploadedEver', 'uploadRatio', 'seedRatioLimit', 'seedRatioMode', 'downloadDir', 'isFinished' ]
 
 Torrent.prototype =
@@ -251,13 +251,27 @@ Torrent.prototype =
 	getPercentDoneStr: function() {
 		return Transmission.fmt.percentString( 100 * this.getPercentDone() );
 	},
+	isQueued: function() { return this._queued ? true : false; },
+	queueRank: function() { return this._queueRank; },
 	size: function() { return this._size; },
 	state: function() { return this._state; },
 	stateStr: function() {
 		switch( this.state() ) {
 			case Torrent._StatusSeeding:        return 'Seeding';
 			case Torrent._StatusDownloading:    return 'Downloading';
-			case Torrent._StatusPaused:         return this.isFinished() ? 'Seeding complete' : 'Paused';
+			case Torrent._StatusPaused: {
+				var queued = this.isQueued();
+				var leech = this._leftUntilDone > 0 || this.needsMetaData();
+
+				if( queued )
+					queued = leech
+						? this._controller._prefs['queue-enabled-download']
+						: this._controller._prefs['queue-enabled-seed'];
+
+				return queued
+					? ( leech ? 'Queued to download' : 'Queued to seed' )
+					: ( this.isFinished() ? 'Seeding complete' : 'Paused' );
+                    	}
 			case Torrent._StatusChecking:       return 'Verifying local data';
 			case Torrent._StatusWaitingToCheck: return 'Waiting to verify';
 			default:                            return 'error';
@@ -403,6 +417,8 @@ Torrent.prototype =
 		this._error                   = data.error;
 		this._error_string            = data.errorString;
 		this._eta                     = data.eta;
+		this._queued                  = data.queued;
+		this._queueRank               = data.queueRank;
 		this._trackerStats            = this.buildTrackerStats(data.trackerStats);
 		this._state                   = data.status;
 		this._download_dir            = data.downloadDir;
@@ -740,6 +756,11 @@ Torrent.compareById = function( a, b ) {
 };
 
 /** Helper function for sortTorrents(). */
+Torrent.compareByQueue = function( a, b ) {
+	return a.queueRank() - b.queueRank();
+};
+
+/** Helper function for sortTorrents(). */
 Torrent.compareByAge = function( a, b ) {
 	return a.dateAdded() - b.dateAdded();
 };
@@ -784,7 +805,7 @@ Torrent.sortTorrents = function( torrents, sortMethod, sortDirection )
 			torrents.sort( this.compareByAge );
 			break;
 		case Prefs._SortByQueue:
-			torrents.sort( this.compareById );
+			torrents.sort( this.compareByQueue );
 			break;
 		case Prefs._SortByProgress:
 			torrents.sort( this.compareByProgress );

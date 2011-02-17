@@ -455,6 +455,20 @@ compareByETA( GtkTreeModel * m, GtkTreeIter  * a, GtkTreeIter  * b, gpointer use
 }
 
 static int
+compareByQueue( GtkTreeModel * model,
+                GtkTreeIter  * a,
+                GtkTreeIter  * b,
+                gpointer       user_data UNUSED )
+{
+    tr_torrent *ta, *tb;
+
+    gtk_tree_model_get( model, a, MC_TORRENT_RAW, &ta, -1 );
+    gtk_tree_model_get( model, b, MC_TORRENT_RAW, &tb, -1 );
+
+    return -tr_sessionCompareTorrentByQueueRank( ta, tb );
+}
+
+static int
 compareByState( GtkTreeModel * m, GtkTreeIter * a, GtkTreeIter * b, gpointer user_data )
 {
     int ret = 0;
@@ -484,6 +498,8 @@ setSort( TrCore * core, const char * mode, gboolean isReversed  )
         sort_func = compareByProgress;
     else if( !strcmp( mode, "sort-by-time-left" ) )
         sort_func = compareByETA;
+    else if( !strcmp( mode, "sort-by-queue" ) )
+        sort_func = compareByQueue;
     else if( !strcmp( mode, "sort-by-ratio" ) )
         sort_func = compareByRatio;
     else if( !strcmp( mode, "sort-by-state" ) )
@@ -1795,3 +1811,44 @@ tr_core_get_active_torrent_count( TrCore * core )
     return activeCount;
 }
 
+int
+tr_core_get_inactive_torrent_count( TrCore * core )
+{
+    GtkTreeIter iter;
+    GtkTreeModel * model = tr_core_model( core );
+    int inactiveCount = 0;
+
+    if( gtk_tree_model_get_iter_first( model, &iter ) ) do
+    {
+        int activity;
+        gtk_tree_model_get( model, &iter, MC_ACTIVITY, &activity, -1 );
+
+        if( activity == TR_STATUS_STOPPED )
+            ++inactiveCount;
+    }
+    while( gtk_tree_model_iter_next( model, &iter ) );
+
+    return inactiveCount;
+}
+
+int
+tr_core_get_inactive_queued_torrent_count( TrCore * core )
+{
+    GtkTreeIter iter;
+    GtkTreeModel * model = tr_core_model( core );
+    int inactiveQueuedCount = 0;
+
+    if( gtk_tree_model_get_iter_first( model, &iter ) ) do
+    {
+        int activity;
+        tr_torrent * tor;
+        gtk_tree_model_get( model, &iter, MC_ACTIVITY, &activity, -1 );
+        gtk_tree_model_get( model, &iter, MC_TORRENT_RAW, &tor, -1 );
+
+        if( activity == TR_STATUS_STOPPED && tr_torrentIsQueued( tor ) )
+            ++inactiveQueuedCount;
+    }
+    while( gtk_tree_model_iter_next( model, &iter ) );
+
+    return inactiveQueuedCount;
+}

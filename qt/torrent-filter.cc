@@ -109,6 +109,9 @@ TorrentFilter :: lessThan( const QModelIndex& left, const QModelIndex& right ) c
         case SortMode :: SORT_BY_RATIO:
             if( !val ) val = a->compareRatio( *b );
             break;
+        case SortMode :: SORT_BY_QUEUE:
+            less = compare( b->queueRank(), a->queueRank() );
+            break;
         case SortMode :: SORT_BY_ETA:
             if( !val ) val = a->compareETA( *b );
             break;
@@ -156,7 +159,7 @@ TorrentFilter :: activityFilterAcceptsTorrent( const Torrent * tor, const Filter
             accepts = tor->isFinished( );
             break;
         case FilterMode::SHOW_QUEUED:
-            accepts = tor->isWaitingToVerify( );
+            accepts = tor->isQueued();
             break;
         case FilterMode::SHOW_VERIFYING:
             accepts = tor->isVerifying( ) || tor->isWaitingToVerify( );

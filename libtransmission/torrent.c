@@ -22,6 +22,7 @@
 #include <dirent.h>
 
 #include <assert.h>
+#include <float.h> /* DBL_MAX */
 #include <limits.h> /* INT_MAX */
 #include <math.h>
 #include <stdarg.h>
@@ -37,6 +38,7 @@
 #include "cache.h"
 #include "completion.h"
 #include "crypto.h" /* for tr_sha1 */
+#include "history.h"
 #include "resume.h"
 #include "fdlimit.h" /* tr_fdTorrentClose */
 #include "inout.h" /* tr_ioTestPiece() */
@@ -451,6 +453,8 @@ tr_torrentCheckSeedLimit( tr_torrent * tor )
         /* maybe notify the client */
         if( tor->ratio_limit_hit_func != NULL )
             tor->ratio_limit_hit_func( tor, tor->ratio_limit_hit_func_user_data );
+
+        tr_torrentSetQueued( tor, FALSE );
     }
     /* if we're seeding and reach our inactiviy limit, stop the torrent */
     else if( tr_torrentIsSeedIdleLimitDone( tor ) )
@@ -463,6 +467,132 @@ tr_torrentCheckSeedLimit( tr_torrent * tor )
         /* maybe notify the client */
         if( tor->idle_limit_hit_func != NULL )
             tor->idle_limit_hit_func( tor, tor->idle_limit_hit_func_user_data );
+
+        tr_torrentSetQueued( tor, FALSE );
+    }
+
+}
+
+/***
+****
+***/
+
+static void
+torrentSetQueueRank( tr_torrent * tor, int rank )
+{
+    tr_session * session;
+    tr_torrent ** torrents;
+    int count, i, offset;
+
+    assert( tr_isTorrent( tor ) );
+
+    session = tor->session;
+    torrents = (tr_torrent**)tr_ptrArrayPeek( session->queueList, &count );
+    if( rank >= count )
+        rank = count - 1;
+
+    offset = rank - tor->queueRank;
+    if( !offset )
+        return;
+    else if( offset > 0 ) /* rank > tor->queueRank */
+    {
+        tr_torrent * t;
+        memmove( torrents + tor->queueRank,
+                 torrents + tor->queueRank + 1,
+                 sizeof( tr_torrent* ) * offset );
+        for( i = tor->queueRank; i < rank; ++i )
+        {
+            t = torrents[i];
+            --t->queueRank;
+            tr_torrentSetDirty( t );
+        }
+    }
+    else /* rank < tor->queueRank */
+    {
+        tr_torrent * t;
+        memmove( torrents + rank + 1,
+                 torrents + rank,
+                 sizeof( tr_torrent* ) * -offset );
+        for( i = tor->queueRank; i > rank; --i )
+        {
+            t = torrents[i];
+            ++t->queueRank;
+            tr_torrentSetDirty( t );
+        }
+    }
+
+    torrents[rank] = tor;
+    tor->queueRank = rank;
+    tr_torrentSetDirty( tor );
+    tr_sessionProcessQueue( session );
+}
+
+static void
+torrentRemoveFromQueue( tr_torrent * tor )
+{
+    assert( tr_isTorrent( tor ) );
+
+    tr_torrentMoveQueueRankBottom( tor );
+    tr_ptrArrayPop( tor->session->queueList );
+    tr_torrentSetQueued( tor, FALSE );
+}
+
+int
+tr_torrentGetQueueRank( const tr_torrent * tor )
+{
+    assert( tr_isTorrent( tor ) );
+
+    return tor->queueRank;
+}
+
+void
+tr_torrentSetQueueRank( tr_torrent * tor, int rank )
+{
+    assert( tr_isTorrent( tor ) );
+
+    torrentSetQueueRank( tor, rank < 0 ? INT_MAX : rank );
+}
+
+tr_bool
+tr_torrentCouldQueue( const tr_torrent * tor )
+{
+    tr_bool ret = FALSE;
+
+    assert( tr_isTorrent( tor ) );
+    assert( tr_isSession( tor->session ) );
+
+    if( tr_torrentIsSeed( tor ) )
+    {
+        if( tr_sessionIsQueueEnabledSeed( tor->session ) )
+            ret = TRUE;
+    }
+    else
+    {
+        if( tr_sessionIsQueueEnabledDownload( tor->session ) )
+            ret = TRUE;
+    }
+
+    return ret;
+}
+
+tr_bool
+tr_torrentIsQueued( const tr_torrent * tor )
+{
+    assert( tr_isTorrent( tor ) );
+
+    return tor->isQueued;
+}
+
+void
+tr_torrentSetQueued( tr_torrent * tor, tr_bool queued )
+{
+    assert( tr_isTorrent( tor ) );
+
+    if( tor->isQueued != queued )
+    {
+        tor->isQueued = queued;
+        tr_sessionProcessQueue( tor->session );
+        tr_torrentSetDirty( tor );
     }
 }
 
@@ -904,6 +1034,18 @@ torrentInit( tr_torrent * tor, const tr_ctor * ctor )
 
     tor->tiers = tr_announcerAddTorrent( tor, onTrackerResponse, NULL );
 
+    if( !( loaded & TR_FR_QUEUERANK ) )
+    {
+        tor->queueRank = tr_ptrArraySize( session->queueList );
+        tr_ptrArrayInsertSorted( session->queueList, tor, tr_sessionCompareTorrentByQueueRank );
+        if( tr_sessionGetQueueNewTorrentsTop( session ) )
+            tr_torrentMoveQueueRankTop( tor );
+    }
+    else
+    {
+        tr_ptrArrayInsertSorted( session->queueList, tor, tr_sessionCompareTorrentByQueueRank );
+    }
+
     if( isNewTorrent )
     {
         tor->startAfterVerify = doStart;
@@ -911,7 +1053,10 @@ torrentInit( tr_torrent * tor, const tr_ctor * ctor )
     }
     else if( doStart )
     {
-        torrentStart( tor );
+        if( loaded & TR_FR_ADDED_DATE ) /* a resumed torrent should start right away */
+            torrentStart( tor );
+        else                            /* new torrents should respect any enabled queues */
+            tr_torrentStart( tor );
     }
 
     tr_sessionUnlock( session );
@@ -1649,6 +1794,15 @@ torrentStart( tr_torrent * tor )
      * was missed to ensure that we didn't think someone was cheating. */
     tr_free( tor->peer_id );
     tor->peer_id = tr_peerIdNew( );
+
+    /* refresh time used in the queue cutoff calculation */
+    tor->timeQueue = tr_time();
+    /* throw out the first data point */
+    tor->downloadedQueue = INT64_MAX;
+    tor->downloadedQueueKBps = DBL_MAX;
+    tor->uploadedQueue = INT64_MAX;
+    tor->uploadedQueueKBps = DBL_MAX;
+
     tor->isRunning = 1;
     tr_torrentSetDirty( tor );
     tr_runInEventThread( tor->session, torrentStartImpl, tor );
@@ -1658,6 +1812,19 @@ torrentStart( tr_torrent * tor )
 
 void
 tr_torrentStart( tr_torrent * tor )
+{
+    if( tr_isTorrent( tor ) )
+    {
+        const tr_bool isSeed = tr_torrentIsSeed( tor );
+        tr_torrentSetQueued( tor, TRUE );
+        if( !( tr_sessionIsQueueEnabledDownload( tor->session ) && !isSeed )
+         && !( tr_sessionIsQueueEnabledSeed( tor->session ) && isSeed ) )
+            torrentStart( tor );
+    }
+}
+
+void
+tr_torrentStartQueued( tr_torrent * tor )
 {
     if( tr_isTorrent( tor ) )
         torrentStart( tor );
@@ -1673,7 +1840,10 @@ torrentRecheckDoneImpl( void * vtor )
 
     if( tor->startAfterVerify ) {
         tor->startAfterVerify = FALSE;
-        torrentStart( tor );
+        if( tor->isQueued )
+            tr_torrentStart( tor );
+        else
+            torrentStart( tor );
     }
 }
 
@@ -1699,7 +1869,7 @@ verifyTorrent( void * vtor )
     if( tor->startAfterVerify || tor->isRunning ) {
         /* don't clobber isStopping */
         const tr_bool startAfter = tor->isStopping ? FALSE : TRUE;
-        tr_torrentStop( tor );
+        tr_torrentStopQueued( tor );
         tor->startAfterVerify = startAfter;
     }
 
@@ -1715,7 +1885,10 @@ void
 tr_torrentVerify( tr_torrent * tor )
 {
     if( tr_isTorrent( tor ) )
+    {
         tr_runInEventThread( tor->session, verifyTorrent, tor );
+        tr_sessionProcessQueue( tor->session );
+    }
 }
 
 void
@@ -1755,6 +1928,20 @@ stopTorrent( void * vtor )
 
 void
 tr_torrentStop( tr_torrent * tor )
+{
+    assert( tr_isTorrent( tor ) );
+
+    if( tr_isTorrent( tor ) )
+    {
+        tr_torrentSetQueued( tor, FALSE );
+
+        if( tor->isRunning )
+            tr_torrentStopQueued( tor );
+    }
+}
+
+void
+tr_torrentStopQueued( tr_torrent * tor )
 {
     assert( tr_isTorrent( tor ) );
 
@@ -1843,6 +2030,7 @@ tr_torrentRemove( tr_torrent   * tor,
     struct remove_data * data;
 
     assert( tr_isTorrent( tor ) );
+    torrentRemoveFromQueue( tor );
     tor->isDeleting = 1;
 
     data = tr_new0( struct remove_data, 1 );
@@ -1942,6 +2130,23 @@ tr_torrentClearIdleLimitHitCallback( tr_torrent * torrent )
     tr_torrentSetIdleLimitHitCallback( torrent, NULL, NULL );
 }
 
+void
+tr_torrentSetQueueCallback( tr_torrent           * tor,
+                            tr_torrent_queue_func  func,
+                            void                 * user_data )
+{
+    assert( tr_isTorrent( tor ) );
+
+    tor->queue_hit_func = func;
+    tor->queue_hit_func_user_data = user_data;
+}
+
+void
+tr_torrentClearQueueCallback( tr_torrent * torrent )
+{
+    tr_torrentSetQueueCallback( torrent, NULL, NULL );
+}
+
 static void
 onSigCHLD( int i UNUSED )
 {
@@ -2021,7 +2226,7 @@ tr_torrentRecheckCompleteness( tr_torrent * tor )
             if( recentChange )
             {
                 tr_announcerTorrentCompleted( tor );
-                tor->doneDate = tor->anyDate = tr_time( );
+                tor->doneDate = tr_time( );
             }
 
             if( wasLeeching && wasRunning )
@@ -2041,6 +2246,8 @@ tr_torrentRecheckCompleteness( tr_torrent * tor )
         }
 
         fireCompletenessChange( tor, wasRunning, completeness );
+
+        tr_sessionProcessQueue( tor->session );
 
         tr_torrentSetDirty( tor );
     }

@@ -560,18 +560,45 @@ options_page_new( struct DetailsImpl * d )
 ****/
 
 static const char *
-activityString( int activity, tr_bool finished )
+activityString( const tr_torrent * tor, const tr_stat * torStat )
 {
-    switch( activity )
+    switch( torStat->activity )
     {
         case TR_STATUS_CHECK_WAIT: return _( "Waiting to verify local data" );
         case TR_STATUS_CHECK:      return _( "Verifying local data" );
-        case TR_STATUS_DOWNLOAD:   return _( "Downloading" );
-        case TR_STATUS_SEED:       return _( "Seeding" );
-        case TR_STATUS_STOPPED:    return finished ? _( "Finished" ) : _( "Paused" );
+        case TR_STATUS_DOWNLOAD:
+        {
+            if( !tr_torrentIsQueued( tor ) && tr_torrentCouldQueue( tor ) )
+                return _( "Forced downloading" );
+            else
+                return _( "Downloading" );
+        }
+        case TR_STATUS_SEED:       
+        {
+            if( !tr_torrentIsQueued( tor ) && tr_torrentCouldQueue( tor ) )
+                return _( "Forced seeding" );
+            else
+                return _( "Seeding" );
+        }
+        case TR_STATUS_STOPPED:
+        {
+            if( tr_torrentIsQueued( tor ) && tr_torrentCouldQueue( tor ) )
+            {
+                if( torStat->leftUntilDone )
+                    return _( "Queued to download" );
+                else
+                    return _( "Queued to seed" );
+            }
+            else
+            {
+                if( torStat->finished )
+                    return _( "Finished" );
+                else
+                    return _( "Paused" );
+            }
+        }
+        default:                   return "";
     }
-
-    return "";
 }
 
 /* Only call gtk_text_buffer_set_text() if the new text differs from the old.
@@ -708,15 +735,11 @@ refreshInfo( struct DetailsImpl * di, tr_torrent ** torrents, int n )
     if( n<=0 )
         str = no_torrent;
     else {
-        const tr_torrent_activity activity = stats[0]->activity;
-        tr_bool allFinished = stats[0]->finished;
-        for( i=1; i<n; ++i ) {
-            if( activity != stats[i]->activity )
+        const char * baseline = activityString( torrents[0], stats[0] );
+        for( i=1; i<n; ++i )
+            if( strcmp( baseline,  activityString( torrents[i], stats[i] ) ) )
                 break;
-            if( !stats[i]->finished )
-                allFinished = FALSE;
-        }
-        str = i<n ? mixed : activityString( activity, allFinished );
+        str = i<n ? mixed : baseline;
     }
     stateString = str;
     gtr_label_set_text( GTK_LABEL( di->state_lb ), str );

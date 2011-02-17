@@ -229,15 +229,18 @@ TorrentDelegate :: statusString( const Torrent& tor ) const
 
         case TR_STATUS_DOWNLOAD:
             if( tor.hasMetadata( ) )
-                str = tr( "Downloading from %1 of %n connected peer(s)", 0, tor.connectedPeersAndWebseeds( ) )
+                str = tr( "%1 from %2 of %n connected peer(s)", 0, tor.connectedPeersAndWebseeds( ) )
+                        .arg( tor.activityString( ) )
                         .arg( tor.peersWeAreDownloadingFrom( ) );
             else
-                str = tr( "Downloading metadata from %n peer(s) (%1% done)", 0, tor.peersWeAreDownloadingFrom( ) )
+                str = tr( "%1 metadata from %n peer(s) (%2% done)", 0, tor.peersWeAreDownloadingFrom( ) )
+                        .arg( tor.activityString( ) )
                         .arg( Formatter::percentToString( 100.0 * tor.metadataPercentDone( ) ) );
             break;
 
         case TR_STATUS_SEED:
-            str = tr( "Seeding to %1 of %n connected peer(s)", 0, tor.connectedPeers( ) )
+            str = tr( "%1 to %2 of %n connected peer(s)", 0, tor.connectedPeers( ) )
+                  .arg( tor.activityString( ) )
                   .arg( tor.peersWeAreUploadingTo( ) );
             break;
 

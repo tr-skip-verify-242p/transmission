@@ -65,6 +65,7 @@
    Method name          | libtransmission function
    ---------------------+-------------------------------------------------
    "torrent-start"      | tr_torrentStart
+   "torrent-force-start"| tr_torrentStart but calls tr_torrentSetQueued( tor, FALSE ) first
    "torrent-stop"       | tr_torrentStop
    "torrent-verify"     | tr_torrentVerify
    "torrent-reannounce" | tr_torrentManualUpdate ("ask tracker for more peers")
@@ -94,10 +95,13 @@
    "honorsSessionLimits" | boolean    true if session upload limits are honored
    "ids"                 | array      torrent list, as described in 3.1
    "location"            | string     new location of the torrent's content
+   "moveQueueRank"       | number     move torrent in queue. See tr_queue_direction
    "peer-limit"          | number     maximum number of peers
    "priority-high"       | array      indices of high-priority file(s)
    "priority-low"        | array      indices of low-priority file(s)
    "priority-normal"     | array      indices of normal-priority file(s)
+   "queued"              | boolean    true if the queue should handle this torrent
+   "queueRank"           | number     directly set a torrent's queue rank
    "seedIdleLimit"       | number     torrent-level number of minutes of seeding inactivity
    "seedIdleMode"        | number     which seeding inactivity to use.  See tr_inactvelimit
    "seedRatioLimit"      | double     torrent-level seeding ratio
@@ -180,6 +184,8 @@
    pieceCount                  | number                      | tr_info
    pieceSize                   | number                      | tr_info
    priorities                  | array (see below)           | n/a
+   queued                      | boolean                     | torrent-set
+   queueRank                   | number                      | torrent-set
    rateDownload (B/s)          | number                      | tr_stat
    rateUpload (B/s)            | number                      | tr_stat
    recheckProgress             | double                      | tr_stat
@@ -429,6 +435,15 @@
    "peer-port"                      | number     | port number
    "peer-port-random-on-start"      | boolean    | true means pick a random peer port on launch
    "port-forwarding-enabled"        | boolean    | true means enabled
+   "queue-enabled-download"         | boolean    | whether the queue is enabled for downloads
+   "queue-enabled-seed"             | boolean    | whether the queue is enabled for seeds
+   "queue-max-download-active"      | number     | maximum number of active downloading torrents, includes unqueued downloading torrents
+   "queue-max-seed-active"          | number     | maximum number of active seeds total, including unqueued seeding torrents
+   "queue-new-torrents-top"         | boolean    | queue newly added torrents to the top of the queue instead of the bottom
+   "queue-skip-slow-enabled"        | boolean    | whether or not the queue should skip "slow" torrents when starting/stopping torrents
+   "queue-slow-count"               | number     | number of minutes a torrent must be "slow" before being skipped
+   "queue-slow-cutoff"              | number     | speed at which the queue considers torrents "slow" (KBps)
+   "queue-speed-limit-enabled"      | boolean    | true means the queue will not start new torrents if the current speed limit is reached
    "rename-partial-files"           | boolean    | true means append ".part" to incomplete files
    "rpc-version"                    | number     | the current RPC API version
    "rpc-version-minimum"            | number     | the minimum RPC API version supported

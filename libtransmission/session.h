@@ -44,6 +44,7 @@ struct tr_bandwidth;
 struct tr_bindsockets;
 struct tr_cache;
 struct tr_fdInfo;
+struct tr_ptrArray;
 
 typedef void ( tr_web_config_func )( tr_session * session, void * curl_pointer, const char * url );
 
@@ -154,6 +155,17 @@ struct tr_session
     int                          peerSocketTOS;
     char *                       peer_congestion_algorithm;
 
+    tr_bool                      queueEnabledDownload;
+    tr_bool                      queueEnabledSeed;
+    int                          queueMaxDownloadActive;
+    int                          queueMaxSeedActive;
+    tr_bool                      queueNewTorrentsTop;
+    tr_bool                      queueSkipSlowTorrents;
+    int                          queueSlowCount;
+    int                          queueSlowCutoff;
+    tr_bool                      queueSpeedLimit;
+    struct tr_ptrArray *         queueList;
+
     int                          torrentCount;
     tr_torrent *                 torrentList;
 
@@ -195,6 +207,7 @@ struct tr_session
 
     struct event               * nowTimer;
     struct event               * saveTimer;
+    struct event               * queueTimer;
 
     /* monitors the "global pool" speeds */
     struct tr_bandwidth        * bandwidth;
@@ -323,5 +336,18 @@ tr_bool  tr_sessionGetActiveSpeedLimit_Bps( const tr_session  * session,
  */
 uint64_t tr_sessionGetTimeMsec( tr_session * session );
 
+/**
+ * Run processQueue
+ */
+void tr_sessionProcessQueue( tr_session * session );
 
+/**
+ * Ensure the queue is sorted
+ */
+void tr_sessionSortQueue( tr_session * session );
+
+/**
+ * Ensure the queue is consistent
+ */
+void tr_sessionCompactQueue( tr_session * session );
 #endif

@@ -82,6 +82,8 @@ Torrent :: myProperties[] =
     { DATE_CREATED, "dateCreated", QVariant::DateTime, INFO },
     { PEERS_CONNECTED, "peersConnected", QVariant::Int, STAT },
     { ETA, "eta", QVariant::Int, STAT },
+    { QUEUED, "queued", QVariant::Bool, STAT },
+    { QUEUE_RANK, "queueRank", QVariant::Int, STAT },
     { RATIO, "uploadRatio", QVariant::Double, STAT },
     { DOWNLOADED_EVER, "downloadedEver", QVariant::ULongLong, STAT },
     { UPLOADED_EVER, "uploadedEver", QVariant::ULongLong, STAT },
@@ -698,9 +700,34 @@ Torrent :: activityString( ) const
     {
         case TR_STATUS_CHECK_WAIT: str = tr( "Waiting to verify local data" ); break;
         case TR_STATUS_CHECK:      str = tr( "Verifying local data" ); break;
-        case TR_STATUS_DOWNLOAD:   str = tr( "Downloading" ); break;
-        case TR_STATUS_SEED:       str = tr( "Seeding" ); break;
-        case TR_STATUS_STOPPED:    str = isFinished() ? tr( "Finished" ): tr( "Paused" ); break;
+        case TR_STATUS_DOWNLOAD: {
+            if( myPrefs.getBool( Prefs::QUEUE_ENABLED_DOWNLOAD ) && !isQueued() )
+                str = tr( "Forced downloading" );
+            else
+                str = tr( "Downloading" );
+            break;
+        }
+        case TR_STATUS_SEED: {
+            if( myPrefs.getBool( Prefs::QUEUE_ENABLED_SEED ) && !isQueued() )
+                str = tr( "Forced seeding" );
+            else
+                str = tr( "Seeding" );
+            break;
+        }
+        case TR_STATUS_STOPPED: {
+            const bool leech = !isDone( ) || isMagnet( );
+            bool queued = isQueued();
+
+            if( queued )
+                queued = leech
+                    ? myPrefs.getBool( Prefs::QUEUE_ENABLED_DOWNLOAD )
+                    : myPrefs.getBool( Prefs::QUEUE_ENABLED_SEED );
+
+            str = queued
+                ? ( leech ? tr( "Queued to download" ) : tr( "Queued to seed" ) )
+                : ( isFinished() ? tr( "Finished" ) : tr( "Paused" ) );
+            break;
+        }
     }
 
     return str;

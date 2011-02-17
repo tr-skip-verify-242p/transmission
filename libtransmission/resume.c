@@ -67,6 +67,9 @@
 #define KEY_PROGRESS_BITFIELD  "bitfield"
 #define KEY_PROGRESS_HAVE      "have"
 
+#define KEY_QUEUE_RANK         "queue-rank"
+#define KEY_QUEUED             "queued"
+
 enum
 {
     MAX_REMEMBERED_PEERS = 200
@@ -621,6 +624,8 @@ tr_torrentSaveResume( tr_torrent * tor )
     tr_bencDictAddInt( &top, KEY_MAX_PEERS, tor->maxConnectedPeers );
     tr_bencDictAddInt( &top, KEY_BANDWIDTH_PRIORITY, tr_torrentGetPriority( tor ) );
     tr_bencDictAddBool( &top, KEY_PAUSED, !tor->isRunning );
+    tr_bencDictAddInt( &top, KEY_QUEUE_RANK, tr_torrentGetQueueRank( tor ) );
+    tr_bencDictAddInt( &top, KEY_QUEUED, tr_torrentIsQueued( tor ) );
     savePeers( &top, tor );
     if( tr_torrentHasMetadata( tor ) )
     {
@@ -760,6 +765,20 @@ loadFromFile( tr_torrent * tor,
     {
         tr_torrentSetPriority( tor, i );
         fieldsLoaded |= TR_FR_BANDWIDTH_PRIORITY;
+    }
+
+    if( ( fieldsToLoad & TR_FR_QUEUERANK )
+      && tr_bencDictFindInt( &top, KEY_QUEUE_RANK, &i ) )
+    {
+        tor->queueRank = i;
+        fieldsLoaded |= TR_FR_QUEUERANK;
+    }
+
+    if( ( fieldsToLoad & TR_FR_QUEUED )
+      && tr_bencDictFindBool( &top, KEY_QUEUED, &boolVal ) )
+    {
+        tor->isQueued = boolVal;
+        fieldsLoaded |= TR_FR_QUEUED;
     }
 
     if( fieldsToLoad & TR_FR_PEERS )

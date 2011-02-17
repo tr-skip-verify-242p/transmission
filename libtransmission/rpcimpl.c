@@ -207,10 +207,38 @@ torrentStart( tr_session               * session,
     for( i = 0; i < torrentCount; ++i )
     {
         tr_torrent * tor = torrents[i];
+
         if( !tor->isRunning )
         {
             tr_torrentStart( tor );
             notify( session, TR_RPC_TORRENT_STARTED, tor );
+        }
+    }
+    tr_free( torrents );
+    return NULL;
+}
+
+static const char*
+torrentForceStart( tr_session               * session,
+                   tr_benc                  * args_in,
+                   tr_benc                  * args_out UNUSED,
+                   struct tr_rpc_idle_data  * idle_data UNUSED )
+{
+    int           i, torrentCount;
+    tr_torrent ** torrents = getTorrents( session, args_in, &torrentCount );
+
+    assert( idle_data == NULL );
+
+    for( i = 0; i < torrentCount; ++i )
+    {
+        tr_torrent * tor = torrents[i];
+
+        tr_torrentSetQueued( tor, FALSE );
+        if( !tor->isRunning )
+        {
+            tr_torrentStartQueued( tor );
+            notify( session, TR_RPC_TORRENT_STARTED, tor );
+            tr_sessionProcessQueue( tor->session );
         }
     }
     tr_free( torrents );
@@ -232,11 +260,8 @@ torrentStop( tr_session               * session,
     {
         tr_torrent * tor = torrents[i];
 
-        if( tor->isRunning )
-        {
-            tor->isStopping = TRUE;
-            notify( session, TR_RPC_TORRENT_STOPPED, tor );
-        }
+        tr_torrentStop( tor );
+        notify( session, TR_RPC_TORRENT_STOPPED, tor );
     }
     tr_free( torrents );
     return NULL;
@@ -582,6 +607,10 @@ addField( const tr_torrent * tor, tr_benc * d, const char * key )
         for( i = 0; i < inf->fileCount; ++i )
             tr_bencListAddInt( p, inf->files[i].priority );
     }
+    else if( tr_streq( key, keylen, "queued" ) )
+        tr_bencDictAddBool( d, key, tr_torrentIsQueued( tor ) );
+    else if( tr_streq( key, keylen, "queueRank" ) )
+        tr_bencDictAddInt( d, key, tr_torrentGetQueueRank( tor ) );
     else if( tr_streq( key, keylen, "rateDownload" ) )
         tr_bencDictAddInt( d, key, toSpeedBytes( st->pieceDownloadSpeed_KBps ) );
     else if( tr_streq( key, keylen, "rateUpload" ) )
@@ -963,6 +992,19 @@ removeTrackers( tr_torrent * tor, tr_benc * ids )
     return errmsg;
 }
 
+static void
+torrentMoveQueueRank( tr_torrent * tor , const tr_queue_direction dir )
+{
+    switch(dir)
+    {
+        case TR_QUEUE_UP        : tr_torrentMoveQueueRankUp( tor ); break;
+        case TR_QUEUE_DOWN      : tr_torrentMoveQueueRankDown( tor ); break;
+        case TR_QUEUE_TOP       : tr_torrentMoveQueueRankTop( tor ); break;
+        case TR_QUEUE_BOTTOM    : tr_torrentMoveQueueRankBottom( tor ); break;
+        default                 : break;
+    }
+}
+
 static const char*
 torrentSet( tr_session               * session,
             tr_benc                  * args_in,
@@ -1023,6 +1065,12 @@ torrentSet( tr_session               * session,
             errmsg = removeTrackers( tor, trackers );
         if( !errmsg && tr_bencDictFindList( args_in, "trackerReplace", &trackers ) )
             errmsg = replaceTrackers( tor, trackers );
+        if( tr_bencDictFindInt( args_in, "moveQueueRank", &tmp ) )
+            torrentMoveQueueRank( tor, (tr_queue_direction)tmp );
+        if( tr_bencDictFindBool( args_in, "queued", &boolVal) )
+            tr_torrentSetQueued( tor, boolVal );
+        if( tr_bencDictFindInt( args_in, "queueRank", &tmp ) )
+            tr_torrentSetQueueRank( tor, tmp );
         notify( session, TR_RPC_TORRENT_CHANGED, tor );
     }
 
@@ -1514,6 +1562,22 @@ sessionSet( tr_session               * session,
         else
             tr_sessionSetEncryption( session, TR_ENCRYPTION_PREFERRED );
     }
+    if( tr_bencDictFindBool( args_in, TR_PREFS_KEY_QUEUE_ENABLED_DOWNLOAD, &boolVal ) )
+        tr_sessionSetQueueEnabledDownload( session, boolVal );
+    if( tr_bencDictFindBool( args_in, TR_PREFS_KEY_QUEUE_ENABLED_SEED, &boolVal ) )
+        tr_sessionSetQueueEnabledSeed( session, boolVal );
+    if( tr_bencDictFindInt( args_in, TR_PREFS_KEY_QUEUE_MAX_DOWNLOAD_ACTIVE, &i ) )
+        tr_sessionSetQueueMaxDownloadActive( session, i );
+    if( tr_bencDictFindInt( args_in, TR_PREFS_KEY_QUEUE_MAX_SEED_ACTIVE, &i ) )
+        tr_sessionSetQueueMaxSeedActive( session, i );
+    if( tr_bencDictFindBool( args_in, TR_PREFS_KEY_QUEUE_NEW_TORRENTS_TOP, &boolVal ) )
+        tr_sessionSetQueueNewTorrentsTop( session, boolVal );
+    if( tr_bencDictFindBool( args_in, TR_PREFS_KEY_QUEUE_SKIP_SLOW_TORRENTS, &boolVal ) )
+        tr_sessionSetQueueSkipSlowTorrentsEnabled( session, boolVal );
+    if( tr_bencDictFindInt( args_in, TR_PREFS_KEY_QUEUE_SLOW_CUTOFF_KBps, &i ) )
+        tr_sessionSetQueueSlowCutoff( session, i );
+    if( tr_bencDictFindBool( args_in, TR_PREFS_KEY_QUEUE_SPEED_LIMIT, &boolVal ) )
+        tr_sessionSetQueueSpeedLimitEnabled( session, boolVal );
 
     notify( session, TR_RPC_SESSION_CHANGED, NULL );
 
@@ -1624,7 +1688,15 @@ sessionGet( tr_session               * s,
         default: str = "preferred"; break;
     }
     tr_bencDictAddStr( d, TR_PREFS_KEY_ENCRYPTION, str );
-    
+    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_ENABLED_DOWNLOAD, tr_sessionIsQueueEnabledDownload( s ) );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_ENABLED_SEED, tr_sessionIsQueueEnabledSeed( s ) );
+    tr_bencDictAddInt( d, TR_PREFS_KEY_QUEUE_MAX_DOWNLOAD_ACTIVE, tr_sessionGetQueueMaxDownloadActive( s ) );
+    tr_bencDictAddInt( d, TR_PREFS_KEY_QUEUE_MAX_SEED_ACTIVE, tr_sessionGetQueueMaxSeedActive( s ) );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_NEW_TORRENTS_TOP, tr_sessionGetQueueNewTorrentsTop( s ) );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_SKIP_SLOW_TORRENTS, tr_sessionIsQueueSkipSlowTorrentsEnabled( s ) );
+    tr_bencDictAddInt( d, TR_PREFS_KEY_QUEUE_SLOW_CUTOFF_KBps, tr_sessionGetQueueSlowCutoff( s ) );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_QUEUE_SPEED_LIMIT, tr_sessionIsQueueSpeedLimitEnabled( s ) );
+
     return NULL;
 }
 
@@ -1668,6 +1740,7 @@ methods[] =
     { "torrent-set",           TRUE,  torrentSet          },
     { "torrent-set-location",  TRUE,  torrentSetLocation  },
     { "torrent-start",         TRUE,  torrentStart        },
+    { "torrent-force-start",   TRUE,  torrentForceStart   },
     { "torrent-stop",          TRUE,  torrentStop         },
     { "torrent-verify",        TRUE,  torrentVerify       },
     { "torrent-reannounce",    TRUE,  torrentReannounce   }

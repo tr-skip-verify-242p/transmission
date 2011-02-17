@@ -164,6 +164,15 @@ Session :: updatePref( int key )
         case Prefs :: PEER_PORT_RANDOM_ON_START:
         case Prefs :: PEX_ENABLED:
         case Prefs :: PORT_FORWARDING:
+        case Prefs :: QUEUE_ENABLED_DOWNLOAD:
+        case Prefs :: QUEUE_ENABLED_SEED:
+        case Prefs :: QUEUE_MAX_DOWNLOAD_ACTIVE:
+        case Prefs :: QUEUE_MAX_SEED_ACTIVE:
+        case Prefs :: QUEUE_NEW_TORRENTS_TOP:
+        case Prefs :: QUEUE_SKIP_SLOW_TORRENTS:
+        case Prefs :: QUEUE_SLOW_COUNT:
+        case Prefs :: QUEUE_SLOW_CUTOFF:
+        case Prefs :: QUEUE_SPEED_LIMIT:
         case Prefs :: SCRIPT_TORRENT_DONE_ENABLED:
         case Prefs :: SCRIPT_TORRENT_DONE_FILENAME:
         case Prefs :: START:
@@ -449,6 +458,30 @@ namespace
                 tr_bencListAddInt( idList, i );
         }
     }
+
+    void
+    addOptionalIds( tr_benc * args, const QList<int>& ids )
+    {
+        if( !ids.isEmpty( ) )
+        {
+            tr_benc * idList( tr_bencDictAddList( args, "ids", ids.size( ) ) );
+            for( int i = 0; i < ids.count(); ++i )
+                tr_bencListAddInt( idList, ids[i] );
+        }
+    }
+}
+
+void
+Session :: torrentSet( const QList<int>& ids, const QString& key, int value )
+{
+    tr_benc top;
+    tr_bencInitDict( &top, 2 );
+    tr_bencDictAddStr( &top, "method", "torrent-set" );
+    tr_benc * args = tr_bencDictAddDict( &top, "arguments", 2 );
+    tr_bencDictAddInt( args, key.toUtf8().constData(), value );
+    addOptionalIds( args, ids );
+    exec( &top );
+    tr_bencFree( &top );
 }
 
 void
@@ -606,6 +639,12 @@ void
 Session :: startTorrents( const QSet<int>& ids )
 {
     sendTorrentRequest( "torrent-start", ids );
+}
+
+void
+Session :: forceStartTorrents( const QSet<int>& ids )
+{
+    sendTorrentRequest( "torrent-force-start", ids );
 }
 
 void

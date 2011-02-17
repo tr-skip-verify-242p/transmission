@@ -198,6 +198,15 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_PROXY                         "proxy"
 #define TR_PREFS_KEY_PROXY_TYPE                    "proxy-type"
 #define TR_PREFS_KEY_PROXY_USERNAME                "proxy-auth-username"
+#define TR_PREFS_KEY_QUEUE_ENABLED_DOWNLOAD        "queue-enabled-download"
+#define TR_PREFS_KEY_QUEUE_ENABLED_SEED            "queue-enabled-seed"
+#define TR_PREFS_KEY_QUEUE_MAX_DOWNLOAD_ACTIVE     "queue-max-download-active"
+#define TR_PREFS_KEY_QUEUE_MAX_SEED_ACTIVE         "queue-max-seed-active"
+#define TR_PREFS_KEY_QUEUE_NEW_TORRENTS_TOP        "queue-new-torrents-top"
+#define TR_PREFS_KEY_QUEUE_SKIP_SLOW_TORRENTS      "queue-skip-slow-enabled"
+#define TR_PREFS_KEY_QUEUE_SLOW_COUNT              "queue-slow-count"
+#define TR_PREFS_KEY_QUEUE_SLOW_CUTOFF_KBps        "queue-slow-cutoff"
+#define TR_PREFS_KEY_QUEUE_SPEED_LIMIT             "queue-speed-limit-enabled"
 #define TR_PREFS_KEY_RATIO                         "ratio-limit"
 #define TR_PREFS_KEY_RATIO_ENABLED                 "ratio-limit-enabled"
 #define TR_PREFS_KEY_RENAME_PARTIAL_FILES          "rename-partial-files"
@@ -774,6 +783,37 @@ tr_bool    tr_sessionGetPaused        ( const tr_session * );
 void       tr_sessionSetDeleteSource  ( tr_session *, tr_bool deleteSource );
 tr_bool    tr_sessionGetDeleteSource  ( const tr_session * );
 
+/***
+****
+***/
+
+tr_bool     tr_sessionIsQueueEnabledDownload( const tr_session * session );
+void        tr_sessionSetQueueEnabledDownload( tr_session * session, tr_bool enabled );
+
+tr_bool     tr_sessionIsQueueEnabledSeed( const tr_session * session );
+void        tr_sessionSetQueueEnabledSeed( tr_session * session, tr_bool enabled );
+
+int         tr_sessionGetQueueMaxDownloadActive( const tr_session * session );
+void        tr_sessionSetQueueMaxDownloadActive( tr_session * session, int maxActive );
+
+int         tr_sessionGetQueueMaxSeedActive( const tr_session * session );
+void        tr_sessionSetQueueMaxSeedActive( tr_session * session, int maxActive );
+
+tr_bool     tr_sessionGetQueueNewTorrentsTop( const tr_session * session );
+void        tr_sessionSetQueueNewTorrentsTop( tr_session * session, tr_bool enabled );
+
+tr_bool     tr_sessionIsQueueSkipSlowTorrentsEnabled( const tr_session * session );
+void        tr_sessionSetQueueSkipSlowTorrentsEnabled( tr_session * session, tr_bool enabled );
+
+int         tr_sessionGetQueueSlowCount( const tr_session * session );
+void        tr_sessionSetQueueSlowCount( tr_session * session, int count );
+
+int         tr_sessionGetQueueSlowCutoff( const tr_session * session );
+void        tr_sessionSetQueueSlowCutoff( tr_session * session, int cutoff );
+
+tr_bool     tr_sessionIsQueueSpeedLimitEnabled( const tr_session * session );
+void        tr_sessionSetQueueSpeedLimitEnabled( tr_session * session, tr_bool enabled );
+
 /**
  *  Load all the torrents in tr_getTorrentDir().
  *  This can be used at startup to kickstart all the torrents
@@ -1098,10 +1138,10 @@ void tr_torrentRemove( tr_torrent  * torrent,
                        tr_bool       removeLocalData,
                        tr_fileFunc   removeFunc );
 
-/** @brief Start a torrent */
+/** @brief Start a torrent or add it to the queue */
 void tr_torrentStart( tr_torrent * torrent );
 
-/** @brief Stop (pause) a torrent */
+/** @brief Stop (pause) a torrent and remove from queue */
 void tr_torrentStop( tr_torrent * torrent );
 
 enum
@@ -1328,6 +1368,49 @@ tr_torrentSetAnnounceList( tr_torrent             * torrent,
                            const tr_tracker_info  * trackers,
                            int                      trackerCount );
 
+/**
+ * @brief returns if an active queue could apply to this torrent
+ */
+tr_bool tr_torrentCouldQueue( const tr_torrent * tor );
+
+/**
+ * @brief returns if a torrent is queued
+ */
+tr_bool tr_torrentIsQueued( const tr_torrent * tor );
+
+/**
+ * @brief set if a torrent is queued
+ */
+void tr_torrentSetQueued( tr_torrent * tor, tr_bool queued );
+
+/**
+ * @brief returns a torrent's queueRank
+ */
+int tr_torrentGetQueueRank( const tr_torrent * tor );
+
+/**
+ * @brief sets a torrent's queueRank.
+ *
+ * The queue starts downloading torrents starting from queueRank 1.
+ */
+void tr_torrentSetQueueRank( tr_torrent * tor, int rank );
+
+/**
+ * @brief comparator for sorting torrents by queue rank
+ *
+ * Compares first by queue and then by name and hash for torrents that have
+ * equal queue rankings.
+ */
+int tr_sessionCompareTorrentByQueueRank( const void * va, const void * vb );
+
+typedef enum
+{
+    TR_QUEUE_UP         = 0,
+    TR_QUEUE_DOWN       = 1,
+    TR_QUEUE_TOP        = 2,
+    TR_QUEUE_BOTTOM     = 3
+}
+tr_queue_direction;
 
 /**
 ***
@@ -1356,6 +1439,8 @@ typedef void ( tr_torrent_ratio_limit_hit_func )( tr_torrent   * torrent,
 typedef void ( tr_torrent_idle_limit_hit_func )( tr_torrent   * torrent,
                                                  void         * user_data );
 
+typedef void ( tr_torrent_queue_func )( tr_torrent   * torrent,
+                                        void         * user_data );
 
 /**
  * Register to be notified whenever a torrent's "completeness"
@@ -1420,7 +1505,18 @@ void tr_torrentSetIdleLimitHitCallback(
 
 void tr_torrentClearIdleLimitHitCallback( tr_torrent * torrent );
 
+/**
+ * Register to be notified whenever a torrent has been started or
+ * or stopped by the queue.
+ *
+ * Has the same restrictions as tr_torrentSetCompletenessCallback
+ */
+void tr_torrentSetQueueCallback(
+     tr_torrent           * tor,
+     tr_torrent_queue_func  func,
+     void                 * user_data );
 
+void tr_torrentClearQueueCallback( tr_torrent * torrent );
 /**
  * MANUAL ANNOUNCE
  *

@@ -358,25 +358,18 @@ Details :: refresh( )
         string = none;
     else {
         bool isMixed = false;
-        bool allPaused = true;
-        bool allFinished = true;
-        const tr_torrent_activity activity = torrents[0]->getActivity( );
+        const QString activity = torrents[0]->activityString( );
         foreach( const Torrent * t, torrents ) {
-            if( activity != t->getActivity( ) )
+            if( t->activityString( ) != activity )
+            {
                 isMixed = true;
-            if( activity != TR_STATUS_STOPPED )
-                allPaused = allFinished = false;
-            if( !t->isFinished( ) )
-                allFinished = false;
+                break;
+            }
         }
         if( isMixed )
             string = mixed;
-        else if( allFinished )
-            string = tr( "Finished" );
-        else if( allPaused )
-            string = tr( "Paused" );
         else
-            string = torrents[0]->activityString( );
+            string = activity;
     }
     myStateLabel->setText( string );
     const QString stateString = string;

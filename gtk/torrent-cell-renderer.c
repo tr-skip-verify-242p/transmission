@@ -192,6 +192,39 @@ getShortTransferString( const tr_torrent  * tor,
 }
 
 static char*
+getActivityString( const tr_torrent * tor,
+                   const tr_stat    * torStat )
+{
+    GString * gstr = g_string_new( NULL );
+
+    switch( torStat->activity )
+    {
+        case TR_STATUS_DOWNLOAD:
+        {
+            if( !tr_torrentIsQueued( tor ) && tr_torrentCouldQueue( tor ) )
+                g_string_assign( gstr, _( "Forced downloading" ) );
+            else
+                g_string_assign( gstr, _( "Downloading" ) );
+            break;
+        }
+
+        case TR_STATUS_SEED:
+        {
+            if( !tr_torrentIsQueued( tor ) && tr_torrentCouldQueue( tor ) )
+                g_string_assign( gstr, _( "Forced seeding" ) );
+            else
+                g_string_assign( gstr, _( "Seeding" ) );
+            break;
+        }
+
+        default:
+            break;
+    }
+
+    return g_string_free( gstr, FALSE );
+}
+
+static char*
 getShortStatusString( const tr_torrent  * tor,
                       const tr_stat     * st,
                       double              uploadSpeed_KBps,
@@ -232,6 +265,23 @@ getShortStatusString( const tr_torrent  * tor,
             g_string_append( gstr, buf );
             break;
         }
+
+        case TR_STATUS_STOPPED:
+            if( tr_torrentIsQueued( tor ) && tr_torrentCouldQueue( tor ) )
+            {
+                if( torStat->leftUntilDone )
+                    g_string_assign( gstr, _( "Queued to download" ) );
+                else
+                    g_string_assign( gstr, _( "Queued to seed" ) );
+            }
+            else
+            {
+                if( torStat->finished )
+                    g_string_assign( gstr, _( "Finished" ) );
+                else
+                    g_string_assign( gstr, _( "Paused" ) );
+            }
+            break;
 
         default:
             break;

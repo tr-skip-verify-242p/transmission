@@ -259,6 +259,9 @@ struct counts_data
     int total_count;
     int active_count;
     int inactive_count;
+    int    queuedCount;
+    int    inactiveAndQueuedCount;
+    int    forcedCount;
 };
 
 static void
@@ -267,15 +270,27 @@ get_selected_torrent_counts_foreach( GtkTreeModel * model, GtkTreePath * path UN
 {
     int activity = 0;
     struct counts_data * counts = user_data;
+    tr_torrent * tor;
 
     ++counts->total_count;
 
     gtk_tree_model_get( model, iter, MC_ACTIVITY, &activity, -1 );
+    gtk_tree_model_get( model, iter, MC_TORRENT_RAW, &tor, -1 );
 
     if( activity == TR_STATUS_STOPPED )
+    {
         ++counts->inactive_count;
+        if( tr_torrentIsQueued( tor ) )
+            ++counts->inactiveAndQueuedCount;
+    }
     else
+    {
         ++counts->active_count;
+        if( !tr_torrentIsQueued( tor ) )
+            ++counts->forcedCount;
+    }
+    if( tr_torrentIsQueued( tor ) )
+        ++counts->queuedCount;
 }
 
 static void
@@ -284,6 +299,9 @@ get_selected_torrent_counts( struct cbdata * data, struct counts_data * counts )
     counts->active_count = 0;
     counts->inactive_count = 0;
     counts->total_count = 0;
+    counts->queuedCount = 0;
+    counts->inactiveAndQueuedCount = 0;
+    counts->forcedCount = 0;
 
     gtk_tree_selection_selected_foreach( data->sel, get_selected_torrent_counts_foreach, counts );
 }
@@ -305,23 +323,35 @@ refresh_actions( gpointer gdata )
     struct cbdata * data = gdata;
     const size_t total = tr_core_get_torrent_count( data->core );
     const size_t active = tr_core_get_active_torrent_count( data->core );
+    const int inactive = tr_core_get_inactive_torrent_count( data->core );
+    const int inactiveQueued = tr_core_get_inactive_queued_torrent_count( data->core );
     const int torrent_count = gtk_tree_model_iter_n_children( tr_core_model( data->core ), NULL );
+    const char * sort_mode = pref_string_get( PREF_KEY_SORT_MODE );
+    gboolean sort_queue = !strcmp( sort_mode, "sort-by-queue" );
 
     gtr_action_set_sensitive( "select-all", torrent_count != 0 );
     gtr_action_set_sensitive( "deselect-all", torrent_count != 0 );
-    gtr_action_set_sensitive( "pause-all-torrents", active != 0 );
-    gtr_action_set_sensitive( "start-all-torrents", active != total );
+    action_sensitize( "pause-all-torrents", inactive < total || inactiveQueued > 0 );
+    action_sensitize( "start-all-torrents", inactive > 0 && inactiveQueued < inactive );
 
     get_selected_torrent_counts( data, &sel_counts );
-    gtr_action_set_sensitive( "pause-torrent", sel_counts.active_count != 0 );
-    gtr_action_set_sensitive( "start-torrent", sel_counts.inactive_count != 0 );
+    sort_queue = sort_queue && ( counts.totalCount != 0 );
+    action_sensitize( "pause-torrent", counts.activeCount != 0 || counts.inactiveAndQueuedCount != 0 );
+    action_sensitize( "start-torrent", counts.inactiveCount != 0 && counts.inactiveCount != counts.inactiveAndQueuedCount );
+    action_sensitize( "force-start-torrent", counts.totalCount != 0 );
     gtr_action_set_sensitive( "remove-torrent", sel_counts.total_count != 0 );
     gtr_action_set_sensitive( "delete-torrent", sel_counts.total_count != 0 );
+    action_sensitize( "queue-up", sort_queue );
+    action_sensitize( "queue-down", sort_queue );
+    action_sensitize( "queue-top", sort_queue );
+    action_sensitize( "queue-bottom", sort_queue );
     gtr_action_set_sensitive( "verify-torrent", sel_counts.total_count != 0 );
     gtr_action_set_sensitive( "relocate-torrent", sel_counts.total_count != 0 );
     gtr_action_set_sensitive( "show-torrent-properties", sel_counts.total_count != 0 );
     gtr_action_set_sensitive( "open-torrent-folder", sel_counts.total_count == 1 );
     gtr_action_set_sensitive( "copy-magnet-link-to-clipboard", sel_counts.total_count == 1 );
+
+    action_set_toggle( "force-start-torrent", counts.forcedCount != 0 );
 
     canUpdate = 0;
     gtk_tree_selection_selected_foreach( data->sel, count_updatable_foreach, &canUpdate );
@@ -1330,6 +1360,42 @@ on_core_error( TrCore * core UNUSED, guint code, const char * msg, struct cbdata
             g_assert_not_reached( );
             break;
     }
+    else if( !strcmp( key, TR_PREFS_KEY_QUEUE_ENABLED_DOWNLOAD ) )
+    {
+        tr_sessionSetQueueEnabledDownload( tr, pref_flag_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_QUEUE_ENABLED_SEED ) )
+    {
+        tr_sessionSetQueueEnabledSeed( tr, pref_flag_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_QUEUE_MAX_DOWNLOAD_ACTIVE ) )
+    {
+        tr_sessionSetQueueMaxDownloadActive( tr, pref_int_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_QUEUE_MAX_SEED_ACTIVE ) )
+    {
+        tr_sessionSetQueueMaxSeedActive( tr, pref_int_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_QUEUE_NEW_TORRENTS_TOP ) )
+    {
+        tr_sessionSetQueueNewTorrentsTop( tr, pref_flag_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_QUEUE_SKIP_SLOW_TORRENTS ) )
+    {
+        tr_sessionSetQueueSkipSlowTorrentsEnabled( tr, pref_flag_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_QUEUE_SLOW_COUNT ) )
+    {
+        tr_sessionSetQueueSlowCount( tr, pref_int_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_QUEUE_SLOW_CUTOFF_KBps ) )
+    {
+        tr_sessionSetQueueSlowCutoff( tr, pref_int_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_QUEUE_SPEED_LIMIT ) )
+    {
+        tr_sessionSetQueueSpeedLimitEnabled( tr, pref_flag_get( key ) );
+    }
 }
 
 #if GTK_CHECK_VERSION( 2, 8, 0 )
@@ -1745,6 +1811,72 @@ removeSelected( struct cbdata * data, gboolean delete_files )
 }
 
 static void
+accumulateSelectedTorrentsRaw( GtkTreeModel *      model,
+                               GtkTreePath  * path UNUSED,
+                               GtkTreeIter *       iter,
+                               gpointer            gdata )
+{
+    GSList ** data = ( GSList** ) gdata;
+    tr_torrent * tor = NULL;
+
+    gtk_tree_model_get( model, iter, MC_TORRENT_RAW, &tor, -1 );
+    *data = g_slist_prepend( *data, tor );
+}
+
+static gboolean
+moveTorrentQueue( struct cbdata      * data,
+                  tr_queue_direction   dir )
+{
+    gboolean changed = FALSE;
+    GtkTreeSelection * s = tr_window_get_selection( data->wind );
+    GSList * l = NULL;
+
+    gtk_tree_selection_selected_foreach( s, accumulateSelectedTorrentsRaw, &l );
+    l = g_slist_sort( l, tr_sessionCompareTorrentByQueueRank );
+
+    switch( dir )
+    {
+        case TR_QUEUE_DOWN:
+            if( tr_torrentGetQueueRank( g_slist_last( l )->data ) + 1 == tr_core_get_torrent_count( data-> core ) )
+                break;
+        case TR_QUEUE_TOP:
+            l = g_slist_reverse( l );
+            changed = TRUE;
+            break;
+        case TR_QUEUE_UP:
+            if( tr_torrentGetQueueRank( l->data ) == 0 )
+                break;
+        case TR_QUEUE_BOTTOM:
+            changed = TRUE;
+            break;
+    }
+
+    if( changed )
+    {
+        tr_benc top, *args, *ids;
+        GSList * le = l;
+
+        tr_bencInitDict( &top, 2 );
+        tr_bencDictAddStr( &top, "method", "torrent-set" );
+        args = tr_bencDictAddDict( &top, "arguments", 1 );
+        tr_bencDictAddInt( args, "moveQueueRank", (int)dir );
+        ids = tr_bencDictAddList( args, "ids", g_slist_length( le ) );
+        do
+        {
+            const tr_torrent * tor = ( tr_torrent* )le->data;
+            tr_bencListAddInt( ids, tr_torrentId( tor ) );
+        }
+        while(( le = g_slist_next( le ) ));
+        tr_core_exec( data->core, &top );
+
+        tr_bencFree( &top );
+    }
+
+    g_slist_free( l );
+    return changed;
+}
+
+static void
 startAllTorrents( struct cbdata * data )
 {
     tr_session * session = tr_core_session( data->core );
@@ -1855,6 +1987,34 @@ gtr_actions_handler( const char * action_name, gpointer user_data )
     {
         changed |= rpcOnSelectedTorrents( data, "torrent-start" );
     }
+    else if( !strcmp( action_name, "force-start-torrent" ) )
+    {
+        if( action_get_toggle( action_name ) )
+            changed |= rpcOnSelectedTorrents( data, "torrent-force-start" );
+        else
+        {
+            GSList * ids = getSelectedTorrentIds( data );
+            if( ids )
+            {
+                GSList * l = ids;
+                tr_benc top, *args, *ids;
+
+                tr_bencInitDict( &top, 2 );
+                tr_bencDictAddStr( &top, "method", "torrent-set" );
+                args = tr_bencDictAddDict( &top, "arguments", 2 );
+                tr_bencDictAddBool( args, "queued", TRUE );
+                ids = tr_bencDictAddList( args, "ids", g_slist_length( l ) );
+                do
+                    tr_bencListAddInt( ids, GPOINTER_TO_INT( l->data ) );
+                while(( l = g_slist_next( l ) ));
+                tr_core_exec( data->core, &top );
+                changed = TRUE;
+
+                tr_bencFree( &top );
+            }
+            g_slist_free( ids );
+        }
+    }
     else if( !strcmp( action_name, "pause-torrent" ) )
     {
         changed |= rpcOnSelectedTorrents( data, "torrent-stop" );
@@ -1887,6 +2047,22 @@ gtr_actions_handler( const char * action_name, gpointer user_data )
     else if( !strcmp( action_name, "delete-torrent" ) )
     {
         removeSelected( data, TRUE );
+    }
+    else if( !strcmp( action_name, "queue-up" ) )
+    {
+        changed |= moveTorrentQueue( data, TR_QUEUE_UP );
+    }
+    else if( !strcmp( action_name, "queue-down" ) )
+    {
+        changed |= moveTorrentQueue( data, TR_QUEUE_DOWN );
+    }
+    else if( !strcmp( action_name, "queue-top" ) )
+    {
+        changed |= moveTorrentQueue( data, TR_QUEUE_TOP );
+    }
+    else if( !strcmp( action_name, "queue-bottom" ) )
+    {
+        changed |= moveTorrentQueue( data, TR_QUEUE_BOTTOM );
     }
     else if( !strcmp( action_name, "quit" ) )
     {

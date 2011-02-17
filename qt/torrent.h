@@ -146,6 +146,8 @@ class Torrent: public QObject
             DATE_CREATED,
             PEERS_CONNECTED,
             ETA,
+            QUEUED,
+            QUEUE_RANK,
             RATIO,
             DOWNLOADED_EVER,
             UPLOADED_EVER,
@@ -273,6 +275,7 @@ class Torrent: public QObject
         int compareETA( const Torrent& ) const;
         bool hasETA( ) const { return getETA( ) >= 0; }
         int getETA( ) const { return getInt( ETA ); }
+        int queueRank( ) const { return getInt( QUEUE_RANK ); }
         QDateTime lastActivity( ) const { return getDateTime( DATE_ACTIVITY ); }
         QDateTime lastStarted( ) const { return getDateTime( DATE_STARTED ); }
         QDateTime dateAdded( ) const { return getDateTime( DATE_ADDED ); }
@@ -307,6 +310,7 @@ class Torrent: public QObject
     public:
         QString activityString( ) const;
         tr_torrent_activity getActivity( ) const { return (tr_torrent_activity) getInt( ACTIVITY ); }
+        bool isQueued( ) const { return getBool( QUEUED ); }
         bool isFinished( ) const { return getBool( IS_FINISHED ); }
         bool isPaused( ) const { return getActivity( ) == TR_STATUS_STOPPED; }
         bool isWaitingToVerify( ) const { return getActivity( ) == TR_STATUS_CHECK_WAIT; }

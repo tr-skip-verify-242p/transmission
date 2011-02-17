@@ -18,7 +18,7 @@
 #define TR_TORRENT_H 1
 
 #include "completion.h" /* tr_completion */
-#include "session.h" /* tr_sessionLock(), tr_sessionUnlock() */
+#include "session.h" /* tr_sessionLock(), tr_sessionUnlock(), tr_sessionProcessQueue */
 #include "utils.h" /* TR_GNUC_PRINTF */
 
 struct tr_bandwidth;
@@ -98,7 +98,9 @@ void             tr_torrentSave( tr_torrent * tor );
 
 void             tr_torrentSetLocalError( tr_torrent * tor, const char * fmt, ... ) TR_GNUC_PRINTF( 2, 3 );
 
-
+/* helper functions needed for the queue */
+void             tr_torrentStartQueued( tr_torrent * tor );
+void             tr_torrentStopQueued( tr_torrent * tor );
 
 typedef enum
 {
@@ -218,6 +220,9 @@ struct tr_torrent
     tr_torrent_idle_limit_hit_func  * idle_limit_hit_func;
     void                            * idle_limit_hit_func_user_data;
 
+    tr_torrent_queue_func * queue_hit_func;
+    void                  * queue_hit_func_user_data;
+
     tr_bool                    isRunning;
     tr_bool                    isStopping;
     tr_bool                    isDeleting;
@@ -236,6 +241,14 @@ struct tr_torrent
     tr_torrent *               next;
 
     int                        uniqueId;
+    int                        queueRank;
+
+    tr_bool                    isQueued;
+    time_t                     timeQueue;
+    uint64_t                   downloadedQueue;
+    double                     downloadedQueueKBps;
+    uint64_t                   uploadedQueue;
+    double                     uploadedQueueKBps;
 
     struct tr_bandwidth      * bandwidth;
 
@@ -346,6 +359,26 @@ static inline tr_bool tr_torrentAllowsLPD( const tr_torrent * tor )
         && ( !tr_torrentIsPrivate( tor ) );
 }
 
+static inline void tr_torrentMoveQueueRankUp( tr_torrent * tor )
+{
+    if( tor->queueRank > 0 ) tr_torrentSetQueueRank( tor, tor->queueRank - 1 );
+}
+
+static inline void tr_torrentMoveQueueRankDown( tr_torrent * tor )
+{
+    if( tor->queueRank >= 0 ) tr_torrentSetQueueRank( tor, tor->queueRank + 1 );
+}
+
+static inline void tr_torrentMoveQueueRankTop( tr_torrent * tor )
+{
+    if( tor->queueRank > 0 ) tr_torrentSetQueueRank( tor, 0 );
+}
+
+static inline void tr_torrentMoveQueueRankBottom( tr_torrent * tor )
+{
+    if( tor->queueRank >= 0 ) tr_torrentSetQueueRank( tor, -1 );
+}
+
 /***
 ****
 ***/
@@ -369,6 +402,7 @@ void tr_torrentSetDirty( tr_torrent * tor )
 {
     assert( tr_isTorrent( tor ) );
 
+    tor->anyDate = tr_time();
     tor->isDirty = TRUE;
 }
 

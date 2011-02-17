@@ -89,6 +89,7 @@ class TrMainWindow: public QMainWindow
         QSet<int> getSelectedTorrents( ) const;
         void updateNetworkIcon( );
         QWidgetList myHidden;
+        void moveQueue( int dir );
 
     public slots:
         void openURL( QString );
@@ -135,9 +136,14 @@ class TrMainWindow: public QMainWindow
         void onSortByETAToggled      ( bool );
         void onSortByNameToggled     ( bool );
         void onSortByProgressToggled ( bool );
+        void onSortByQueueToggled    ( bool );
         void onSortByRatioToggled    ( bool );
         void onSortBySizeToggled     ( bool );
         void onSortByStateToggled    ( bool );
+        void moveQueueUp             ( );
+        void moveQueueDown           ( );
+        void moveQueueTop            ( );
+        void moveQueueBottom         ( );
 
     private:
         QWidget * myFilterBar;
@@ -158,6 +164,7 @@ class TrMainWindow: public QMainWindow
     public slots:
         void startAll( );
         void startSelected( );
+        void forceStartSelected( );
         void pauseAll( );
         void pauseSelected( );
         void removeSelected( );

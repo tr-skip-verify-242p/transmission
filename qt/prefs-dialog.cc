@@ -238,6 +238,54 @@ PrefsDialog :: createWebTab( Session& session )
 ****
 ***/
 
+QWidget *
+PrefsDialog :: createQueueTab( )
+{
+    QWidget *l, *r;
+    QString s;
+    HIG * hig = new HIG( this );
+    const QString speed_K_str = Formatter::unitStr( Formatter::SPEED, Formatter::KB );
+
+    hig->addSectionTitle( tr( "Limits" ) );
+
+        l = checkBoxNew( tr( "Maximum &downloads active:" ), Prefs::QUEUE_ENABLED_DOWNLOAD );
+        r = spinBoxNew( Prefs::QUEUE_MAX_DOWNLOAD_ACTIVE, 0, INT_MAX, 1 );
+        hig->addRow( l, r );
+        enableBuddyWhenChecked( qobject_cast<QCheckBox*>(l), r );
+
+        l = checkBoxNew( tr( "Maximum &seeds active:" ), Prefs::QUEUE_ENABLED_SEED );
+        r = spinBoxNew( Prefs::QUEUE_MAX_SEED_ACTIVE, 0, INT_MAX, 1 );
+        hig->addRow( l, r );
+        enableBuddyWhenChecked( qobject_cast<QCheckBox*>(l), r );
+
+    hig->addSectionTitle( tr( "Skip" ) );
+
+        l = checkBoxNew( tr( "Skip torrents if slow for &N minutes:" ), Prefs::QUEUE_SKIP_SLOW_TORRENTS );
+        r = spinBoxNew( Prefs::QUEUE_SLOW_COUNT, 0, INT_MAX, 1 );
+        hig->addRow( l, r );
+        enableBuddyWhenChecked( qobject_cast<QCheckBox*>(l), r );
+
+        s = tr( "Slow torrent cutoff sp&eed (%1):" ).arg( speed_K_str );
+        r = spinBoxNew( Prefs::QUEUE_SLOW_CUTOFF, 0, INT_MAX, 1 );
+        hig->addRow( s, r );
+        enableBuddyWhenChecked( qobject_cast<QCheckBox*>(l), r );
+
+    hig->addSectionTitle( tr( "Options" ) );
+
+        l = checkBoxNew( tr( "Don't s&tart new torrents if a speed limit is reached" ), Prefs::QUEUE_SPEED_LIMIT );
+        hig->addWideControl( l );
+
+        l = checkBoxNew( tr( "&Add new torrents to the top of the queue" ), Prefs::QUEUE_NEW_TORRENTS_TOP );
+        hig->addWideControl( l );
+
+    hig->finish( );
+    return hig;
+}
+
+/***
+****
+***/
+
 void
 PrefsDialog :: altSpeedDaysEdited( int i )
 {
@@ -641,6 +689,7 @@ PrefsDialog :: PrefsDialog( Session& session, Prefs& prefs, QWidget * parent ):
     t->addTab( createSpeedTab( ),        tr( "Speed" ) );
     t->addTab( createPrivacyTab( ),      tr( "Privacy" ) );
     t->addTab( createNetworkTab( ),      tr( "Network" ) );
+    t->addTab( createQueueTab( ),        tr( "Queue" ) );
     t->addTab( createDesktopTab( ),      tr( "Desktop" ) );
     t->addTab( createWebTab( session ),  tr( "Web" ) );
     t->addTab( createProxyTab( ),        tr( "Proxy" ) );

@@ -110,6 +110,7 @@ TrMainWindow :: TrMainWindow( Session& session, Prefs& prefs, TorrentModel& mode
     ui.action_Properties->setIcon( getStockIcon( "document-properties", QStyle::SP_DesktopIcon ) );
     ui.action_OpenFolder->setIcon( getStockIcon( "folder-open", QStyle::SP_DirOpenIcon ) );
     ui.action_Start->setIcon( getStockIcon( "media-playback-start", QStyle::SP_MediaPlay ) );
+    ui.action_ForceStart->setIcon( getStockIcon( "media-seek-forward", QStyle::SP_MediaSeekForward ) );
     ui.action_Announce->setIcon( getStockIcon( "network-transmit-receive" ) );
     ui.action_Pause->setIcon( getStockIcon( "media-playback-pause", QStyle::SP_MediaPause ) );
     ui.action_Remove->setIcon( getStockIcon( "list-remove", QStyle::SP_TrashIcon ) );
@@ -122,6 +123,10 @@ TrMainWindow :: TrMainWindow( Session& session, Prefs& prefs, TorrentModel& mode
     ui.action_Preferences->setIcon( getStockIcon( "preferences-system" ) );
     ui.action_Contents->setIcon( getStockIcon( "help-contents", QStyle::SP_DialogHelpButton ) );
     ui.action_About->setIcon( getStockIcon( "help-about" ) );
+    ui.action_QueueUp->setIcon( getStockIcon( "go-up", QStyle::SP_ArrowUp ) );
+    ui.action_QueueDown->setIcon( getStockIcon( "go-down", QStyle::SP_ArrowDown ) );
+    ui.action_QueueTop->setIcon( getStockIcon( "go-top" ) );
+    ui.action_QueueBottom->setIcon( getStockIcon( "go-bottom" ) );
 
     // ui signals
     connect( ui.action_Toolbar, SIGNAL(toggled(bool)), this, SLOT(setToolbarVisible(bool)));
@@ -133,11 +138,17 @@ TrMainWindow :: TrMainWindow( Session& session, Prefs& prefs, TorrentModel& mode
     connect( ui.action_SortByETA,      SIGNAL(toggled(bool)), this, SLOT(onSortByETAToggled(bool)));
     connect( ui.action_SortByName,     SIGNAL(toggled(bool)), this, SLOT(onSortByNameToggled(bool)));
     connect( ui.action_SortByProgress, SIGNAL(toggled(bool)), this, SLOT(onSortByProgressToggled(bool)));
+    connect( ui.action_SortByQueue,    SIGNAL(toggled(bool)), this, SLOT(onSortByQueueToggled(bool)));
     connect( ui.action_SortByRatio,    SIGNAL(toggled(bool)), this, SLOT(onSortByRatioToggled(bool)));
     connect( ui.action_SortBySize,     SIGNAL(toggled(bool)), this, SLOT(onSortBySizeToggled(bool)));
     connect( ui.action_SortByState,    SIGNAL(toggled(bool)), this, SLOT(onSortByStateToggled(bool)));
     connect( ui.action_ReverseSortOrder, SIGNAL(toggled(bool)), this, SLOT(setSortAscendingPref(bool)));
+    connect( ui.action_QueueUp, SIGNAL(triggered()), this, SLOT(moveQueueUp()));
+    connect( ui.action_QueueDown, SIGNAL(triggered()), this, SLOT(moveQueueDown()));
+    connect( ui.action_QueueTop, SIGNAL(triggered()), this, SLOT(moveQueueTop()));
+    connect( ui.action_QueueBottom, SIGNAL(triggered()), this, SLOT(moveQueueBottom()));
     connect( ui.action_Start, SIGNAL(triggered()), this, SLOT(startSelected()));
+    connect( ui.action_ForceStart, SIGNAL(triggered()), this, SLOT(forceStartSelected()));
     connect( ui.action_Pause, SIGNAL(triggered()), this, SLOT(pauseSelected()));
     connect( ui.action_Remove, SIGNAL(triggered()), this, SLOT(removeSelected()));
     connect( ui.action_Delete, SIGNAL(triggered()), this, SLOT(deleteSelected()));
@@ -171,6 +182,7 @@ TrMainWindow :: TrMainWindow( Session& session, Prefs& prefs, TorrentModel& mode
             << ui.action_OpenFolder
             << sep2
             << ui.action_Start
+            << ui.action_ForceStart
             << ui.action_Announce
             << ui.action_Pause
             << ui.action_CopyMagnetToClipboard
@@ -210,6 +222,7 @@ TrMainWindow :: TrMainWindow( Session& session, Prefs& prefs, TorrentModel& mode
     actionGroup->addAction( ui.action_SortByETA );
     actionGroup->addAction( ui.action_SortByName );
     actionGroup->addAction( ui.action_SortByProgress );
+    actionGroup->addAction( ui.action_SortByQueue );
     actionGroup->addAction( ui.action_SortByRatio );
     actionGroup->addAction( ui.action_SortBySize );
     actionGroup->addAction( ui.action_SortByState );
@@ -521,12 +534,14 @@ void
 TrMainWindow :: setSortPref( int i )
 {
     myPrefs.set( Prefs::SORT_MODE, SortMode( i ) );
+    refreshActionSensitivity( );
 }
 void TrMainWindow :: onSortByActivityToggled ( bool b ) { if( b ) setSortPref( SortMode::SORT_BY_ACTIVITY ); }
 void TrMainWindow :: onSortByAgeToggled      ( bool b ) { if( b ) setSortPref( SortMode::SORT_BY_AGE );      }
 void TrMainWindow :: onSortByETAToggled      ( bool b ) { if( b ) setSortPref( SortMode::SORT_BY_ETA );      }
 void TrMainWindow :: onSortByNameToggled     ( bool b ) { if( b ) setSortPref( SortMode::SORT_BY_NAME );     }
 void TrMainWindow :: onSortByProgressToggled ( bool b ) { if( b ) setSortPref( SortMode::SORT_BY_PROGRESS ); }
+void TrMainWindow :: onSortByQueueToggled    ( bool b ) { if( b ) setSortPref( SortMode::SORT_BY_QUEUE );    }
 void TrMainWindow :: onSortByRatioToggled    ( bool b ) { if( b ) setSortPref( SortMode::SORT_BY_RATIO );    }
 void TrMainWindow :: onSortBySizeToggled     ( bool b ) { if( b ) setSortPref( SortMode::SORT_BY_SIZE );     }
 void TrMainWindow :: onSortByStateToggled    ( bool b ) { if( b ) setSortPref( SortMode::SORT_BY_STATE );    }
@@ -535,6 +550,73 @@ void
 TrMainWindow :: setSortAscendingPref( bool b )
 {
     myPrefs.set( Prefs::SORT_REVERSED, b );
+}
+
+/****
+*****
+****/
+
+namespace
+{
+    QList<int>
+    reverse( const QList<int> &list )
+    {
+        QList<int> ret;
+        for( int i = list.count(); i > 0; --i )
+            ret << list[i-1];
+        return ret;
+    }
+}
+
+void
+TrMainWindow :: moveQueue( int dir )
+{
+    QMap<int, int> map;
+
+    foreach( int id, getSelectedTorrents( ) )
+        map.insert( myModel.getTorrentFromId( id )->queueRank(), id );
+
+    switch( dir )
+    {
+        case TR_QUEUE_DOWN:
+            if( myModel.getTorrentFromId( map.values().last() )->queueRank() + 1 == myModel.rowCount() )
+                break;
+        case TR_QUEUE_TOP:
+            mySession.torrentSet( reverse( map.values() ), "moveQueueRank", dir );
+            break;
+        case TR_QUEUE_UP:
+            if( myModel.getTorrentFromId( map.values().first() )->queueRank() == 0 )
+                break;
+        case TR_QUEUE_BOTTOM:
+            mySession.torrentSet( map.values(), "moveQueueRank", dir );
+            break;
+    }
+
+    mySession.refreshActiveTorrents( );
+}
+
+void
+TrMainWindow :: moveQueueUp( )
+{
+    moveQueue( TR_QUEUE_UP );
+}
+
+void
+TrMainWindow :: moveQueueDown( )
+{
+    moveQueue( TR_QUEUE_DOWN );
+}
+
+void
+TrMainWindow :: moveQueueTop( )
+{
+    moveQueue( TR_QUEUE_TOP );
+}
+
+void
+TrMainWindow :: moveQueueBottom( )
+{
+    moveQueue( TR_QUEUE_BOTTOM );
 }
 
 /****
@@ -700,28 +782,50 @@ TrMainWindow :: refreshActionSensitivity( )
     int selected( 0 );
     int paused( 0 );
     int selectedAndPaused( 0 );
+    int pausedAndQueued( 0 );
+    int selectedAndQueued( 0 );
+    int selectedPausedAndQueued( 0 );
+    int selectedAndForced( 0 );
     int canAnnounce( 0 );
     const QAbstractItemModel * model( ui.listView->model( ) );
     const QItemSelectionModel * selectionModel( ui.listView->selectionModel( ) );
     const int rowCount( model->rowCount( ) );
+    const bool downloadQueue( myPrefs.getBool( Prefs::QUEUE_ENABLED_DOWNLOAD ) );
+    const bool seedQueue( myPrefs.getBool( Prefs::QUEUE_ENABLED_SEED ) );
 
     // count how many torrents are selected, paused, etc
     for( int row=0; row<rowCount; ++row ) {
         const QModelIndex modelIndex( model->index( row, 0 ) );
         assert( model == modelIndex.model( ) );
         const Torrent * tor( model->data( modelIndex, TorrentModel::TorrentRole ).value<const Torrent*>( ) );
-        if( tor ) {
-            const bool isSelected( selectionModel->isSelected( modelIndex ) );
-            const bool isPaused( tor->isPaused( ) );
-            if( isSelected )
-                ++selected;
-            if( isPaused )
-                ++ paused;
-            if( isSelected && isPaused )
-                ++selectedAndPaused;
-            if( tor->canManualAnnounce( ) )
-                ++canAnnounce;
+        const bool isSelected( selectionModel->isSelected( modelIndex ) );
+        const bool isPaused( tor->isPaused( ) );
+        const bool isQueued( tor->isQueued( ) );
+        const bool isDone( tor->leftUntilDone( ) == 0 );
+        const bool queueTest = ( downloadQueue && !isDone ) || ( seedQueue && isDone );
+
+        if( isSelected )
+        {
+            ++selected;
+            if( queueTest && isQueued )
+                ++selectedAndQueued;
+            if( !isQueued && !isPaused )
+                ++selectedAndForced;
         }
+        if( isPaused )
+        {
+            ++paused;
+            if( queueTest && isQueued )
+                ++pausedAndQueued;
+        }
+        if( isSelected && isPaused )
+        {
+            ++selectedAndPaused;
+            if( queueTest && isQueued )
+                ++selectedPausedAndQueued;
+        }
+        if( tor->canManualAnnounce( ) )
+            ++canAnnounce;
     }
 
     const bool haveSelection( selected > 0 );
@@ -736,12 +840,31 @@ TrMainWindow :: refreshActionSensitivity( )
     ui.action_OpenFolder->setEnabled( oneSelection && mySession.isLocal( ) );
     ui.action_CopyMagnetToClipboard->setEnabled( oneSelection );
 
+    const bool queueSort( ( myPrefs.get<SortMode>(Prefs::SORT_MODE).mode() == SortMode::SORT_BY_QUEUE ) && haveSelection );
+    ui.action_QueueUp->setEnabled( queueSort );
+    ui.action_QueueDown->setEnabled( queueSort );
+    ui.action_QueueTop->setEnabled( queueSort );
+    ui.action_QueueBottom->setEnabled( queueSort );
+
     ui.action_SelectAll->setEnabled( selected < rowCount );
-    ui.action_StartAll->setEnabled( paused > 0 );
-    ui.action_PauseAll->setEnabled( paused < rowCount );
-    ui.action_Start->setEnabled( selectedAndPaused > 0 );
-    ui.action_Pause->setEnabled( selectedAndPaused < selected );
+    /*
+       A stopped torrent is a paused torrent that is not queue managed.
+       A queued torrent is a paused torrent that is queue managed.
+
+       Start should display only for torrents that are stopped.
+       Pause should only display for non stopped torrents.
+       StartAll should only display if there are stopped torrents.
+       PauseAll should only display if there are non stopped torrents.
+       ForceStart should display for every torrent.
+    */
+    ui.action_StartAll->setEnabled( paused > 0 && pausedAndQueued < paused );
+    ui.action_PauseAll->setEnabled( paused < rowCount || pausedAndQueued > 0 );
+    ui.action_Start->setEnabled( selectedAndPaused > 0 && selectedAndQueued < selected );
+    ui.action_ForceStart->setEnabled( selected );
+    ui.action_Pause->setEnabled( selectedAndPaused < selected || selectedPausedAndQueued > 0 );
     ui.action_Announce->setEnabled( selected > 0 && ( canAnnounce == selected ) );
+
+    ui.action_ForceStart->setChecked( selectedAndForced > 0 );
 
     if( myDetailsDialog )
         myDetailsDialog->setIds( getSelectedTorrents( ) );
@@ -775,6 +898,18 @@ void
 TrMainWindow :: startSelected( )
 {
     mySession.startTorrents( getSelectedTorrents( ) );
+}
+void
+TrMainWindow :: forceStartSelected( )
+{
+    const QSet<int> ids = getSelectedTorrents( );
+    // FIXME: why is this returning the opposite of what it should?
+    const bool start = ui.action_ForceStart->isChecked( );
+
+    if( start )
+        mySession.forceStartTorrents( ids );
+    else
+        mySession.torrentSet( ids, "queued", true );
 }
 void
 TrMainWindow :: pauseSelected( )
@@ -914,6 +1049,7 @@ TrMainWindow :: refreshPref( int key )
             ui.action_SortByETA->setChecked      ( i == SortMode::SORT_BY_ETA );
             ui.action_SortByName->setChecked     ( i == SortMode::SORT_BY_NAME );
             ui.action_SortByProgress->setChecked ( i == SortMode::SORT_BY_PROGRESS );
+            ui.action_SortByQueue->setChecked    ( i == SortMode::SORT_BY_QUEUE );
             ui.action_SortByRatio->setChecked    ( i == SortMode::SORT_BY_RATIO );
             ui.action_SortBySize->setChecked     ( i == SortMode::SORT_BY_SIZE );
             ui.action_SortByState->setChecked    ( i == SortMode::SORT_BY_STATE );

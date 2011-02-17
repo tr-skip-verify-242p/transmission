@@ -256,6 +256,25 @@ static tr_option opts[] =
     { 920, "session-info",           "Show the session's details", "si", 0, NULL },
     { 921, "session-stats",          "Show the session's statistics", "st", 0, NULL },
     { 'l', "list",                   "List all torrents", "l",  0, NULL },
+    { 931, "max-download",           "Set the maximum active downloading torrent(s)", "md", 1, "<max>" },
+    { 932, "max-seed",               "Set the maximum active seeding torrent(s)", "ms", 1, "<max>" },
+    { 933, "skip-slow",              "Skip slow torrents in the queue", "ss", 0, NULL },
+    { 934, "no-skip-slow",           "Don't skip slow torrents in the queue", "SS", 0, NULL },
+    { 935, "cutoff-speed",           "Cutoff speed of slow torrents", "cs", 1, "<speed>" },
+    { 936, "queue-download",         "Enable the torrent queue for downloads", "qd", 0, NULL },
+    { 937, "no-queue-download",      "Disable the torrent queue for downloads", "QD", 0, NULL },
+    { 938, "queue-seed",             "Enable the torrent queue for seeds", "qs", 0, NULL },
+    { 939, "no-queue-seed",          "Disable the torrent queue for seeds", "QS", 0, NULL },
+    { 955, "queue-new-top",          "New torrents start at the top of the queue", "qnt", 0, NULL },
+    { 956, "queue-new-bottom",       "New torrents start at the bottom of the queue", "qnb", 0, NULL },
+    { 957, "queue-speed-limit",      "Don't start new torrents if the speed limit is reached", "qsl", 0, NULL },
+    { 958, "no-queue-speed-limit",   "Start new torrents even if the speed limit is reached", "QSL", 0, NULL },
+    { 944, "queued",                 "Queue the torrent(s)", "q", 0, NULL },
+    { 945, "no-queued",              "Remove the torrent(s) from the queue", "Q", 0, NULL },
+    { 946, "queue-move-up",          "Move the torrent(s) up in the queue", "qmu", 0, NULL },
+    { 947, "queue-move-down",        "Move the torrent(s) down in the queue", "qmd", 0, NULL },
+    { 948, "queue-move-top",         "Move the torrent(s) to the top of the queue", "qmt", 0, NULL },
+    { 949, "queue-move-bottom",      "Move the torrent(s) to the bottom of the queue", "qmb", 0, NULL },
     { 960, "move",                   "Move current torrent's data to a new folder", NULL, 1, "<path>" },
     { 961, "find",                   "Tell Transmission where to find a torrent's data", NULL, 1, "<path>" },
     { 'm', "portmap",                "Enable portmapping via NAT-PMP or UPnP", "m",  0, NULL },
@@ -288,6 +307,7 @@ static tr_option opts[] =
     { 710, "tracker-add",            "Add a tracker to a torrent", "td", 1, "<tracker>" },
     { 712, "tracker-remove",         "Remove a tracker from a torrent", "tr", 1, "<trackerId>" },
     { 's', "start",                  "Start the current torrent(s)", "s",  0, NULL },
+    { 964, "force-start",            "Force start the current torrent(s)", "fs",  0, NULL },
     { 'S', "stop",                   "Stop the current torrent(s)", "S",  0, NULL },
     { 't', "torrent",                "Set the current torrent(s)", "t",  1, "<torrent>" },
     { 990, "start-paused",           "Start added torrents paused", NULL, 0, NULL },
@@ -380,6 +400,19 @@ getOptMode( int val )
         case 'Y': /* no-lpd */
         case 800: /* torrent-done-script */
         case 801: /* no-torrent-done-script */
+        case 931: /* max-download */
+        case 932: /* max-seed */
+        case 933: /* skip-slow */
+        case 934: /* no-skip-slow */
+        case 935: /* cutoff-speed */
+        case 936: /* queue-download */
+        case 937: /* no-queue-download */
+        case 938: /* queue-seed */
+        case 939: /* no-queue-seed */
+        case 955: /* queue-new-top */
+        case 956: /* queue-new-bottom */
+        case 957: /* queue-speed-limit */
+        case 958: /* no-queue-speed-limit */
         case 970: /* alt-speed */
         case 971: /* no-alt-speed */
         case 972: /* alt-speed-downlimit */
@@ -401,6 +434,12 @@ getOptMode( int val )
             return MODE_SESSION_SET;
 
         case 712: /* tracker-remove */
+        case 944: /* queued */
+        case 945: /* no-queued */
+        case 946: /* queue-up */
+        case 947: /* queue-down */
+        case 948: /* queue-top */
+        case 949: /* queue-bottom */
         case 950: /* seedratio */
         case 951: /* seedratio-default */
         case 952: /* no-seedratio */
@@ -441,6 +480,7 @@ getOptMode( int val )
             return MODE_SESSION_SET | MODE_TORRENT_SET;
 
         case 's': /* start */
+        case 964: /* force-start */
             return MODE_TORRENT_START | MODE_TORRENT_ADD;
 
         case 'S': /* stop */
@@ -676,6 +716,8 @@ static const char * details_keys[] = {
     "peer-limit",
     "pieceCount",
     "pieceSize",
+    "queued",
+    "queueRank",
     "rateDownload",
     "rateUpload",
     "recheckProgress",
@@ -844,6 +886,10 @@ printDetails( tr_benc * top )
             printf( "\n" );
 
             printf( "TRANSFER\n" );
+            if( tr_bencDictFindBool( t, "queued", &boolVal ) )
+                printf( "  Queued: %s\n", boolVal ? "Yes" : "No" );
+            if( tr_bencDictFindInt( t, "queueRank", &i ) )
+                printf( "  Queue rank: %" PRId64 "\n", i );
             getStatusString( t, buf, sizeof( buf ) );
             printf( "  State: %s\n", buf );
 
@@ -1566,6 +1612,39 @@ printSession( tr_benc * top )
         }
         printf( "\n" );
 
+        printf( "QUEUE\n" );
+        {
+            tr_bool queueDownload, queueSeed, skip, speed, top;
+            int64_t maxDown, maxSeed, cutoff;
+            if( tr_bencDictFindBool( args, TR_PREFS_KEY_QUEUE_ENABLED_DOWNLOAD, &queueDownload ) &&
+                tr_bencDictFindBool( args, TR_PREFS_KEY_QUEUE_ENABLED_SEED, &queueSeed ) &&
+                tr_bencDictFindInt ( args, TR_PREFS_KEY_QUEUE_MAX_DOWNLOAD_ACTIVE, &maxDown ) &&
+                tr_bencDictFindInt ( args, TR_PREFS_KEY_QUEUE_MAX_SEED_ACTIVE, &maxSeed ) &&
+                tr_bencDictFindBool( args, TR_PREFS_KEY_QUEUE_NEW_TORRENTS_TOP, &top ) &&
+                tr_bencDictFindBool( args, TR_PREFS_KEY_QUEUE_SKIP_SLOW_TORRENTS, &skip ) &&
+                tr_bencDictFindInt ( args, TR_PREFS_KEY_QUEUE_SLOW_CUTOFF_KBps, &cutoff ) &&
+                tr_bencDictFindBool( args, TR_PREFS_KEY_QUEUE_SPEED_LIMIT, &speed ) )
+            {
+                char buf[128];
+                printf( "  Download queue: %s ( limit: %" PRId64" )\n",
+                        queueDownload ? "Enabled" : "Disabled",
+                        maxDown );
+                printf( "  Seed queue: %s ( limit: %" PRId64" )\n",
+                        queueSeed ? "Enabled" : "Disabled",
+                        maxSeed );
+
+                tr_formatter_speed_KBps( buf, cutoff, sizeof( buf ) );
+                printf( "  Skip slow torrents: %s (Slow torrent cutoff: %s)\n",
+                        skip ? "Yes" : "No",
+                        buf );
+
+                printf( "  Don't start new torrents if speed limit is reached: %s\n", speed ? "Yes" : "No" );
+                printf( "  Queue new torrents at the: %s\n", top ? "Top" : "Bottom" );
+
+            }
+        }
+        printf( "\n" );
+
         printf( "MISC\n" );
         if( tr_bencDictFindBool( args, TR_PREFS_KEY_START, &boolVal ) )
             printf( "  Autostart added torrents: %s\n", ( boolVal ? "Yes" : "No" ) );
@@ -1952,6 +2031,32 @@ processArgs( const char * rpcurl, int argc, const char ** argv )
                           break;
                 case 801: tr_bencDictAddBool( args, TR_PREFS_KEY_SCRIPT_TORRENT_DONE_ENABLED, FALSE );
                           break;
+                case 931: tr_bencDictAddInt( args, TR_PREFS_KEY_QUEUE_MAX_DOWNLOAD_ACTIVE, numarg( optarg ) );
+                          break;
+                case 932: tr_bencDictAddInt( args, TR_PREFS_KEY_QUEUE_MAX_SEED_ACTIVE, numarg( optarg ) );
+                          break;
+                case 933: tr_bencDictAddBool( args, TR_PREFS_KEY_QUEUE_SKIP_SLOW_TORRENTS, TRUE );
+                          break;
+                case 934: tr_bencDictAddBool( args, TR_PREFS_KEY_QUEUE_SKIP_SLOW_TORRENTS, FALSE );
+                          break;
+                case 935: tr_bencDictAddInt( args, TR_PREFS_KEY_QUEUE_SLOW_CUTOFF_KBps, numarg( optarg ) );
+                          break;
+                case 936: tr_bencDictAddBool( args, TR_PREFS_KEY_QUEUE_ENABLED_DOWNLOAD, TRUE );
+                          break;
+                case 937: tr_bencDictAddBool( args, TR_PREFS_KEY_QUEUE_ENABLED_DOWNLOAD, FALSE );
+                          break;
+                case 938: tr_bencDictAddBool( args, TR_PREFS_KEY_QUEUE_ENABLED_SEED, TRUE );
+                          break;
+                case 939: tr_bencDictAddBool( args, TR_PREFS_KEY_QUEUE_ENABLED_SEED, FALSE );
+                          break;
+                case 955: tr_bencDictAddBool( args, TR_PREFS_KEY_QUEUE_NEW_TORRENTS_TOP, TRUE );
+                          break;
+                case 956: tr_bencDictAddBool( args, TR_PREFS_KEY_QUEUE_NEW_TORRENTS_TOP, FALSE );
+                          break;
+                case 957: tr_bencDictAddBool( args, TR_PREFS_KEY_QUEUE_SPEED_LIMIT, TRUE );
+                          break;
+                case 958: tr_bencDictAddBool( args, TR_PREFS_KEY_QUEUE_SPEED_LIMIT, FALSE );
+                          break;
                 case 970: tr_bencDictAddBool( args, TR_PREFS_KEY_ALT_SPEED_ENABLED, TRUE );
                           break;
                 case 971: tr_bencDictAddBool( args, TR_PREFS_KEY_ALT_SPEED_ENABLED, FALSE );
@@ -2075,6 +2180,18 @@ processArgs( const char * rpcurl, int argc, const char ** argv )
             {
                 case 712: tr_bencListAddInt( tr_bencDictAddList( args, "trackerRemove", 1 ), atoi( optarg ) );
                           break;
+                case 944: tr_bencDictAddBool( args, "queued", TRUE );
+                          break;
+                case 945: tr_bencDictAddBool( args, "queued", FALSE );
+                          break;
+                case 946: tr_bencDictAddInt( args, "moveQueueRank", TR_QUEUE_UP );
+                          break;
+                case 947: tr_bencDictAddInt( args, "moveQueueRank", TR_QUEUE_DOWN );
+                          break;
+                case 948: tr_bencDictAddInt( args, "moveQueueRank", TR_QUEUE_TOP );
+                          break;
+                case 949: tr_bencDictAddInt( args, "moveQueueRank", TR_QUEUE_BOTTOM );
+                          break;
                 case 950: tr_bencDictAddReal( args, "seedRatioLimit", atof(optarg) );
                           tr_bencDictAddInt( args, "seedRatioMode", TR_RATIOLIMIT_SINGLE );
                           break;
@@ -2165,6 +2282,19 @@ processArgs( const char * rpcurl, int argc, const char ** argv )
                     tr_bencDictAddStr( top, "method", "torrent-start" );
                     addIdArg( tr_bencDictAddDict( top, ARGUMENTS, 1 ), id );
                     status |= flush( rpcurl, &top );
+                }
+                break;
+            }
+            case 964: /* force-start */
+            {
+                if( tadd )
+                    tr_bencDictAddBool( tr_bencDictFind( tadd, "arguments" ), "paused", FALSE );
+                else {
+                    tr_benc * top = tr_new0( tr_benc, 1 );
+                    tr_bencInitDict( top, 2 );
+                    tr_bencDictAddStr( top, "method", "torrent-force-start" );
+                    addIdArg( tr_bencDictAddDict( top, ARGUMENTS, 1 ), id );
+                    status |= flush( host, port, &top );
                 }
                 break;
             }

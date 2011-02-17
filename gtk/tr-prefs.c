@@ -337,6 +337,69 @@ torrentPage( GObject * core )
 }
 
 /****
+*****  Queue Tab
+****/
+
+static GtkWidget*
+queuePage( GObject * core )
+{
+    int          row = 0;
+    const char * s;
+    GtkWidget *  t;
+    GtkWidget *  w;
+    GtkWidget *  w2;
+    char buf[512];
+
+    t = hig_workarea_create( );
+
+    hig_workarea_add_section_title( t, &row, _( "Limits" ) );
+
+        s = _( "Maxiumum _downloads active:" );
+        w = new_check_button( s, TR_PREFS_KEY_QUEUE_ENABLED_DOWNLOAD, core );
+        w2 = new_spin_button( TR_PREFS_KEY_QUEUE_MAX_DOWNLOAD_ACTIVE, core, 0, 9999, 1 );
+        gtk_widget_set_sensitive( GTK_WIDGET( w2 ), pref_flag_get( TR_PREFS_KEY_QUEUE_ENABLED_DOWNLOAD ) );
+        g_signal_connect( w, "toggled", G_CALLBACK( target_cb ), w2 );
+        hig_workarea_add_row_w( t, &row, w, w2, NULL );
+
+        s = _( "Maxiumum _seeds active:" );
+        w = new_check_button( s, TR_PREFS_KEY_QUEUE_ENABLED_SEED, core );
+        w2 = new_spin_button( TR_PREFS_KEY_QUEUE_MAX_SEED_ACTIVE, core, 0, 9999, 1 );
+        gtk_widget_set_sensitive( GTK_WIDGET( w2 ), pref_flag_get( TR_PREFS_KEY_QUEUE_ENABLED_SEED ) );
+        g_signal_connect( w, "toggled", G_CALLBACK( target_cb ), w2 );
+        hig_workarea_add_row_w( t, &row, w, w2, NULL );
+
+    hig_workarea_add_section_divider( t, &row );
+    hig_workarea_add_section_title( t, &row, _( "Skip" ) );
+
+        s = _( "Skip torrent if slow for _N minutes:" );
+        w = new_check_button( s, TR_PREFS_KEY_QUEUE_SKIP_SLOW_TORRENTS, core );
+        w2 = new_spin_button( TR_PREFS_KEY_QUEUE_SLOW_COUNT, core, 0, 9999, 1 );
+        gtk_widget_set_sensitive( GTK_WIDGET( w2 ), pref_flag_get( TR_PREFS_KEY_QUEUE_SKIP_SLOW_TORRENTS ) );
+        g_signal_connect( w, "toggled", G_CALLBACK( target_cb ), w2 );
+        hig_workarea_add_row_w( t, &row, w, w2, NULL );
+
+        g_snprintf( buf, sizeof( buf ), _( "Slow torrent cutoff sp_eed (%s):" ), _(speed_K_str) );
+        w2 = new_spin_button( TR_PREFS_KEY_QUEUE_SLOW_CUTOFF_KBps, core, 0, 9999, 1 );
+        gtk_widget_set_sensitive( GTK_WIDGET( w2 ), pref_flag_get( TR_PREFS_KEY_QUEUE_SKIP_SLOW_TORRENTS ) );
+        g_signal_connect( w, "toggled", G_CALLBACK( target_cb ), w2 );
+        hig_workarea_add_row( t, &row, buf, w2, NULL );
+
+    hig_workarea_add_section_divider( t, &row );
+    hig_workarea_add_section_title( t, &row, _( "Options" ) );
+
+        s = _( "_Add new torrents to the top of the queue" );
+        w = new_check_button( s, TR_PREFS_KEY_QUEUE_NEW_TORRENTS_TOP, core );
+        hig_workarea_add_wide_control( t, &row, w );
+
+        s = _( "Don't start _new torrents if a speed limit is reached" );
+        w = new_check_button( s, TR_PREFS_KEY_QUEUE_SPEED_LIMIT, core );
+        hig_workarea_add_wide_control( t, &row, w );
+
+    hig_workarea_finish( t, &row );
+    return t;
+}
+
+/****
 *****  Desktop Tab
 ****/
 
@@ -1405,6 +1468,9 @@ gtr_prefs_dialog_new( GtkWindow * parent, GObject * core )
     gtk_notebook_append_page( GTK_NOTEBOOK( n ),
                               networkPage( core ),
                               gtk_label_new ( _( "Network" ) ) );
+    gtk_notebook_append_page( GTK_NOTEBOOK( n ),
+                              queuePage( core ),
+                              gtk_label_new ( _( "Queue" ) ) );
     gtk_notebook_append_page( GTK_NOTEBOOK( n ),
                               desktopPage( core ),
                               gtk_label_new ( _( "Desktop" ) ) );
