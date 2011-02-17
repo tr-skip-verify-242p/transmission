@@ -54,6 +54,10 @@
 
 enum
 {
+    QUEUE_INTERVAL_SECS = 60,
+    QUEUE_MIN_INTERVAL_SECS = 1,
+    QUEUE_MIN_DT = 5,
+    QUEUE_MAX_DT = 600, /* 10 minutes */
 #ifdef TR_LIGHTWEIGHT
     DEFAULT_CACHE_SIZE_MB = 2,
     DEFAULT_PREFETCH_ENABLED = FALSE,
@@ -62,15 +66,6 @@ enum
     DEFAULT_PREFETCH_ENABLED = TRUE,
 #endif
     SAVE_INTERVAL_SECS = 360
-
-    QUEUE_INTERVAL_SECS = 60,
-
-    QUEUE_MIN_INTERVAL_SECS = 1,
-
-    QUEUE_MIN_DT = 5,
-
-    QUEUE_MAX_DT = 600, /* 10 minutes */
-
 };
 
 
