@@ -597,7 +597,8 @@ activityString( const tr_torrent * tor, const tr_stat * torStat )
                     return _( "Paused" );
             }
         }
-        default:                   return "";
+        default:
+            return "";
     }
 }
 
