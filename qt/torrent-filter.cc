@@ -110,7 +110,7 @@ TorrentFilter :: lessThan( const QModelIndex& left, const QModelIndex& right ) c
             if( !val ) val = a->compareRatio( *b );
             break;
         case SortMode :: SORT_BY_QUEUE:
-            less = compare( b->queueRank(), a->queueRank() );
+            if( !val ) val = compare( b->queueRank(), a->queueRank() );
             break;
         case SortMode :: SORT_BY_ETA:
             if( !val ) val = a->compareETA( *b );
