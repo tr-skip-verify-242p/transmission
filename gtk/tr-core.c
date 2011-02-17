@@ -1811,12 +1811,12 @@ tr_core_get_active_torrent_count( TrCore * core )
     return activeCount;
 }
 
-int
+size_t
 tr_core_get_inactive_torrent_count( TrCore * core )
 {
     GtkTreeIter iter;
     GtkTreeModel * model = tr_core_model( core );
-    int inactiveCount = 0;
+    size_t inactiveCount = 0;
 
     if( gtk_tree_model_get_iter_first( model, &iter ) ) do
     {
@@ -1831,12 +1831,12 @@ tr_core_get_inactive_torrent_count( TrCore * core )
     return inactiveCount;
 }
 
-int
+size_t
 tr_core_get_inactive_queued_torrent_count( TrCore * core )
 {
     GtkTreeIter iter;
     GtkTreeModel * model = tr_core_model( core );
-    int inactiveQueuedCount = 0;
+    size_t inactiveQueuedCount = 0;
 
     if( gtk_tree_model_get_iter_first( model, &iter ) ) do
     {
