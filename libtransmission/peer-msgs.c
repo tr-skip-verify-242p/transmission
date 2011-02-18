@@ -79,7 +79,7 @@ enum
     KEEPALIVE_INTERVAL_SECS = 100,
 
     PEX_INTERVAL_SECS       = 90, /* sec between sendPex() calls */
-    TEX_INTERVAL_SECS       = 70, /* sec between sendTex() calls */
+    TEX_INTERVAL_SECS       = 120, /* sec between sendTex() calls */
 
     REQQ                    = 512,
 
