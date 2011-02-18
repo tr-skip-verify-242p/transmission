@@ -353,6 +353,7 @@ char* tr_strdup( const void * in );
  */
 int tr_strcmp0( const char * str1, const char * str2 );
 
+int vstrcmp( const void * a, const void * b );
 
 
 struct evbuffer;
@@ -469,6 +470,12 @@ int  tr_urlParse( const char * url,
                   int        * setme_port,
                   char      ** setme_path ) TR_GNUC_NONNULL(1);
 
+/**
+ * @brief Normalize a URL as per BEP 28 (tracker exchange).
+ * @return A newly-allocated string which you must free, or
+ *         NULL if @a url is not a valid url.
+ */
+char * tr_normalizeURL( const char * url );
 
 /** @brief return TR_RATIO_NA, TR_RATIO_INF, or a number in [0..1]
     @return TR_RATIO_NA, TR_RATIO_INF, or a number in [0..1] */

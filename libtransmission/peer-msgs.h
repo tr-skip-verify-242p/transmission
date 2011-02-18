@@ -50,6 +50,10 @@ void         tr_peerMsgsPulse( tr_peermsgs * msgs );
 void         tr_peerMsgsCancel( tr_peermsgs * msgs,
                                 tr_block_index_t block );
 
+void         tr_peerMsgsSendTexAdded( tr_peermsgs * msgs,
+                                      const char  * bencdata,
+                                      size_t        benclen );
+
 void         tr_peerMsgsFree( tr_peermsgs* );
 
 size_t       tr_generateAllowedSet( tr_piece_index_t  * setmePieces,

@@ -75,7 +75,6 @@ void tr_announcerClose( tr_session * );
 struct tr_torrent_tiers * tr_announcerAddTorrent( tr_torrent          * torrent,
                                                   tr_tracker_callback * cb,
                                                   void                * cbdata );
-
 tr_bool tr_announcerHasBacklog( const struct tr_announcer * );
 
 void tr_announcerResetTorrent( struct tr_announcer*, tr_torrent* );
@@ -104,5 +103,36 @@ tr_tracker_stat * tr_announcerStats( const tr_torrent * torrent,
 void tr_announcerStatsFree( tr_tracker_stat * trackers,
                             int               trackerCount );
 
+
+struct tr_ptrArray;
+
+/**
+ * Add all verified trackers for the given torrent to the pointer
+ * array @a trackers. The array is cleared beforehand.
+ *
+ * The elements of the array will be newly allocated NULL-terminated
+ * strings containing the normalized announce URLs and will be sorted
+ * in ascending lexicographical order (as per BEP 28).
+ *
+ * @note You must destroy the pointer array and free the strings when
+ *       they are no longer needed, e.g. by
+ *       @code tr_ptrArrayDestruct( trackers, tr_free ); @endcode
+ *
+ * @see tr_torrentGetTexHash
+ */
+void tr_announcerGetVerifiedTrackers( const tr_torrent   * torrent,
+                                      struct tr_ptrArray * trackers );
+
+/**
+ * Adds the trackers in @a trackers to the torrent's tiers.
+ *
+ * @note Only the @a tr_tracker_info.announce field is used,
+ *       and it is assumed to be a NULL-terminated string.
+ *
+ * @see parseUtTex
+ */
+void tr_announcerAddTex( tr_torrent            * tor,
+                         const tr_tracker_info * trackers,
+                         int                     tracker_count );
 
 #endif /* _TR_ANNOUNCER_H_ */
