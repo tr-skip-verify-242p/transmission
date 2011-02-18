@@ -535,6 +535,12 @@ privacyPage( GObject * core )
     gtr_widget_set_tooltip_text( w, s );
     hig_workarea_add_wide_control( t, &row, w );
 
+    s = _( "Use _TEX to find more trackers" );
+    w = new_check_button( s, TR_PREFS_KEY_TEX_ENABLED, core );
+    s = _( "TEX is a tool for exchanging tracker lists with the peers you're connected to." );
+    gtr_widget_set_tooltip_text( w, s );
+    hig_workarea_add_wide_control( t, &row, w );
+
     s = _( "Use _DHT to find more peers" );
     w = new_check_button( s, TR_PREFS_KEY_DHT_ENABLED, core );
     s = _( "DHT is a tool for finding peers without a tracker." );
