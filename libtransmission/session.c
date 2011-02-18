@@ -333,6 +333,7 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PORT_RANDOM_HIGH,    65535 );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_SOCKET_TOS,          TR_DEFAULT_PEER_SOCKET_TOS_STR );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PEX_ENABLED,              TRUE );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_TEX_ENABLED,              TRUE );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PORT_FORWARDING,          TRUE );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PREALLOCATION,            TR_PREALLOCATE_SPARSE );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_PROXY,                    "" );
@@ -405,6 +406,7 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_SOCKET_TOS,          format_tos(s->peerSocketTOS) );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_CONGESTION_ALGORITHM, s->peer_congestion_algorithm );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PEX_ENABLED,              s->isPexEnabled );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_TEX_ENABLED,              tr_sessionIsTexEnabled( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PORT_FORWARDING,          tr_sessionIsPortForwardingEnabled( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PREALLOCATION,            s->preallocationMode );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_PROXY,                    s->proxy );
@@ -699,9 +701,6 @@ tr_sessionInitImpl( void * vdata )
 
     session->shared = tr_sharedInit( session );
 
-    /* BEP 28 */
-    session->isTexEnabled = 1;
-
     /**
     ***  Blocklist
     **/
@@ -777,6 +776,8 @@ sessionSetImpl( void * vdata )
         tr_sessionSetPeerLimitPerTorrent( session, i );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_PEX_ENABLED, &boolVal ) )
         tr_sessionSetPexEnabled( session, boolVal );
+    if( tr_bencDictFindBool( settings, TR_PREFS_KEY_TEX_ENABLED, &boolVal ) )
+        tr_sessionSetTexEnabled( session, boolVal );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_DHT_ENABLED, &boolVal ) )
         tr_sessionSetDHTEnabled( session, boolVal );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_LPD_ENABLED, &boolVal ) )
@@ -1962,6 +1963,20 @@ tr_sessionIsPexEnabled( const tr_session * session )
     assert( tr_isSession( session ) );
 
     return session->isPexEnabled;
+}
+
+tr_bool
+tr_sessionIsTexEnabled( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+    return session->isTexEnabled;
+}
+
+void
+tr_sessionSetTexEnabled( tr_session * session, tr_bool enabled )
+{
+    assert( tr_isSession( session ) );
+    session->isTexEnabled = enabled;
 }
 
 tr_bool

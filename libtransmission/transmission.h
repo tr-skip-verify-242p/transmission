@@ -189,6 +189,7 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_PEER_SOCKET_TOS               "peer-socket-tos"
 #define TR_PREFS_KEY_PEER_CONGESTION_ALGORITHM     "peer-congestion-algorithm"
 #define TR_PREFS_KEY_PEX_ENABLED                   "pex-enabled"
+#define TR_PREFS_KEY_TEX_ENABLED                   "tracker-exchange-enabled"
 #define TR_PREFS_KEY_PORT_FORWARDING               "port-forwarding-enabled"
 #define TR_PREFS_KEY_PROXY_AUTH_ENABLED            "proxy-auth-enabled"
 #define TR_PREFS_KEY_PREALLOCATION                 "preallocation"
@@ -622,6 +623,9 @@ void tr_sessionClearStats( tr_session * session );
  */
 void     tr_sessionSetPexEnabled( tr_session  * session, tr_bool isEnabled );
 tr_bool  tr_sessionIsPexEnabled( const tr_session * session );
+
+tr_bool  tr_sessionIsTexEnabled( const tr_session * session );
+void     tr_sessionSetTexEnabled( tr_session * session, tr_bool enabled );
 
 tr_bool  tr_sessionIsDHTEnabled( const tr_session * session );
 void     tr_sessionSetDHTEnabled( tr_session * session, tr_bool );
