@@ -1092,8 +1092,11 @@ onAnnounceDone( tr_session   * session,
                 if(( tracker = tier->currentTracker ))
                 {
                     tracker->consecutiveAnnounceFailures = 0;
-                    tracker->verified = TRUE;
-                    tr_torrentTexListChanged( tier->tor );
+                    if( !tracker->verified )
+                    {
+                        tracker->verified = TRUE;
+                        tr_torrentTexListChanged( tier->tor );
+                    }
                 }
 
                 if( gotScrape )
