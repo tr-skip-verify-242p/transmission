@@ -460,7 +460,7 @@ compareByQueue( GtkTreeModel * model,
                 GtkTreeIter  * b,
                 gpointer       user_data UNUSED )
 {
-    tr_torrent *ta, *tb;
+    tr_torrent * ta, * tb;
 
     gtk_tree_model_get( model, a, MC_TORRENT_RAW, &ta, -1 );
     gtk_tree_model_get( model, b, MC_TORRENT_RAW, &tb, -1 );
