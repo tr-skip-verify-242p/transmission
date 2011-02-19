@@ -540,7 +540,7 @@ gtr_file_list_set_torrent( GtkWidget * w, int torrentId )
 
             /* build a GNode tree of the files */
             root_data = g_new0( struct row_struct, 1 );
-            root_data->name = g_strdup( inf->name );
+            root_data->name = g_strdup( tr_torrentName( tor ) );
             root_data->index = -1;
             root_data->length = 0;
             root = g_node_new( root_data );
@@ -1093,5 +1093,6 @@ gtr_file_list_new( TrCore * core, int torrentId )
     g_object_set_data_full( G_OBJECT( ret ), "file-data", data, freeData );
     gtr_file_list_set_torrent( ret, torrentId );
 
+    pango_font_description_free( pango_font_description );
     return ret;
 }

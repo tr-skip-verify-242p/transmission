@@ -396,6 +396,8 @@ registerMagnetLinkHandler( void )
         gconf_client_set_bool( client, "/desktop/gnome/url-handlers/magnet/enabled", TRUE, NULL );
         tr_inf( "Transmission registered as default magnet link handler" );
     }
+
+    g_object_unref( G_OBJECT( client ) );
 #endif
 }
 
@@ -447,20 +449,37 @@ signal_handler( int sig )
     }
 }
 
-struct remove_torrent_idle_data
+struct torrent_idle_data
 {
     TrCore * core;
     int id;
+    gboolean delete_files;
 };
 
 static gboolean
-remove_torrent_idle( gpointer gdata )
+rpc_torrent_remove_idle( gpointer gdata )
 {
-    struct remove_torrent_idle_data * data = gdata;
-    tr_core_remove_torrent_from_id( data->core, data->id, FALSE );
+    struct torrent_idle_data * data = gdata;
+
+    tr_core_remove_torrent_from_id( data->core, data->id, data->delete_files );
+
     g_free( data );
     return FALSE; /* tell g_idle not to call this func twice */
 }
+
+static gboolean
+rpc_torrent_add_idle( gpointer gdata )
+{
+    tr_torrent * tor;
+    struct torrent_idle_data * data = gdata;
+
+    if(( tor = tr_torrentFindFromId( tr_core_session( data->core ), data->id )))
+        tr_core_add_torrent( data->core, tr_torrent_new_preexisting( tor ), TRUE );
+
+    g_free( data );
+    return FALSE; /* tell g_idle not to call this func twice */
+}
+
 
 static void
 setupsighandlers( void )
@@ -485,15 +504,21 @@ onRPCChanged( tr_session            * session,
             gtr_action_activate( "quit" );
             break;
 
-        case TR_RPC_TORRENT_ADDED:
-            tr_core_add_torrent( cbdata->core, tr_torrent_new_preexisting( tor ), TRUE );
-            break;
-
-        case TR_RPC_TORRENT_REMOVING: {
-            struct remove_torrent_idle_data * data = g_new0( struct remove_torrent_idle_data, 1 );
+        case TR_RPC_TORRENT_ADDED: {
+            struct torrent_idle_data * data = g_new0( struct torrent_idle_data, 1 );
             data->id = tr_torrentId( tor );
             data->core = cbdata->core;
-            gtr_idle_add( remove_torrent_idle, data );
+            gtr_idle_add( rpc_torrent_add_idle, data );
+            break;
+        }
+
+        case TR_RPC_TORRENT_REMOVING:
+        case TR_RPC_TORRENT_TRASHING: {
+            struct torrent_idle_data * data = g_new0( struct torrent_idle_data, 1 );
+            data->id = tr_torrentId( tor );
+            data->core = cbdata->core;
+            data->delete_files = type == TR_RPC_TORRENT_TRASHING;
+            gtr_idle_add( rpc_torrent_remove_idle, data );
             status = TR_RPC_NOREMOVE;
             break;
         }
@@ -604,9 +629,11 @@ applyDesktopProxySettings( CURL * easy, GConfClient * client, const char * host_
     if(( value = gconf_client_get( client, host_key, NULL )))
     {
         const char * url = gconf_value_get_string( value );
+
         if( url && *url )
         {
             char * scheme = NULL;
+            GConfValue * port_value;
 
             if( !tr_urlParse( url, strlen( url ), &scheme, NULL, NULL, NULL ) )
             {
@@ -621,12 +648,20 @@ applyDesktopProxySettings( CURL * easy, GConfClient * client, const char * host_
             curl_easy_setopt( easy, CURLOPT_PROXY, url );
 
             if( port_key != NULL )
-                if(( value = gconf_client_get( client, port_key, NULL )))
+            {
+                if(( port_value = gconf_client_get( client, port_key, NULL )))
+                {
                     if(( port = gconf_value_get_int( value )))
                         curl_easy_setopt( easy, CURLOPT_PROXYPORT, (long)port );
 
+                    gconf_value_free( port_value );
+                }
+            }
+
             tr_free( scheme );
         }
+
+        gconf_value_free( value );
     }
 }
 #endif
@@ -635,7 +670,6 @@ static void
 curlConfigFunc( tr_session * session UNUSED, void * vcurl UNUSED, const char * destination UNUSED )
 {
 #ifdef HAVE_GCONF2
-    const char * str;
     GConfValue * value;
     CURL * easy = vcurl;
     gboolean use_http_proxy = TRUE;
@@ -644,7 +678,7 @@ curlConfigFunc( tr_session * session UNUSED, void * vcurl UNUSED, const char * d
     /* get GNOME's proxy mode */
     if(( value = gconf_client_get( client, "/system/proxy/mode", NULL )))
     {
-        char * mode = g_strdup( gconf_value_get_string( value ) );
+        const char * mode = gconf_value_get_string( value );
 
         if( !gtr_strcmp0( mode, "auto" ) )
         {
@@ -670,36 +704,48 @@ curlConfigFunc( tr_session * session UNUSED, void * vcurl UNUSED, const char * d
             tr_free( scheme );
         }
 
-        g_free( mode );
+        gconf_value_free( value );
     }
 
     /* if this the proxy hasn't been handled yet and "use_http_proxy" is disabled, then don't use a proxy */
-    if( use_http_proxy )
-        if(( value = gconf_client_get( client, "/system/http_proxy/use_http_proxy", NULL )))
+    if( use_http_proxy ) {
+        if(( value = gconf_client_get( client, "/system/http_proxy/use_http_proxy", NULL ))) {
             use_http_proxy = gconf_value_get_bool( value ) != 0;
+            gconf_value_free( value );
+        }
+    }
 
     if( use_http_proxy )
     {
+        gboolean auth = FALSE;
         applyDesktopProxySettings( easy, client, "/system/http_proxy/host", "/system/http_proxy/port" );
 
-        if((( value = gconf_client_get( client, "/system/http_proxy/use_authentication", NULL ))) &&  gconf_value_get_bool( value ))
+        if(( value = gconf_client_get( client, "/system/http_proxy/use_authentication", NULL )))
         {
-            const char * user = NULL;
-            const char * pass = NULL;
+            auth = gconf_value_get_bool( value );
+            gconf_value_free( value );
+        }
 
-            if(( value = gconf_client_get( client, "/system/http_proxy/authentication_user", NULL )))
-                user = str = gconf_value_get_string( value );
-            if(( value = gconf_client_get( client, "/system/http_proxy/authentication_password", NULL )))
-                pass = str = gconf_value_get_string( value );
+        if( auth )
+        {
+            GConfValue * user_value = gconf_client_get( client, "/system/http_proxy/authentication_user", NULL );
+            const char * user = ( user_value != NULL ) ? gconf_value_get_string( user_value ) : NULL;
+            GConfValue * pass_value = gconf_client_get( client, "/system/http_proxy/authentication_password", NULL );
+            const char * pass = ( pass_value != NULL ) ? gconf_value_get_string( pass_value ) : NULL;
 
-           if( ( user != NULL ) && ( pass != NULL ) )
-           {
-               char * userpass = g_strdup_printf( "%s:%s", user, pass );
-               curl_easy_setopt( easy, CURLOPT_PROXYUSERPWD, userpass );
-               g_free( userpass );
-           }
-       }
+            if( ( user != NULL ) && ( pass != NULL ) )
+            {
+                char * userpass = g_strdup_printf( "%s:%s", user, pass );
+                curl_easy_setopt( easy, CURLOPT_PROXYUSERPWD, userpass );
+                g_free( userpass );
+            }
+
+            if( pass_value ) gconf_value_free( pass_value );
+            if( user_value ) gconf_value_free( user_value );
+        }
     }
+
+    g_object_unref( G_OBJECT( client ) );
 #endif
 }
 
@@ -1404,6 +1450,10 @@ on_prefs_changed( TrCore * core UNUSED, const char * key, gpointer data )
     else if( !strcmp( key, TR_PREFS_KEY_DHT_ENABLED ) )
     {
         tr_sessionSetDHTEnabled( tr, gtr_pref_flag_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_UTP_ENABLED ) )
+    {
+        tr_sessionSetUTPEnabled( tr, gtr_pref_flag_get( key ) );
     }
     else if( !strcmp( key, TR_PREFS_KEY_LPD_ENABLED ) )
     {
