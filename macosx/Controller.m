@@ -36,6 +36,7 @@
 #import "PrefsController.h"
 #import "GroupsController.h"
 #import "AboutWindowController.h"
+#import "URLSheetWindowController.h"
 #import "AddWindowController.h"
 #import "AddMagnetWindowController.h"
 #import "MessageWindowController.h"
@@ -318,6 +319,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         tr_bencDictAddInt(&settings, TR_PREFS_KEY_MSGLEVEL, TR_MSG_DBG);
         tr_bencDictAddInt(&settings, TR_PREFS_KEY_PEER_LIMIT_GLOBAL, [fDefaults integerForKey: @"PeersTotal"]);
         tr_bencDictAddInt(&settings, TR_PREFS_KEY_PEER_LIMIT_TORRENT, [fDefaults integerForKey: @"PeersTorrent"]);
+        tr_bencDictAddBool(&settings, TR_PREFS_KEY_UTP_ENABLED, [fDefaults boolForKey: @"UTPGlobal"]);
         
         const BOOL randomPort = [fDefaults boolForKey: @"RandomPort"];
         tr_bencDictAddBool(&settings, TR_PREFS_KEY_PEER_PORT_RANDOM_ON_START, randomPort);
@@ -1230,49 +1232,15 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 
 - (void) openURLShowSheet: (id) sender
 {
-    [NSApp beginSheet: fURLSheetWindow modalForWindow: fWindow modalDelegate: self
-            didEndSelector: @selector(urlSheetDidEnd:returnCode:contextInfo:) contextInfo: nil];
+    [[[URLSheetWindowController alloc] initWithController: self] beginSheetForWindow: fWindow];
 }
 
-- (void) openURLEndSheet: (id) sender
+- (void) urlSheetDidEnd: (URLSheetWindowController *) controller url: (NSString *) urlString returnCode: (NSInteger) returnCode
 {
-    [fURLSheetWindow orderOut: sender];
-    [NSApp endSheet: fURLSheetWindow returnCode: 1];
-}
-
-- (void) openURLCancelEndSheet: (id) sender
-{
-    [fURLSheetWindow orderOut: sender];
-    [NSApp endSheet: fURLSheetWindow returnCode: 0];
-}
-
-- (void) controlTextDidChange: (NSNotification *) notification
-{
-    if ([notification object] != fURLSheetTextField)
-        return;
+    if (returnCode == 1)
+        [self performSelectorOnMainThread: @selector(openURL:) withObject: urlString waitUntilDone: NO];
     
-    NSString * string = [fURLSheetTextField stringValue];
-    BOOL enable = YES;
-    if ([string isEqualToString: @""])
-        enable = NO;
-    else
-    {
-        NSRange prefixRange = [string rangeOfString: @"://"];
-        if (prefixRange.location != NSNotFound && [string length] == NSMaxRange(prefixRange))
-            enable = NO;
-    }
-    
-    [fURLSheetOpenButton setEnabled: enable];
-}
-
-- (void) urlSheetDidEnd: (NSWindow *) sheet returnCode: (NSInteger) returnCode contextInfo: (void *) contextInfo
-{
-    [fURLSheetTextField selectText: self];
-    if (returnCode != 1)
-        return;
-    
-    NSString * urlString = [fURLSheetTextField stringValue];
-    [self performSelectorOnMainThread: @selector(openURL:) withObject: urlString waitUntilDone: NO];
+    [controller release];
 }
 
 - (void) createFile: (id) sender
@@ -1362,10 +1330,10 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 - (void) removeTorrents: (NSArray *) torrents deleteData: (BOOL) deleteData
 {
     [torrents retain];
-    NSInteger active = 0, downloading = 0;
 
     if ([fDefaults boolForKey: @"CheckRemove"])
     {
+        NSInteger active = 0, downloading = 0;
         for (Torrent * torrent in torrents)
             if ([torrent isActive])
             {
@@ -1445,6 +1413,9 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 
 - (void) confirmRemoveTorrents: (NSArray *) torrents deleteData: (BOOL) deleteData
 {
+    NSMutableArray * selectedValues = [NSMutableArray arrayWithArray: [fTableView selectedValues]];
+    [selectedValues removeObjectsInArray: torrents];
+    
     //don't want any of these starting then stopping
     for (Torrent * torrent in torrents)
         [torrent setWaitToStart: NO];
@@ -1471,9 +1442,10 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         [torrent closeRemoveTorrent: deleteData];
     }
     
+    #warning why do we need them retained?
     [torrents release];
     
-    [fTableView deselectAll: nil];
+    [fTableView selectValues: selectedValues];
     
     [self updateTorrentsInQueue];
 }
@@ -1486,6 +1458,17 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 - (void) removeDeleteData: (id) sender
 {
     [self removeTorrents: [fTableView selectedTorrents] deleteData: YES];
+}
+
+- (void) clearCompleted: (id) sender
+{
+    NSMutableArray * torrents = [[NSMutableArray alloc] init];
+    
+    for (Torrent * torrent in fTorrents)
+        if ([torrent isFinishedSeeding])
+            [torrents addObject: torrent];
+    
+    [self confirmRemoveTorrents: torrents deleteData: NO];
 }
 
 - (void) moveDataFilesSelected: (id) sender
@@ -3454,6 +3437,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         [item setImage: [NSImage imageNamed: @"ToolbarRemoveTemplate.png"]];
         [item setTarget: self];
         [item setAction: @selector(removeNoDelete:)];
+        [item setVisibilityPriority: NSToolbarItemVisibilityPriorityHigh];
         
         return item;
     }
@@ -3508,6 +3492,9 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
                                         NSLocalizedString(@"Resume All", "All toolbar item -> label"), nil]];
         
         [segmentedControl release];
+        
+        [groupItem setVisibilityPriority: NSToolbarItemVisibilityPriorityHigh];
+        
         return [groupItem autorelease];
     }
     else if ([ident isEqualToString: TOOLBAR_PAUSE_RESUME_SELECTED])
@@ -3547,6 +3534,9 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
                                         NSLocalizedString(@"Resume Selected", "Selected toolbar item -> label"), nil]];
         
         [segmentedControl release];
+        
+        [groupItem setVisibilityPriority: NSToolbarItemVisibilityPriorityHigh];
+        
         return [groupItem autorelease];
     }
     else if ([ident isEqualToString: TOOLBAR_FILTER])
@@ -3574,6 +3564,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         [item setImage: [NSImage imageNamed: NSImageNameQuickLookTemplate]];
         [item setTarget: self];
         [item setAction: @selector(toggleQuickLook:)];
+        [item setVisibilityPriority: NSToolbarItemVisibilityPriorityLow];
         
         return item;
     }
@@ -3931,6 +3922,15 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         }
         
         return canUseTable && [fTableView numberOfSelectedRows] > 0;
+    }
+    
+    //clear completed transfers item
+    if (action == @selector(clearCompleted:))
+    {
+        for (Torrent * torrent in fTorrents)
+            if ([torrent isFinishedSeeding])
+                return YES;
+        return NO;
     }
 
     //enable pause all item
@@ -4441,6 +4441,10 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
             [self performSelectorOnMainThread: @selector(rpcRemoveTorrent:) withObject: torrent waitUntilDone: NO];
             break;
         
+        case TR_RPC_TORRENT_TRASHING:
+            [self performSelectorOnMainThread: @selector(rpcRemoveTorrentDeleteData:) withObject: torrent waitUntilDone: NO];
+            break;
+        
         case TR_RPC_TORRENT_CHANGED:
             [self performSelectorOnMainThread: @selector(rpcChangedTorrent:) withObject: torrent waitUntilDone: NO];
             break;
@@ -4487,6 +4491,12 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 - (void) rpcRemoveTorrent: (Torrent *) torrent
 {
     [self confirmRemoveTorrents: [[NSArray arrayWithObject: torrent] retain] deleteData: NO];
+    [torrent release];
+}
+
+- (void) rpcRemoveTorrentDeleteData: (Torrent *) torrent
+{
+    [self confirmRemoveTorrents: [[NSArray arrayWithObject: torrent] retain] deleteData: YES];
     [torrent release];
 }
 

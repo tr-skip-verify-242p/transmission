@@ -372,14 +372,6 @@ void tr_torrentSetDirty( tr_torrent * tor )
     tor->isDirty = TRUE;
 }
 
-static inline
-const char * tr_torrentName( const tr_torrent * tor )
-{
-    assert( tr_isTorrent( tor ) );
-
-    return tor->info.name;
-}
-
 uint32_t tr_getBlockSize( uint32_t pieceSize );
 
 /**
@@ -428,6 +420,8 @@ tr_bool tr_torrentPieceNeedsCheck( const tr_torrent * tor, tr_piece_index_t piec
  * @return true if the piece's passes the checksum test
  */
 tr_bool tr_torrentCheckPiece( tr_torrent * tor, tr_piece_index_t pieceIndex );
+
+time_t tr_torrentGetFileMTime( const tr_torrent * tor, tr_file_index_t i );
 
 uint64_t tr_torrentGetCurrentSizeOnDisk( const tr_torrent * tor );
 

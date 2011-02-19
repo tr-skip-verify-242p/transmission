@@ -14,8 +14,7 @@
 #include <ctype.h> /* isdigit() */
 #include <errno.h>
 #include <math.h> /* fabs() */
-#include <stdio.h>
-#include <stdlib.h> /* realpath() */
+#include <stdio.h> /* rename() */
 #include <string.h>
 
 #ifdef WIN32 /* tr_mkstemp() */
@@ -24,10 +23,8 @@
  #define _S_IWRITE 128
 #endif
 
-#include <sys/types.h> /* stat() */
-#include <sys/stat.h> /* stat() */
-#include <locale.h>
-#include <unistd.h> /* stat() */
+#include <locale.h> /* setlocale() */
+#include <unistd.h> /* write(), unlink() */
 
 #include <event2/buffer.h>
 
@@ -1660,17 +1657,6 @@ tr_mkstemp( char * template )
 #endif
 }
 
-/* portability wrapper for fsync(). */
-static void
-tr_fsync( int fd )
-{
-#ifdef WIN32
-    _commit( fd );
-#else
-    fsync( fd );
-#endif
-}
-
 int
 tr_bencToFile( const tr_benc * top, tr_fmt_mode mode, const char * filename )
 {
@@ -1718,24 +1704,16 @@ tr_bencToFile( const tr_benc * top, tr_fmt_mode mode, const char * filename )
         }
         else
         {
-            struct stat sb;
-            const tr_bool already_exists = !stat( filename, &sb ) && S_ISREG( sb.st_mode );
-
             tr_fsync( fd );
             tr_close_file( fd );
 
-            if( !already_exists || !unlink( filename ) )
+#ifdef WIN32
+            if( MoveFileEx( tmp, filename, MOVEFILE_REPLACE_EXISTING ) )
+#else
+            if( !rename( tmp, filename ) )
+#endif
             {
-                if( !rename( tmp, filename ) )
-                {
-                    tr_inf( _( "Saved \"%s\"" ), filename );
-                }
-                else
-                {
-                    err = errno;
-                    tr_err( _( "Couldn't save file \"%1$s\": %2$s" ), filename, tr_strerror( err ) );
-                    unlink( tmp );
-                }
+                tr_inf( _( "Saved \"%s\"" ), filename );
             }
             else
             {
