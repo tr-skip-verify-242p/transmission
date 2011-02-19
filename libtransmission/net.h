@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -101,6 +101,12 @@ int  tr_netOpenPeerSocket( tr_session       * session,
                            const tr_address * addr,
                            tr_port            port,
                            tr_bool            clientIsSeed );
+
+struct UTPSocket *
+tr_netOpenPeerUTPSocket( tr_session        * session,
+                         const tr_address  * addr,
+                         tr_port             port,
+                         tr_bool             clientIsSeed);
 
 int  tr_netBindTCP( const tr_address * addr,
                     tr_port            port,

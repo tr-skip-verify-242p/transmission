@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2010 Transmission authors and contributors
+ * Copyright (c) 2010-2011 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -185,7 +185,7 @@
         
         if (connected > 0)
         {
-            NSMutableArray * fromComponents = [NSMutableArray arrayWithCapacity: 6];
+            NSMutableArray * fromComponents = [NSMutableArray arrayWithCapacity: 7];
             if (tracker > 0)
                 [fromComponents addObject: [NSString stringWithFormat:
                                         NSLocalizedString(@"%d tracker", "Inspector -> Peers tab -> peers"), tracker]];
@@ -366,8 +366,13 @@
                                 "Inspector -> Peers tab -> table row tooltip")];
         [components addObject: progressString];
         
+        NSString * protocolString = [[peer objectForKey: @"uTP"] boolValue] ? @"\u00b5TP" : @"TCP";
         if ([[peer objectForKey: @"Encryption"] boolValue])
-            [components addObject: NSLocalizedString(@"Encrypted Connection", "Inspector -> Peers tab -> table row tooltip")];
+            protocolString = [protocolString stringByAppendingFormat: @" (%@)",
+                                NSLocalizedString(@"encrypted", "Inspector -> Peers tab -> table row tooltip")];
+        [components addObject: [NSString stringWithFormat:
+                                NSLocalizedString(@"Protocol: %@", "Inspector -> Peers tab -> table row tooltip"),
+                                protocolString]];
         
         NSString * portString;
         NSInteger port;

@@ -1,7 +1,7 @@
 /*
- * This file Copyright (C) 2008-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
- * This file is licensed by the GPL version 2.  Works owned by the
+ * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
  * so that the bulk of its code can remain under the MIT license.
  * This exemption does not extend to derived works not owned by
@@ -9,6 +9,12 @@
  *
  * $Id$
  */
+
+#if defined( HAVE_ZLIB ) && defined( _FILE_OFFSET_BITS )
+ #if _FILE_OFFSET_BITS == 64
+  #define _LARGEFILE64_SOURCE
+ #endif
+#endif
 
 #include <assert.h>
 #include <ctype.h> /* isdigit */
@@ -21,7 +27,7 @@
  #include <zlib.h>
 #endif
 
-#include <event.h> /* evbuffer */
+#include <event2/buffer.h>
 
 #include "transmission.h"
 #include "bencode.h"
@@ -36,7 +42,7 @@
 #include "version.h"
 #include "web.h"
 
-#define RPC_VERSION     11
+#define RPC_VERSION     13
 #define RPC_VERSION_MIN 1
 
 #define RECENTLY_ACTIVE_SECONDS 60
@@ -102,8 +108,7 @@ tr_idle_function_done( struct tr_rpc_idle_data * data, const char * result )
     tr_bencDictAddStr( data->response, "result", result );
 
     tr_bencToBuf( data->response, TR_FMT_JSON_LEAN, buf );
-    (*data->callback)( data->session, (const char*)EVBUFFER_DATA(buf),
-                       EVBUFFER_LENGTH(buf), data->callback_user_data );
+    (*data->callback)( data->session, buf, data->callback_user_data );
 
     evbuffer_free( buf );
     tr_bencFree( data->response );
@@ -245,19 +250,22 @@ torrentRemove( tr_session               * session,
 {
     int i;
     int torrentCount;
+    tr_rpc_callback_type type;
+    tr_bool deleteFlag = FALSE;
     tr_torrent ** torrents = getTorrents( session, args_in, &torrentCount );
 
     assert( idle_data == NULL );
 
+    tr_bencDictFindBool( args_in, "delete-local-data", &deleteFlag );
+    type = deleteFlag ? TR_RPC_TORRENT_TRASHING
+                      : TR_RPC_TORRENT_REMOVING;
+
     for( i=0; i<torrentCount; ++i )
     {
         tr_torrent * tor = torrents[i];
-        const tr_rpc_callback_status status = notify( session, TR_RPC_TORRENT_REMOVING, tor );
-        tr_bool deleteFlag;
-        if( tr_bencDictFindBool( args_in, "delete-local-data", &deleteFlag ) && deleteFlag )
-            tr_torrentDeleteLocalData( tor, NULL );
+        const tr_rpc_callback_status status = notify( session, type, tor );
         if( !( status & TR_RPC_NOREMOVE ) )
-            tr_torrentRemove( tor );
+            tr_torrentRemove( tor, deleteFlag, NULL );
     }
 
     tr_free( torrents );
@@ -444,6 +452,7 @@ addPeers( const tr_torrent * tor,
         tr_bencDictAddBool( d, "isEncrypted", peer->isEncrypted );
         tr_bencDictAddBool( d, "isIncoming", peer->isIncoming );
         tr_bencDictAddBool( d, "isUploadingTo", peer->isUploadingTo );
+        tr_bencDictAddBool( d, "isUTP", peer->isUTP );
         tr_bencDictAddBool( d, "peerIsChoked", peer->peerIsChoked );
         tr_bencDictAddBool( d, "peerIsInterested", peer->peerIsInterested );
         tr_bencDictAddInt ( d, "port", peer->port );
@@ -455,7 +464,7 @@ addPeers( const tr_torrent * tor,
     tr_torrentPeersFree( peers, peerCount );
 }
 
-/* faster-than-strcmp() optimization.  this is kind of clumsy,
+/* faster-than-strcmp() optimization. This is kind of clumsy,
    but addField() was in the profiler's top 10 list, and this
    makes it 4x faster... */
 #define tr_streq(a,alen,b) ((alen+1==sizeof(b)) && !memcmp(a,b,alen))
@@ -531,7 +540,7 @@ addField( const tr_torrent * tor, tr_benc * d, const char * key )
     else if( tr_streq( key, keylen, "metadataPercentComplete" ) )
         tr_bencDictAddReal( d, key, st->metadataPercentComplete );
     else if( tr_streq( key, keylen, "name" ) )
-        tr_bencDictAddStr( d, key, inf->name );
+        tr_bencDictAddStr( d, key, tr_torrentName( tor ) );
     else if( tr_streq( key, keylen, "percentDone" ) )
         tr_bencDictAddReal( d, key, st->percentDone );
     else if( tr_streq( key, keylen, "peer-limit" ) )
@@ -594,6 +603,10 @@ addField( const tr_torrent * tor, tr_benc * d, const char * key )
         tr_bencDictAddInt( d, key, st->startDate );
     else if( tr_streq( key, keylen, "status" ) )
         tr_bencDictAddInt( d, key, st->activity );
+    else if( tr_streq( key, keylen, "secondsDownloading" ) )
+        tr_bencDictAddInt( d, key, st->secondsDownloading );
+    else if( tr_streq( key, keylen, "secondsSeeding" ) )
+        tr_bencDictAddInt( d, key, st->secondsSeeding );
     else if( tr_streq( key, keylen, "trackers" ) )
         addTrackers( inf, tr_bencDictAddList( d, key, inf->trackerCount ) );
     else if( tr_streq( key, keylen, "trackerStats" ) ) {
@@ -1060,6 +1073,8 @@ torrentSetLocation( tr_session               * session,
 
 static void
 portTested( tr_session       * session UNUSED,
+            tr_bool            did_connect UNUSED,
+            tr_bool            did_timeout UNUSED,
             long               response_code,
             const void       * response,
             size_t             response_byte_count,
@@ -1102,6 +1117,8 @@ portTest( tr_session               * session,
 
 static void
 gotNewBlocklist( tr_session       * session,
+                 tr_bool            did_connect UNUSED,
+                 tr_bool            did_timeout UNUSED,
                  long               response_code,
                  const void       * response,
                  size_t             response_byte_count,
@@ -1246,6 +1263,8 @@ struct add_torrent_idle_data
 
 static void
 gotMetadataFromURL( tr_session       * session UNUSED,
+                    tr_bool            did_connect UNUSED,
+                    tr_bool            did_timeout UNUSED,
                     long               response_code,
                     const void       * response,
                     size_t             response_byte_count,
@@ -1460,6 +1479,8 @@ sessionSet( tr_session               * session,
         tr_sessionSetPexEnabled( session, boolVal );
     if( tr_bencDictFindBool( args_in, TR_PREFS_KEY_DHT_ENABLED, &boolVal ) )
         tr_sessionSetDHTEnabled( session, boolVal );
+    if( tr_bencDictFindBool( args_in, TR_PREFS_KEY_UTP_ENABLED, &boolVal ) )
+        tr_sessionSetUTPEnabled( session, boolVal );
     if( tr_bencDictFindBool( args_in, TR_PREFS_KEY_LPD_ENABLED, &boolVal ) )
         tr_sessionSetLPDEnabled( session, boolVal );
     if( tr_bencDictFindBool( args_in, TR_PREFS_KEY_PEER_PORT_RANDOM_ON_START, &boolVal ) )
@@ -1578,11 +1599,13 @@ sessionGet( tr_session               * s,
     tr_bencDictAddInt ( d, "blocklist-size", tr_blocklistGetRuleCount( s ) );
     tr_bencDictAddStr ( d, "config-dir", tr_sessionGetConfigDir( s ) );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_DOWNLOAD_DIR, tr_sessionGetDownloadDir( s ) );
+    tr_bencDictAddInt ( d, "download-dir-free-space",  tr_sessionGetDownloadDirFreeSpace( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_LIMIT_GLOBAL, tr_sessionGetPeerLimit( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_LIMIT_TORRENT, tr_sessionGetPeerLimitPerTorrent( s ) );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_INCOMPLETE_DIR, tr_sessionGetIncompleteDir( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED, tr_sessionIsIncompleteDirEnabled( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PEX_ENABLED, tr_sessionIsPexEnabled( s ) );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_UTP_ENABLED, tr_sessionIsUTPEnabled( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_DHT_ENABLED, tr_sessionIsDHTEnabled( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_LPD_ENABLED, tr_sessionIsLPDEnabled( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PORT, tr_sessionGetPeerPort( s ) );
@@ -1611,7 +1634,21 @@ sessionGet( tr_session               * s,
         default: str = "preferred"; break;
     }
     tr_bencDictAddStr( d, TR_PREFS_KEY_ENCRYPTION, str );
+    
+    return NULL;
+}
 
+/***
+****
+***/
+
+static const char*
+sessionClose( tr_session               * session,
+              tr_benc                  * args_in UNUSED,
+              tr_benc                  * args_out UNUSED,
+              struct tr_rpc_idle_data  * idle_data UNUSED )
+{
+    notify( session, TR_RPC_SESSION_CLOSE, NULL );
     return NULL;
 }
 
@@ -1631,6 +1668,7 @@ methods[] =
 {
     { "port-test",             FALSE, portTest            },
     { "blocklist-update",      FALSE, blocklistUpdate     },
+    { "session-close",         TRUE,  sessionClose        },
     { "session-get",           TRUE,  sessionGet          },
     { "session-set",           TRUE,  sessionSet          },
     { "session-stats",         TRUE,  sessionStats        },
@@ -1646,10 +1684,9 @@ methods[] =
 };
 
 static void
-noop_response_callback( tr_session * session UNUSED,
-                        const char * response UNUSED,
-                        size_t       response_len UNUSED,
-                        void       * user_data UNUSED )
+noop_response_callback( tr_session       * session UNUSED,
+                        struct evbuffer  * response UNUSED,
+                        void             * user_data UNUSED )
 {
 }
 
@@ -1692,8 +1729,7 @@ request_exec( tr_session             * session,
         if( tr_bencDictFindInt( request, "tag", &tag ) )
             tr_bencDictAddInt( &response, "tag", tag );
         tr_bencToBuf( &response, TR_FMT_JSON_LEAN, buf );
-        (*callback)( session, (const char*)EVBUFFER_DATA(buf),
-                     EVBUFFER_LENGTH( buf ), callback_user_data );
+        (*callback)( session, buf, callback_user_data );
 
         evbuffer_free( buf );
         tr_bencFree( &response );
@@ -1714,8 +1750,7 @@ request_exec( tr_session             * session,
         if( tr_bencDictFindInt( request, "tag", &tag ) )
             tr_bencDictAddInt( &response, "tag", tag );
         tr_bencToBuf( &response, TR_FMT_JSON_LEAN, buf );
-        (*callback)( session, (const char*)EVBUFFER_DATA(buf),
-                     EVBUFFER_LENGTH(buf), callback_user_data );
+        (*callback)( session, buf, callback_user_data );
 
         evbuffer_free( buf );
         tr_bencFree( &response );

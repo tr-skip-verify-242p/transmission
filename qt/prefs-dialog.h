@@ -55,6 +55,7 @@ class PrefsDialog: public QDialog
         void onLocationSelected( const QString&, int key );
         void onPortTested( bool );
         void onPortTest( );
+        void proxyTypeEdited( int );
 
         void onUpdateBlocklistClicked( );
         void onUpdateBlocklistCancelled( );
@@ -83,6 +84,7 @@ class PrefsDialog: public QDialog
         QWidget * createNetworkTab( );
         QWidget * createDesktopTab( );
         QWidget * createWebTab( Session& );
+        QWidget * createProxyTab( );
 
     private:
         typedef QMap<int,QWidget*> key2widget_t;

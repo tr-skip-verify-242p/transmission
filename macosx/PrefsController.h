@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2010 Transmission authors and contributors
+ * Copyright (c) 2005-2011 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -58,6 +58,9 @@
     NSTimer * fPortStatusTimer;
     int fPeerPort, fNatStatus;
     
+    IBOutlet NSTextField * fProxyAddressField, * fProxyPortField, * fProxyPasswordField;
+    IBOutlet NSPopUpButton * fProxyTypePopUp;
+    
     IBOutlet NSTextField * fRPCPortField, * fRPCPasswordField;
     IBOutlet NSTableView * fRPCWhitelistTable;
     NSMutableArray * fRPCWhitelistArray;
@@ -79,6 +82,8 @@
 
 - (NSArray *) sounds;
 - (void) setSound: (id) sender;
+
+- (void) setUTP: (id) sender;
 
 - (void) setPeersGlobal: (id) sender;
 - (void) setPeersTorrent: (id) sender;
@@ -144,6 +149,16 @@
 - (void) importFolderSheetShow: (id) sender;
 
 - (void) setAutoSize: (id) sender;
+
+- (void) setProxyEnabled: (id) sender;
+- (void) setProxyAddress: (id) sender;
+- (void) setProxyPort: (id) sender;
+- (void) setProxyType: (id) sender;
+- (void) updateProxyType;
+- (void) setProxyAuthorize: (id) sender;
+- (void) setProxyUsername: (id) sender;
+- (void) setProxyPassword: (id) sender;
+- (void) updateProxyPassword;
 
 - (void) setRPCEnabled: (id) sender;
 - (void) linkWebUI: (id) sender;
