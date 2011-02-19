@@ -1811,6 +1811,7 @@ tr_announcerResetTorrent( tr_announcer * announcer UNUSED, tr_torrent * tor )
             tr_tier * tier = tiers[i];
             if( !tier->wasCopied )
                 tierAddAnnounce( tier, STARTED, now );
+            tier->wasCopied = FALSE;
         }
     }
 
