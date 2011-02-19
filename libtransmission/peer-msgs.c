@@ -96,7 +96,7 @@ enum
     MAX_FAST_SET_SIZE = 3,
 
     /* when torrents have incomplete metadata never accept
-     * BITFIELD messages with more pieces than this */
+     * HAVE or BITFIELD messages with more pieces than this */
     MAX_UNKNOWN_PIECE_COUNT = 1 << 20,
 
     /* defined in BEP #9 */
@@ -1449,8 +1449,10 @@ readBtMessage( tr_peermsgs * msgs, struct evbuffer * inbuf, size_t inlen )
         case BT_HAVE:
             tr_peerIoReadUint32( msgs->peer->io, inbuf, &ui32 );
             dbgmsg( msgs, "got Have: %u", ui32 );
-            if( tr_torrentHasMetadata( msgs->torrent )
-                    && ( ui32 >= msgs->torrent->info.pieceCount ) )
+            if( ( tr_torrentHasMetadata( msgs->torrent )
+                  && ( ui32 >= msgs->torrent->info.pieceCount ) )
+                || ( !tr_torrentHasMetadata( msgs->torrent )
+                     && ui32 >= MAX_UNKNOWN_PIECE_COUNT ) )
             {
                 fireError( msgs, ERANGE );
                 return READ_ERR;
