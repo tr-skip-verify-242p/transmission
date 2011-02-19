@@ -233,6 +233,13 @@ struct tr_bitfield* tr_peerMgrGetAvailable( const tr_torrent * tor );
 
 void tr_peerMgrOnBlocklistChanged( tr_peerMgr * manager );
 
+/**
+ * Set the maximum number of new peer connections to make per second.
+ * This value may be fractional. If the value is less than or equal to
+ * zero, there will be no limit.
+ */
+void tr_peerMgrSetMaxConnectionsPerSecond( tr_peerMgr * manager, float value );
+
 void tr_peerMgrTorrentStats( tr_torrent * tor,
                              int * setmePeersKnown,
                              int * setmePeersConnected,
