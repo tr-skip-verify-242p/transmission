@@ -1216,7 +1216,7 @@ gotError( tr_peerIo  * io,
     {
         dbgmsg( handshake, "handshake failed, trying plaintext..." );
         handshake->encryptionFailed = TRUE;
-        if (tr_peerIoIsProxied( handshake->io ))
+        if( tr_peerIoIsProxied( handshake->io ) )
         {
             sendProxyRequest( handshake );
         }
