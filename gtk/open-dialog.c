@@ -489,6 +489,12 @@ onOpenURLResponse( GtkDialog * dialog, int response, gpointer user_data )
         gtk_widget_destroy( GTK_WIDGET( dialog ) );
 }
 
+static void
+onUrlEntryActivate( GtkEntry * e UNUSED, gpointer user_data )
+{
+    gtk_dialog_response( GTK_DIALOG( user_data ), GTK_RESPONSE_ACCEPT );
+}
+
 GtkWidget*
 gtr_torrent_open_from_url_dialog_new( GtkWindow * parent, TrCore * core )
 {
@@ -514,6 +520,8 @@ gtr_torrent_open_from_url_dialog_new( GtkWindow * parent, TrCore * core )
     e = gtk_entry_new( );
     gtk_widget_set_size_request( e, 400, -1 );
     gtr_paste_clipboard_url_into_entry( e );
+    g_signal_connect( e, "activate",
+        G_CALLBACK( onUrlEntryActivate ), w );
     g_object_set_data( G_OBJECT( w ), "url-entry", e );
     hig_workarea_add_row( t, &row, _( "_URL" ), e, NULL );
 
