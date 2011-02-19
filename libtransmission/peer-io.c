@@ -909,6 +909,7 @@ tr_peerIoReconnect( tr_peerIo * io )
     event_disable( io, EV_READ | EV_WRITE );
 
     io_close_socket( io );
+
     io->socket = openOutgoingPeerSocket( session, &io->addr, io->port,
                                          io->isSeed, io->proxy );
     io->event_read = event_new( session->event_base, io->socket, EV_READ, event_read_cb, io );
