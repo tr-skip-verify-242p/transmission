@@ -73,6 +73,7 @@ typedef struct tr_peerIo
     tr_bool               extendedProtocolSupported;
     tr_bool               fastExtensionSupported;
     tr_bool               dhtSupported;
+    tr_bool               utpSupported;
 
     tr_priority_t         priority;
 
@@ -85,6 +86,7 @@ typedef struct tr_peerIo
 
     tr_port               port;
     int                   socket;
+    struct UTPSocket      *utp_socket;
 
     int                   refCount;
 
@@ -122,13 +124,16 @@ tr_peerIo*  tr_peerIoNewOutgoing( tr_session              * session,
                                   const struct tr_address * addr,
                                   tr_port                   port,
                                   const  uint8_t          * torrentHash,
-                                  tr_bool                   isSeed );
+                                  tr_bool                   isSeed,
+                                  tr_bool                   utp );
+
 
 tr_peerIo*  tr_peerIoNewIncoming( tr_session              * session,
                                   struct tr_bandwidth     * parent,
                                   const struct tr_address * addr,
                                   tr_port                   port,
-                                  int                       socket );
+                                  int                       socket,
+                                  struct UTPSocket *        utp_socket );
 
 void tr_peerIoRefImpl           ( const char              * file,
                                   int                       line,
@@ -172,6 +177,11 @@ static inline void tr_peerIoEnableDHT( tr_peerIo * io, tr_bool flag )
     io->dhtSupported = flag;
 }
 static inline tr_bool tr_peerIoSupportsDHT( const tr_peerIo * io )
+{
+    return io->dhtSupported;
+}
+
+static inline tr_bool tr_peerIoSupportsUTP( const tr_peerIo * io )
 {
     return io->dhtSupported;
 }
@@ -281,12 +291,7 @@ tr_peerIoIsEncrypted( const tr_peerIo * io )
     return ( io != NULL ) && ( io->encryptionMode == PEER_ENCRYPTION_RC4 );
 }
 
-static inline void
-evbuffer_add_uint8( struct evbuffer * outbuf, uint8_t byte )
-{
-    evbuffer_add( outbuf, &byte, 1 );
-}
-
+void evbuffer_add_uint8 ( struct evbuffer * outbuf, uint8_t byte );
 void evbuffer_add_uint16( struct evbuffer * outbuf, uint16_t hs );
 void evbuffer_add_uint32( struct evbuffer * outbuf, uint32_t hl );
 
