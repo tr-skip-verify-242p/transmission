@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2009-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -61,7 +61,7 @@ startMovingNextTorrent( struct relocate_dialog_data * data )
     data->torrent_ids = g_slist_delete_link( data->torrent_ids,
                                              data->torrent_ids );
 
-    str = g_strdup_printf( _( "Moving \"%s\"" ), tr_torrentInfo(tor)->name );
+    str = g_strdup_printf( _( "Moving \"%s\"" ), tr_torrentName( tor ) );
     gtk_message_dialog_set_markup( GTK_MESSAGE_DIALOG( data->message_dialog ), str );
     g_free( str );
 }

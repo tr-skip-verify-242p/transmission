@@ -397,6 +397,13 @@ PrefsDialog :: createNetworkTab( )
     hig->addRow( tr( "Maximum peers per &torrent:" ), spinBoxNew( Prefs::PEER_LIMIT_TORRENT, 1, 300, 5 ) );
     hig->addRow( tr( "Maximum peers &overall:" ), spinBoxNew( Prefs::PEER_LIMIT_GLOBAL, 1, 3000, 5 ) );
 
+    hig->addSectionDivider( );
+    hig->addSectionTitle( tr( "Options" ) );
+
+    QWidget * w;
+    hig->addWideControl( w = checkBoxNew( tr( "Enable &uTP for peer connections" ), Prefs::UTP_ENABLED ) );
+    w->setToolTip( tr( "uTP is a tool for reducing network congestion." ) );
+
     hig->finish( );
     return hig;
 }
@@ -663,7 +670,8 @@ PrefsDialog :: PrefsDialog( Session& session, Prefs& prefs, QWidget * parent ):
          << Prefs :: DIR_WATCH
          << Prefs :: DOWNLOAD_DIR
          << Prefs :: INCOMPLETE_DIR
-         << Prefs :: INCOMPLETE_DIR_ENABLED;
+         << Prefs :: INCOMPLETE_DIR_ENABLED
+         << Prefs :: SCRIPT_TORRENT_DONE_FILENAME;
     foreach( int key, keys )
         refreshPref( key );
 
@@ -702,7 +710,7 @@ void
 PrefsDialog :: updateBlocklistLabel( )
 {
     const int n = mySession.blocklistSize( );
-    myBlocklistLabel->setText( tr( "<i>Blocklist contains %Ln rules)", 0, n ) );
+    myBlocklistLabel->setText( tr( "<i>Blocklist contains %Ln rules</i>", 0, n ) );
 }
 
 void
@@ -746,6 +754,12 @@ PrefsDialog :: refreshPref( int key )
         case Prefs :: DIR_WATCH:
             myWatchButton->setText( QFileInfo(myPrefs.getString(Prefs::DIR_WATCH)).fileName() );
             break;
+
+        case Prefs :: SCRIPT_TORRENT_DONE_FILENAME: {
+            const QString path( myPrefs.getString( key ) );
+            myTorrentDoneScriptButton->setText( QFileInfo(path).fileName() );
+            break;
+        }
 
         case Prefs :: PEER_PORT:
             myPortLabel->setText( tr( "Status unknown" ) );

@@ -30,7 +30,79 @@ THE SOFTWARE.
 #include "net.h"
 #include "session.h"
 #include "tr-dht.h"
+#include "tr-utp.h"
 #include "tr-udp.h"
+
+/* Since we use a single UDP socket in order to implement multiple
+   uTP sockets, try to set up huge buffers. */
+
+#define RECV_BUFFER_SIZE (4 * 1024 * 1024)
+#define SEND_BUFFER_SIZE (1 * 1024 * 1024)
+#define SMALL_BUFFER_SIZE (32 * 1024)
+
+static void
+set_socket_buffers(int fd, int large)
+{
+    int size, rbuf, sbuf, rc;
+    socklen_t rbuf_len = sizeof(rbuf), sbuf_len = sizeof(sbuf);
+
+    size = large ? RECV_BUFFER_SIZE : SMALL_BUFFER_SIZE;
+    rc = setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &size, sizeof(size));
+    if(rc < 0)
+        tr_nerr("UDP", "Failed to set receive buffer: %s",
+                tr_strerror(errno));
+
+    size = large ? SEND_BUFFER_SIZE : SMALL_BUFFER_SIZE;
+    rc = setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &size, sizeof(size));
+    if(rc < 0)
+        tr_nerr("UDP", "Failed to set send buffer: %s",
+                tr_strerror(errno));
+
+    if(large) {
+        rc = getsockopt(fd, SOL_SOCKET, SO_RCVBUF, &rbuf, &rbuf_len);
+        if(rc < 0)
+            rbuf = 0;
+
+        rc = getsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sbuf, &sbuf_len);
+        if(rc < 0)
+            sbuf = 0;
+
+        if(rbuf < RECV_BUFFER_SIZE) {
+            tr_nerr("UDP", "Failed to set receive buffer: requested %d, got %d",
+                    RECV_BUFFER_SIZE, rbuf);
+#ifdef __linux__
+            tr_ninf("UDP",
+                    "Please add the line "
+                    "\"net.core.rmem_max = %d\" to /etc/sysctl.conf",
+                    RECV_BUFFER_SIZE);
+#endif
+        }
+
+        if(sbuf < SEND_BUFFER_SIZE) {
+            tr_nerr("UDP", "Failed to set send buffer: requested %d, got %d",
+                    SEND_BUFFER_SIZE, sbuf);
+#ifdef __linux__
+            tr_ninf("UDP",
+                    "Please add the line "
+                    "\"net.core.wmem_max = %d\" to /etc/sysctl.conf",
+                    SEND_BUFFER_SIZE);
+#endif
+        }
+    }
+}
+
+void
+tr_udpSetSocketBuffers(tr_session *session)
+{
+    tr_bool utp = tr_sessionIsUTPEnabled(session);
+    if(session->udp_socket >= 0)
+        set_socket_buffers(session->udp_socket, utp);
+    if(session->udp6_socket >= 0)
+        set_socket_buffers(session->udp6_socket, utp);
+}
+
+
+
 
 /* BEP-32 has a rather nice explanation of why we need to bind to one
    IPv6 address, if I may say so myself. */
@@ -38,6 +110,8 @@ THE SOFTWARE.
 static void
 rebind_ipv6(tr_session *ss, tr_bool force)
 {
+    tr_bool is_default;
+    const struct tr_address * public_addr;
     struct sockaddr_in6 sin6;
     const unsigned char *ipv6 = tr_globalIPv6();
     int s = -1, rc;
@@ -71,6 +145,10 @@ rebind_ipv6(tr_session *ss, tr_bool force)
     if(ipv6)
         memcpy(&sin6.sin6_addr, ipv6, 16);
     sin6.sin6_port = htons(ss->udp_port);
+    public_addr = tr_sessionGetPublicAddress(ss, TR_AF_INET6, &is_default);
+    if(public_addr && !is_default)
+        sin6.sin6_addr = public_addr->addr.addr6;
+
     rc = bind(s, (struct sockaddr*)&sin6, sizeof(sin6));
     if(rc < 0)
         goto fail;
@@ -106,7 +184,7 @@ rebind_ipv6(tr_session *ss, tr_bool force)
 }
 
 static void
-event_callback(int s, short type, void *sv)
+event_callback(int s, short type UNUSED, void *sv)
 {
     tr_session *ss = (tr_session*)sv;
     unsigned char *buf;
@@ -114,7 +192,7 @@ event_callback(int s, short type, void *sv)
     socklen_t fromlen;
     int rc;
 
-    assert(tr_isSession(ss));
+    assert(tr_isSession(sv));
     assert(type == EV_READ);
 
     buf = malloc(4096);
@@ -129,21 +207,24 @@ event_callback(int s, short type, void *sv)
     if(rc <= 0)
         return;
 
-    if(buf[0] == 'd') {
+    if( buf[0] == 'd' ) {
         /* DHT packet. */
         buf[rc] = '\0';
         tr_dhtCallback(buf, rc, (struct sockaddr*)&from, fromlen, sv);
     } else {
-        /* Probably a UTP packet. */
-        /* Nothing yet. */
+        rc = tr_utpPacket(buf, rc, (struct sockaddr*)&from, fromlen, ss);
+        if(!rc)
+            tr_ndbg("UDP", "Unexpected UDP packet");
     }
 
     free(buf);
 }    
 
 void
-tr_udpInit(tr_session *ss, const tr_address * addr)
+tr_udpInit(tr_session *ss)
 {
+    tr_bool is_default;
+    const struct tr_address * public_addr;
     struct sockaddr_in sin;
     int rc;
 
@@ -162,7 +243,9 @@ tr_udpInit(tr_session *ss, const tr_address * addr)
 
     memset(&sin, 0, sizeof(sin));
     sin.sin_family = AF_INET;
-    memcpy(&sin.sin_addr, &addr->addr.addr4, sizeof (struct in_addr));
+    public_addr = tr_sessionGetPublicAddress(ss, TR_AF_INET, &is_default);
+    if(public_addr && !is_default)
+        memcpy(&sin.sin_addr, &public_addr->addr.addr4, sizeof (struct in_addr));
     sin.sin_port = htons(ss->udp_port);
     rc = bind(ss->udp_socket, (struct sockaddr*)&sin, sizeof(sin));
     if(rc < 0) {
@@ -187,6 +270,8 @@ tr_udpInit(tr_session *ss, const tr_address * addr)
         if(ss->udp6_event == NULL)
             tr_nerr("UDP", "Couldn't allocate IPv6 event");
     }
+
+    tr_udpSetSocketBuffers(ss);
 
     if(ss->isDHTEnabled)
         tr_dhtInit(ss);

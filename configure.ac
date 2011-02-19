@@ -3,8 +3,8 @@ dnl STATUS: "X" for prerelease beta builds,
 dnl         "Z" for unsupported trunk builds,
 dnl         "0" for stable, supported releases
 dnl these should be the only two lines you need to change
-m4_define([user_agent_prefix],[2.13+])
-m4_define([peer_id_prefix],[-WH213Z-])
+m4_define([user_agent_prefix],[2.21+])
+m4_define([peer_id_prefix],[-TR221Z-])
 
 AC_INIT([transmission],
         [user_agent_prefix],
@@ -26,10 +26,6 @@ if test m4_substr(peer_id_prefix,6,1) = "0"; then
   CPPFLAGS="$CPPFLAGS -DNDEBUG"
 else
   supported_build=no
-  if test "x$GCC" = "xyes" ; then
-    CFLAGS="$CFLAGS -g -O0"
-    CXXFLAGS="$CXXFLAGS -g -O0"
-  fi
 fi
 AM_CONDITIONAL(TR_UNSTABLE, test "x$supported_build" = "xno")
 
@@ -40,6 +36,8 @@ AM_CONDITIONAL(TR_UNSTABLE, test "x$supported_build" = "xno")
 ##
 CURL_MINIMUM=7.15.4
 AC_SUBST(CURL_MINIMUM)
+LIBEVENT_MINIMUM=2.0.10
+AC_SUBST(LIBEVENT_MINIUM)
 OPENSSL_MINIMUM=0.9.4
 AC_SUBST(OPENSSL_MINIMUM)
 
@@ -81,27 +79,6 @@ LIBAPPINDICATOR_MINIMUM=0.0.11
 AC_PROG_CC
 AC_PROG_CXX
 AC_C_INLINE
-if test "x$GCC" = "xyes" ; then
-
-    CFLAGS="$CFLAGS -std=gnu99 -ggdb3 -Wall -W -Wpointer-arith -Wformat-security -Wcast-align -Wundef -Wcast-align -Wstrict-prototypes -Wmissing-declarations -Wmissing-format-attribute -Wredundant-decls -Wnested-externs -Wunused-parameter -Wwrite-strings -Winline -Wfloat-equal"
-
-    dnl figure out gcc version
-    AC_MSG_CHECKING([gcc version])
-    GCC_VERSION=`$CC -dumpversion`
-    GCC_MAJOR=`echo $GCC_VERSION | cut -d . -f1`
-    GCC_MINOR=`echo $GCC_VERSION | cut -d . -f2`
-    GCC_VERSION_NUM=`(expr $GCC_MAJOR "*" 100 + $GCC_MINOR) 2>/dev/null`
-
-    AC_MSG_RESULT($GCC_VERSION)
-    if test $GCC_VERSION_NUM -ge 304; then
-        dnl these were added in 3.4
-        CFLAGS="$CFLAGS -Wextra -Wdeclaration-after-statement -Winit-self"
-    fi
-    if test $GCC_VERSION_NUM -ge 403; then
-        dnl these were added in 4.3
-        CFLAGS="$CFLAGS -Wvariadic-macros"
-    fi
-fi
 
 AC_HEADER_STDC
 AC_HEADER_TIME
@@ -120,6 +97,7 @@ AC_SEARCH_LIBS([socket], [socket net])
 AC_SEARCH_LIBS([gethostbyname], [nsl bind])
 PKG_CHECK_MODULES(OPENSSL, [openssl >= $OPENSSL_MINIMUM], , [CHECK_SSL()])
 PKG_CHECK_MODULES(LIBCURL, [libcurl >= $CURL_MINIMUM])
+PKG_CHECK_MODULES(LIBEVENT, [libevent >= $LIBEVENT_MINIMUM])
 AC_PATH_ZLIB
 
 AC_SYS_LARGEFILE
@@ -204,22 +182,30 @@ AC_CHECK_LIB([rt],
 
 dnl ----------------------------------------------------------------------------
 dnl
-dnl  libevent
-
-LIBEVENT_CFLAGS="-I\$(top_srcdir)/third-party/libevent/include"
-LIBEVENT_LIBS="\$(top_builddir)/third-party/libevent/.libs/libevent.a"
-AC_SUBST(LIBEVENT_CFLAGS)
-AC_SUBST(LIBEVENT_LIBS)
-
-
-dnl ----------------------------------------------------------------------------
-dnl
 dnl  dht
 
 DHT_CFLAGS="-I\$(top_srcdir)/third-party/dht"
 DHT_LIBS="\$(top_builddir)/third-party/dht/libdht.a"
 AC_SUBST(DHT_CFLAGS)
 AC_SUBST(DHT_LIBS)
+
+
+dnl ----------------------------------------------------------------------------
+dnl
+dnl  utp
+
+AC_ARG_ENABLE([utp],
+              AS_HELP_STRING([--enable-utp],[build µTP support]),
+              [build_utp=${enableval}],
+              [build_utp=no])
+if test "x$build_utp" = "xyes" ; then
+    LIBUTP_CFLAGS="-I\$(top_srcdir)/third-party/"
+    LIBUTP_LIBS="\$(top_builddir)/third-party/libutp/libutp.a"
+    AC_DEFINE([WITH_UTP],[1])
+fi
+AC_SUBST(LIBUTP_CFLAGS)
+AC_SUBST(LIBUTP_LIBS)
+AM_CONDITIONAL([BUILD_UTP],[test "x$build_utp" = "xyes"])
 
 
 dnl ----------------------------------------------------------------------------
@@ -413,6 +399,14 @@ case $host_os in
 
 esac
 
+AC_ARG_ENABLE([lightweight],
+              AS_HELP_STRING([--enable-lightweight],[optimize libtransmission for low-resource systems: smaller cache size, prefer unencrypted peer connections, etc.]),
+              [enable_lightweight=${enableval}],
+              [enable_lightweight="no"])
+if test "x$enable_lightweight" = "xyes" ; then 
+  AC_DEFINE([TR_LIGHTWEIGHT],[1],[optimize libtransmission for low-resource systems])
+fi 
+
 AC_ARG_ENABLE([cli],
               [AS_HELP_STRING([--enable-cli],[build command-line client])],
               [build_cli=${enableval}],
@@ -455,6 +449,11 @@ if test "x$have_msw" = "xyes"; then
 fi
 AM_CONDITIONAL(WIN32, test "x$have_msw" = "xyes")
 
+dnl  Setup CFLAGS after all compilation tests
+if test "x$GCC" = "xyes" ; then
+    CFLAGS="$CFLAGS -std=gnu99 -ggdb3 -Wall -Werror -Wextra"
+fi
+
 dnl ----------------------------------------------------------------------------
 dnl
 dnl  Generate the output
@@ -469,6 +468,7 @@ AC_CONFIG_FILES([Makefile
                  third-party/Makefile
                  third-party/miniupnp/Makefile
                  third-party/libnatpmp/Makefile
+                 third-party/libutp/Makefile
                  third-party/dht/Makefile
                  macosx/Makefile
                  gtk/Makefile
@@ -482,9 +482,7 @@ AC_CONFIG_FILES([Makefile
                  web/javascript/jquery/Makefile
                  web/stylesheets/Makefile
                  po/Makefile.in])
-AC_CONFIG_SUBDIRS([third-party/libevent])
 
-ac_configure_args="$ac_configure_args --enable-static --disable-shared -q"
 AC_OUTPUT
 
 echo "
@@ -493,6 +491,11 @@ Configuration:
 
    Source code location:                              ${srcdir}
    Compiler:                                          ${CXX}
+
+   Build libtransmission:                             yes
+
+      * optimized for low-resource systems:           ${enable_lightweight}
+      * µTP enabled:                                  ${build_utp}
 
    Build Command-Line client:                         ${build_cli}
 

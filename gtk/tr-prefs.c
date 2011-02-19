@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -938,60 +938,88 @@ proxy_combo_box_new( GObject * core, const char * key )
     return w;
 }
 
-static GtkWidget*
-trackerPage( GObject * core )
+static GtkWidget *
+proxyPage( GObject * core )
 {
-    int                row = 0;
-    const char *       s;
-    GtkWidget *        t;
-    GtkWidget *        w;
-    struct ProxyPage * page = tr_new0( struct ProxyPage, 1 );
+    struct ProxyPage * page;
+    GtkWidget * t, * t2, * w, * hbox;
+    const char * s;
+    int row = 0, row2;
+
+    page = tr_new0( struct ProxyPage, 1 );
 
     t = hig_workarea_create( );
-    hig_workarea_add_section_title ( t, &row, _( "Tracker" ) );
+    s = _( "Web Trackers and Downloads" );
+    hig_workarea_add_section_title( t, &row, s );
 
-    s = _( "Connect to tracker via a pro_xy" );
+    s = _( "Enable _web proxy for HTTP and HTTPS communications" );
     w = new_check_button( s, TR_PREFS_KEY_PROXY_ENABLED, core );
+    s = _( "This proxy will be used for all HTTP and HTTPS tracker "
+           "communication (announces and scrapes) as well as for "
+           "all other web downloads such as torrent file URLs and "
+           "favicons." );
+    gtr_widget_set_tooltip_text( w, s );
     g_signal_connect( w, "toggled", G_CALLBACK( onProxyToggled ), page );
     hig_workarea_add_wide_control( t, &row, w );
 
-    s = _( "Proxy _server:" );
+    hbox = gtk_hbox_new( FALSE, 0 );
+    t2 = hig_workarea_create( );
+    gtk_container_set_border_width( GTK_CONTAINER( t2 ), 0 );
+    row2 = 0;
+
+    s = _( "_Server:" );
     w = new_entry( TR_PREFS_KEY_PROXY, core );
+    gtk_entry_set_width_chars( GTK_ENTRY( w ), 20 );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
-    w = hig_workarea_add_row( t, &row, s, w, NULL );
+    w = hig_workarea_add_row_full( t2, &row2, s, w, NULL, FALSE );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
 
+    s = _( "_Port:" );
     w = new_spin_button( TR_PREFS_KEY_PROXY_PORT, core, 0, USHRT_MAX, 1 );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
-    w = hig_workarea_add_row( t, &row, _( "Proxy _port:" ), w, NULL );
+    w = hig_workarea_add_row_full( t2, &row2, s, w, NULL, FALSE );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
 
-    s = _( "Proxy _type:" );
+    s = _( "_Type:" );
     w = proxy_combo_box_new( core, TR_PREFS_KEY_PROXY_TYPE );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
-    w = hig_workarea_add_row( t, &row, s, w, NULL );
+    w = hig_workarea_add_row_full( t2, &row2, s, w, NULL, FALSE );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
+
+    hig_workarea_finish( t2, &row2 );
+    gtk_box_pack_start( GTK_BOX( hbox ), t2, FALSE, FALSE, 0 );
+
+    t2 = hig_workarea_create( );
+    gtk_container_set_border_width( GTK_CONTAINER( t2 ), 0 );
+    row2 = 0;
 
     s = _( "Use _authentication" );
     w = new_check_button( s, TR_PREFS_KEY_PROXY_AUTH_ENABLED, core );
     g_signal_connect( w, "toggled", G_CALLBACK( onProxyToggled ), page );
-    hig_workarea_add_wide_control( t, &row, w );
+    hig_workarea_add_wide_control( t2, &row2, w );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
 
     s = _( "_Username:" );
     w = new_entry( TR_PREFS_KEY_PROXY_USERNAME, core );
+    gtk_entry_set_width_chars( GTK_ENTRY( w ), 20 );
     page->proxy_auth_widgets = g_slist_append( page->proxy_auth_widgets, w );
-    w = hig_workarea_add_row( t, &row, s, w, NULL );
+    w = hig_workarea_add_row( t2, &row2, s, w, NULL );
     page->proxy_auth_widgets = g_slist_append( page->proxy_auth_widgets, w );
 
     s = _( "Pass_word:" );
     w = new_entry( TR_PREFS_KEY_PROXY_PASSWORD, core );
+    gtk_entry_set_width_chars( GTK_ENTRY( w ), 20 );
     gtk_entry_set_visibility( GTK_ENTRY( w ), FALSE );
     page->proxy_auth_widgets = g_slist_append( page->proxy_auth_widgets, w );
-    w = hig_workarea_add_row( t, &row, s, w, NULL );
+    w = hig_workarea_add_row( t2, &row2, s, w, NULL );
     page->proxy_auth_widgets = g_slist_append( page->proxy_auth_widgets, w );
 
+    hig_workarea_finish( t2, &row2 );
+    gtk_box_pack_start( GTK_BOX( hbox ), t2, FALSE, FALSE, 0 );
+
+    hig_workarea_add_wide_tall_control( t, &row, hbox );
     hig_workarea_finish( t, &row );
+
     g_object_set_data_full( G_OBJECT( t ), "page", page, proxyPageFree );
 
     refreshProxySensitivity( page );
@@ -1219,7 +1247,7 @@ onCorePrefsChanged( TrCore * core UNUSED, const char *  key, gpointer gdata )
     {
         struct network_page_data * data = gdata;
         gdk_threads_enter();
-        gtk_label_set_text( GTK_LABEL( data->portLabel ), _( "Status unknown" ) );
+        gtr_label_set_text( GTK_LABEL( data->portLabel ), _( "Status unknown" ) );
         gtk_widget_set_sensitive( data->portButton, TRUE );
         gtk_widget_set_sensitive( data->portSpin, TRUE );
         gdk_threads_leave();
@@ -1336,8 +1364,16 @@ networkPage( GObject * core )
     s = _( "Maximum _connections per second:" );
     hig_workarea_add_row( t, &row, s, w, NULL );
 
+#ifdef WITH_UTP
     hig_workarea_add_section_divider( t, &row );
     hig_workarea_add_section_title( t, &row, _( "Options" ) );
+
+    s = _( "Enable _uTP for peer communication" );
+    w = new_check_button( s, TR_PREFS_KEY_UTP_ENABLED, core );
+    s = _( "uTP is a tool for reducing network congestion." );
+    gtr_widget_set_tooltip_text( w, s );
+    hig_workarea_add_wide_control( t, &row, w );
+#endif
 
     w = gtk_button_new_with_mnemonic( _( "Edit GNOME Proxy Settings" ) );
     g_signal_connect( w, "clicked", G_CALLBACK( onGNOMEClicked ), data );
@@ -1391,7 +1427,7 @@ gtr_prefs_dialog_new( GtkWindow * parent, GObject * core )
                               webPage( core ),
                               gtk_label_new ( _( "Web" ) ) );
     gtk_notebook_append_page( GTK_NOTEBOOK( n ),
-                              trackerPage( core ),
+                              proxyPage( core ),
                               gtk_label_new ( _( "Proxy" ) ) );
 
     g_signal_connect( d, "response", G_CALLBACK( response_cb ), core );

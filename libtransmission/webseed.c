@@ -51,11 +51,14 @@ struct tr_webseed
     size_t               base_url_len;
     int                  torrent_id;
     tr_bool              is_stopping;
+    int                  consecutive_failures;
 };
 
 enum
 {
-    TR_IDLE_TIMER_MSEC = 2000
+    TR_IDLE_TIMER_MSEC = 2000,
+
+    MAX_CONSECUIVE_FAILURES = 5
 };
 
 static void
@@ -74,8 +77,6 @@ webseed_free( struct tr_webseed * w )
 ****
 ***/
 
-static const tr_peer_event blank_event = { 0, 0, 0, 0, 0.0f, 0, 0, 0 };
-
 static void
 publish( tr_webseed * w, tr_peer_event * e )
 {
@@ -84,20 +85,31 @@ publish( tr_webseed * w, tr_peer_event * e )
 }
 
 static void
-fire_client_got_block( tr_torrent * tor, tr_webseed * w, tr_block_index_t block )
+fire_client_got_rej( tr_torrent * tor, tr_webseed * w, tr_block_index_t block )
 {
-    tr_peer_event e = blank_event;
+    tr_peer_event e = TR_PEER_EVENT_INIT;
+    e.eventType = TR_PEER_CLIENT_GOT_REJ;
     e.pieceIndex = tr_torBlockPiece( tor, block );
     e.offset = tor->blockSize * block - tor->info.pieceSize * e.pieceIndex;
     e.length = tr_torBlockCountBytes( tor, block );
+    publish( w, &e );
+}
+
+static void
+fire_client_got_block( tr_torrent * tor, tr_webseed * w, tr_block_index_t block )
+{
+    tr_peer_event e = TR_PEER_EVENT_INIT;
     e.eventType = TR_PEER_CLIENT_GOT_BLOCK;
+    e.pieceIndex = tr_torBlockPiece( tor, block );
+    e.offset = tor->blockSize * block - tor->info.pieceSize * e.pieceIndex;
+    e.length = tr_torBlockCountBytes( tor, block );
     publish( w, &e );
 }
 
 static void
 fire_client_got_data( tr_webseed * w, uint32_t length )
 {
-    tr_peer_event e = blank_event;
+    tr_peer_event e = TR_PEER_EVENT_INIT;
     e.eventType = TR_PEER_CLIENT_GOT_DATA;
     e.length = length;
     e.wasPieceData = TRUE;
@@ -124,16 +136,26 @@ on_content_changed( struct evbuffer                * buf UNUSED,
 
 static void task_request_next_chunk( struct tr_webseed_task * task );
 
+static tr_bool
+webseed_has_tasks( const tr_webseed * w )
+{
+    return w->tasks != NULL;
+}
+
+
 static void
 on_idle( tr_webseed * w )
 {
     tr_torrent * tor = tr_torrentFindFromId( w->session, w->torrent_id );
 
-    if( w->is_stopping && !tr_webseedIsActive( w ) )
+    if( w->is_stopping && !webseed_has_tasks( w ) )
     {
         webseed_free( w );
     }
-    else if( !w->is_stopping && tor && tor->isRunning && !tr_torrentIsSeed( tor ) )
+    else if( !w->is_stopping && tor
+                             && tor->isRunning
+                             && !tr_torrentIsSeed( tor )
+                             && ( w->consecutive_failures < MAX_CONSECUIVE_FAILURES ) )
     {
         int i;
         int got = 0;
@@ -172,35 +194,52 @@ on_idle( tr_webseed * w )
 
 static void
 web_response_func( tr_session    * session,
+                   tr_bool         did_connect UNUSED,
+                   tr_bool         did_timeout UNUSED,
                    long            response_code,
                    const void    * response UNUSED,
                    size_t          response_byte_count UNUSED,
                    void          * vtask )
 {
     struct tr_webseed_task * t = vtask;
+    tr_webseed * w = t->webseed;
     tr_torrent * tor = tr_torrentFindFromId( session, t->torrent_id );
     const int success = ( response_code == 206 );
 
-    if( success && tor )
-    {
-        if( evbuffer_get_length( t->content ) < t->length )
-        {
-            task_request_next_chunk( t );
-        }
-        else
-        {
-            tr_webseed * w = t->webseed;
+    if( success )
+        w->consecutive_failures = 0;
+    else
+        ++w->consecutive_failures;
 
-            tr_cacheWriteBlock( session->cache, tor,
-                                t->piece_index, t->piece_offset, t->length,
-                                evbuffer_pullup( t->content, -1 ) );
-            fire_client_got_block( tor, w, t->block );
+    if( tor )
+    {
+        if( !success )
+        {
+            fire_client_got_rej( tor, w, t->block );
 
             tr_list_remove_data( &w->tasks, t );
             evbuffer_free( t->content );
             tr_free( t );
+        }
+        else
+        {
+            if( evbuffer_get_length( t->content ) < t->length )
+            {
+                task_request_next_chunk( t );
+            }
+            else
+            {
+                tr_cacheWriteBlock( session->cache, tor,
+                                    t->piece_index, t->piece_offset, t->length,
+                                    t->content );
+                fire_client_got_block( tor, w, t->block );
 
-            on_idle( w );
+                tr_list_remove_data( &w->tasks, t );
+                evbuffer_free( t->content );
+                tr_free( t );
+
+                on_idle( w );
+            }
         }
     }
 }
@@ -258,17 +297,18 @@ task_request_next_chunk( struct tr_webseed_task * t )
 }
 
 tr_bool
-tr_webseedIsActive( const tr_webseed * w )
+tr_webseedGetSpeed_Bps( const tr_webseed * w, uint64_t now, int * setme_Bps )
 {
-    return w->tasks != NULL;
+    const tr_bool is_active = webseed_has_tasks( w );
+    *setme_Bps = is_active ? tr_rcRate_Bps( &w->download_rate, now ) : 0;
+    return is_active;
 }
 
 tr_bool
-tr_webseedGetSpeed_Bps( const tr_webseed * w, uint64_t now, int * setme_Bps )
+tr_webseedIsActive( const tr_webseed * w )
 {
-    const tr_bool is_active = tr_webseedIsActive( w );
-    *setme_Bps = is_active ? tr_rcRate_Bps( &w->download_rate, now ) : 0;
-    return is_active;
+    int Bps = 0;
+    return tr_webseedGetSpeed_Bps( w, tr_time_msec(), &Bps ) && ( Bps > 0 );
 }
 
 /***
@@ -317,7 +357,7 @@ tr_webseedFree( tr_webseed * w )
 {
     if( w )
     {
-        if( tr_webseedIsActive( w ) )
+        if( webseed_has_tasks( w ) )
             w->is_stopping = TRUE;
         else
             webseed_free( w );

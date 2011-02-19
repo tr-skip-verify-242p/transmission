@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -153,7 +153,7 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_DEFAULT_RPC_PORT_STR                "9091"
 #define TR_DEFAULT_RPC_URL_STR       "/transmission/"
 #define TR_DEFAULT_PEER_PORT_STR              "51413"
-#define TR_DEFAULT_PEER_SOCKET_TOS_STR            "0"
+#define TR_DEFAULT_PEER_SOCKET_TOS_STR      "default"
 #define TR_DEFAULT_PEER_LIMIT_GLOBAL_STR        "240"
 #define TR_DEFAULT_PEER_LIMIT_TORRENT_STR        "60"
 
@@ -170,7 +170,9 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_BLOCKLIST_URL                 "blocklist-url"
 #define TR_PREFS_KEY_MAX_CACHE_SIZE_MB             "cache-size-mb"
 #define TR_PREFS_KEY_DHT_ENABLED                   "dht-enabled"
+#define TR_PREFS_KEY_UTP_ENABLED                   "utp-enabled"
 #define TR_PREFS_KEY_LPD_ENABLED                   "lpd-enabled"
+#define TR_PREFS_KEY_PREFETCH_ENABLED              "prefetch-enabled"
 #define TR_PREFS_KEY_DOWNLOAD_DIR                  "download-dir"
 #define TR_PREFS_KEY_ENCRYPTION                    "encryption"
 #define TR_PREFS_KEY_IDLE_LIMIT                    "idle-seeding-limit"
@@ -513,9 +515,11 @@ typedef enum
     TR_RPC_TORRENT_STARTED,
     TR_RPC_TORRENT_STOPPED,
     TR_RPC_TORRENT_REMOVING,
+    TR_RPC_TORRENT_TRASHING, /* _REMOVING + delete local data */
     TR_RPC_TORRENT_CHANGED, /* catch-all for the "torrent-set" rpc method */
     TR_RPC_TORRENT_MOVED,
-    TR_RPC_SESSION_CHANGED
+    TR_RPC_SESSION_CHANGED,
+    TR_RPC_SESSION_CLOSE
 }
 tr_rpc_callback_type;
 
@@ -624,6 +628,9 @@ tr_bool  tr_sessionIsPexEnabled( const tr_session * session );
 
 tr_bool  tr_sessionIsDHTEnabled( const tr_session * session );
 void     tr_sessionSetDHTEnabled( tr_session * session, tr_bool );
+
+tr_bool  tr_sessionIsUTPEnabled( const tr_session * session );
+void     tr_sessionSetUTPEnabled( tr_session * session, tr_bool );
 
 tr_bool  tr_sessionIsLPDEnabled( const tr_session * session );
 void     tr_sessionSetLPDEnabled( tr_session * session, tr_bool enabled );
@@ -748,7 +755,6 @@ tr_bool  tr_sessionGetActiveSpeedLimit_KBps( const tr_session  * session,
 ***/
 
 double     tr_sessionGetRawSpeed_KBps  ( const tr_session *, tr_direction );
-double     tr_sessionGetPieceSpeed_KBps( const tr_session *, tr_direction );
 
 void       tr_sessionSetRatioLimited  ( tr_session *, tr_bool isLimited );
 tr_bool    tr_sessionIsRatioLimited   ( const tr_session * );
@@ -1145,6 +1151,10 @@ tr_torrent* tr_torrentFindFromHash( tr_session * session, const uint8_t * hash )
 /** @brief Convenience function similar to tr_torrentFindFromHash() */
 tr_torrent* tr_torrentFindFromMagnetLink( tr_session * session, const char * link );
 
+/**
+ * @return this torrent's name.
+ */
+const char* tr_torrentName( const tr_torrent * );
 
 /**
  * @brief find the location of a torrent's file by looking with and without
@@ -1443,6 +1453,8 @@ tr_bool tr_torrentCanManualUpdate( const tr_torrent * torrent );
 
 typedef struct tr_peer_stat
 {
+    tr_bool  isUTP;
+
     tr_bool  isEncrypted;
     tr_bool  isDownloadingFrom;
     tr_bool  isUploadingTo;
@@ -1670,25 +1682,23 @@ void tr_torrentVerify( tr_torrent * torrent );
 /** @brief a part of tr_info that represents a single file of the torrent's content */
 typedef struct tr_file
 {
-    uint64_t            length;    /* Length of the file, in bytes */
-    char *              name;      /* Path to the file */
-    int8_t              priority;  /* TR_PRI_HIGH, _NORMAL, or _LOW */
-    int8_t              dnd;       /* nonzero if the file shouldn't be
-                                     downloaded */
-    tr_piece_index_t    firstPiece; /* We need pieces [firstPiece... */
-    tr_piece_index_t    lastPiece; /* ...lastPiece] to dl this file */
-    uint64_t            offset;    /* file begins at the torrent's nth byte */
+    uint64_t          length;      /* Length of the file, in bytes */
+    char *            name;        /* Path to the file */
+    int8_t            priority;    /* TR_PRI_HIGH, _NORMAL, or _LOW */
+    int8_t            dnd;         /* "do not download" flag */
+    tr_piece_index_t  firstPiece;  /* We need pieces [firstPiece... */
+    tr_piece_index_t  lastPiece;   /* ...lastPiece] to dl this file */
+    uint64_t          offset;      /* file begins at the torrent's nth byte */
 }
 tr_file;
 
 /** @brief a part of tr_info that represents a single piece of the torrent's content */
 typedef struct tr_piece
 {
-    time_t     timeChecked;             /* the last time we tested this piece */
-    uint8_t    hash[SHA_DIGEST_LENGTH]; /* pieces hash */
-    int8_t     priority;               /* TR_PRI_HIGH, _NORMAL, or _LOW */
-    int8_t     dnd;                    /* nonzero if the piece shouldn't be
-                                         downloaded */
+    time_t   timeChecked;              /* the last time we tested this piece */
+    uint8_t  hash[SHA_DIGEST_LENGTH];  /* pieces hash */
+    int8_t   priority;                 /* TR_PRI_HIGH, _NORMAL, or _LOW */
+    int8_t   dnd;                      /* "do not download" flag */
 }
 tr_piece;
 

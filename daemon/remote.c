@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2
@@ -172,7 +172,9 @@ strlmem( char * buf, int64_t bytes, size_t buflen )
 static char*
 strlsize( char * buf, int64_t bytes, size_t buflen )
 {
-    if( !bytes )
+    if( bytes < 1 )
+        tr_strlcpy( buf, "Unknown", buflen );
+    else if( !bytes )
         tr_strlcpy( buf, "None", buflen );
     else
         tr_formatter_size_B( buf, bytes, buflen );
@@ -241,7 +243,8 @@ static tr_option opts[] =
     { 'e', "cache",                  "Set the maximum size of the session's memory cache (in " MEM_M_STR ")", "e", 1, "<size>" },
     { 910, "encryption-required",    "Encrypt all peer connections", "er", 0, NULL },
     { 911, "encryption-preferred",   "Prefer encrypted peer connections", "ep", 0, NULL },
-    { 912, "encryption-tolerated",   "Prefer unencrypted peer connections", "et", 0, NULL },
+    { 912, "encryption-tolerated",   "Prefer unencrypted peer connections", "et", 0, NULL }, 
+    { 850, "exit",                   "Tell the transmission session to shut down", NULL, 0, NULL },
     { 940, "files",                  "List the current torrent(s)' files", "f",  0, NULL },
     { 'g', "get",                    "Mark files for download", "g",  1, "<files>" },
     { 'G', "no-get",                 "Mark files for not downloading", "G",  1, "<files>" },
@@ -282,7 +285,7 @@ static tr_option opts[] =
     { 952, "no-seedratio",           "Let the current torrent(s) seed regardless of ratio", "SR", 0, NULL },
     { 953, "global-seedratio",       "All torrents, unless overridden by a per-torrent setting, should seed until a specific ratio", "gsr", 1, "ratio" },
     { 954, "no-global-seedratio",    "All torrents, unless overridden by a per-torrent setting, should seed regardless of ratio", "GSR", 0, NULL },
-    { 710, "tracker-add",            "Add a tracker to a torrent", "ta", 1, "<tracker>" },
+    { 710, "tracker-add",            "Add a tracker to a torrent", "td", 1, "<tracker>" },
     { 712, "tracker-remove",         "Remove a tracker from a torrent", "tr", 1, "<trackerId>" },
     { 's', "start",                  "Start the current torrent(s)", "s",  0, NULL },
     { 'S', "stop",                   "Stop the current torrent(s)", "S",  0, NULL },
@@ -295,6 +298,8 @@ static tr_option opts[] =
     { 985, "no-honor-session",       "Make the current torrent(s) not honor the session limits", "HL",  0, NULL },
     { 'u', "uplimit",                "Set the max upload speed in "SPEED_K_STR" for the current torrent(s) or globally", "u", 1, "<speed>" },
     { 'U', "no-uplimit",             "Disable max upload speed for the current torrent(s) or globally", "U", 0, NULL },
+    { 830, "utp",                    "Enable uTP for peer connections", NULL, 0, NULL },
+    { 831, "no-utp",                 "Disable uTP for peer connections", NULL, 0, NULL },
     { 'v', "verify",                 "Verify the current torrent(s)", "v",  0, NULL },
     { 'V', "version",                "Show version number and exit", "V", 0, NULL },
     { 'w', "download-dir",           "When adding a new torrent, set its download folder. Otherwise, set the default download folder", "w",  1, "<path>" },
@@ -341,8 +346,9 @@ enum
     MODE_SESSION_SET           = (1<<9),
     MODE_SESSION_GET           = (1<<10),
     MODE_SESSION_STATS         = (1<<11),
-    MODE_BLOCKLIST_UPDATE      = (1<<12),
-    MODE_PORT_TEST             = (1<<13)
+    MODE_SESSION_CLOSE         = (1<<12),
+    MODE_BLOCKLIST_UPDATE      = (1<<13),
+    MODE_PORT_TEST             = (1<<14)
 };
 
 static int
@@ -376,6 +382,8 @@ getOptMode( int val )
         case 'Y': /* no-lpd */
         case 800: /* torrent-done-script */
         case 801: /* no-torrent-done-script */
+        case 830: /* utp */
+        case 831: /* no-utp */
         case 970: /* alt-speed */
         case 971: /* no-alt-speed */
         case 972: /* alt-speed-downlimit */
@@ -445,6 +453,9 @@ getOptMode( int val )
         case 'w': /* download-dir */
             return MODE_SESSION_SET | MODE_TORRENT_ADD;
 
+        case 850: /* session-close */
+            return MODE_SESSION_CLOSE;
+
         case 963: /* blocklist-update */
             return MODE_BLOCKLIST_UPDATE;
 
@@ -482,13 +493,18 @@ static char * sessionId = NULL;
 static char*
 tr_getcwd( void )
 {
+    char * result;
     char buf[2048];
-    *buf = '\0';
 #ifdef WIN32
-    _getcwd( buf, sizeof( buf ) );
+    result = _getcwd( buf, sizeof( buf ) );
 #else
-    getcwd( buf, sizeof( buf ) );
+    result = getcwd( buf, sizeof( buf ) );
 #endif
+    if( result == NULL )
+    {
+        fprintf( stderr, "getcwd error: \"%s\"", tr_strerror( errno ) );
+        *buf = '\0';
+    }
     return tr_strdup( buf );
 }
 
@@ -1979,6 +1995,10 @@ processArgs( const char * rpcurl, int argc, const char ** argv )
                           break;
                 case 'O': tr_bencDictAddBool( args, TR_PREFS_KEY_DHT_ENABLED, FALSE );
                           break;
+                case 830: tr_bencDictAddBool( args, TR_PREFS_KEY_UTP_ENABLED, TRUE );
+                          break;
+                case 831: tr_bencDictAddBool( args, TR_PREFS_KEY_UTP_ENABLED, FALSE );
+                          break;
                 case 'p': tr_bencDictAddInt( args, TR_PREFS_KEY_PEER_PORT, numarg( optarg ) );
                           break;
                 case 'P': tr_bencDictAddBool( args, TR_PREFS_KEY_PEER_PORT_RANDOM_ON_START, TRUE);
@@ -2181,6 +2201,14 @@ processArgs( const char * rpcurl, int argc, const char ** argv )
                 tr_free( path );
                 break;
             }
+            case 850:
+            {
+                tr_benc * top = tr_new0( tr_benc, 1 );
+                tr_bencInitDict( top, 1 );
+                tr_bencDictAddStr( top, "method", "session-close" );
+                status |= flush( rpcurl, &top );
+                break;
+            }
             case 963:
             {
                 tr_benc * top = tr_new0( tr_benc, 1 );
@@ -2257,7 +2285,7 @@ processArgs( const char * rpcurl, int argc, const char ** argv )
             }
             default:
             {
-                fprintf( stderr, "got opt [%d]\n", (int)c );
+                fprintf( stderr, "got opt [%d]\n", c );
                 showUsage( );
                 break;
             }

@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2
@@ -14,9 +14,6 @@
 #include <stdio.h> /* printf */
 #include <stdlib.h> /* exit, atoi */
 #include <string.h> /* strcmp */
-
-#include <sys/types.h> /* umask*/
-#include <sys/stat.h> /* umask*/
 
 #include <fcntl.h> /* open */
 #include <signal.h>
@@ -173,48 +170,36 @@ static int
 tr_daemon( int nochdir, int noclose )
 {
 #if defined(USE_OS_DAEMON)
+
     return daemon( nochdir, noclose );
+
 #elif defined(USE_TR_DAEMON)
-    pid_t pid = fork( );
-    if( pid < 0 )
-        return -1;
-    else if( pid > 0 )
-        _exit( 0 );
-    else {
-        pid = setsid( );
-        if( pid < 0 )
-            return -1;
 
-        pid = fork( );
-        if( pid < 0 )
-            return -1;
-        else if( pid > 0 )
-            _exit( 0 );
-        else {
+    /* this is loosely based off of glibc's daemon() implementation
+     * http://sourceware.org/git/?p=glibc.git;a=blob_plain;f=misc/daemon.c */
 
-            if( !nochdir )
-                if( chdir( "/" ) < 0 )
-                    return -1;
-
-            umask( (mode_t)0 );
-
-            if( !noclose ) {
-                /* send stdin, stdout, and stderr to /dev/null */
-                int i;
-                int fd = open( "/dev/null", O_RDWR, 0 );
-                if( fd < 0 )
-                    fprintf( stderr, "unable to open /dev/null: %s\n", tr_strerror(errno) );
-                for( i=0; i<3; ++i ) {
-                    if( close( i ) )
-                        return -1;
-                    dup2( fd, i );
-                }
-                close( fd );
-            }
-
-            return 0;
-        }
+    switch( fork( ) ) {
+        case -1: return -1;
+        case 0: break;
+        default: _exit(0);
     }
+
+    if( setsid( ) == -1 )
+        return -1;
+
+    if( !nochdir )
+        chdir( "/" );
+
+    if( !noclose ) {
+        int fd = open( "/dev/null", O_RDWR, 0 );
+        dup2( fd, STDIN_FILENO );
+        dup2( fd, STDOUT_FILENO );
+        dup2( fd, STDERR_FILENO );
+        close( fd );
+    }
+
+    return 0;
+
 #else /* USE_NO_DAEMON */
     return 0;
 #endif
@@ -323,7 +308,21 @@ pumpLogMessages( FILE * logfile )
     for( l=list; l!=NULL; l=l->next )
         printMessage( logfile, l->level, l->name, l->message, l->file, l->line );
 
+    if( logfile != NULL )
+        fflush( logfile );
+
     tr_freeMessageList( list );
+}
+
+static tr_rpc_callback_status
+on_rpc_callback( tr_session            * session UNUSED,
+                 tr_rpc_callback_type    type,
+                 struct tr_torrent     * tor UNUSED,
+                 void                  * user_data UNUSED )
+{
+    if( type == TR_RPC_SESSION_CLOSE )
+        closing = TRUE;
+    return TR_RPC_OK;
 }
 
 int
@@ -480,6 +479,7 @@ main( int argc, char ** argv )
     tr_formatter_size_init( DISK_K, DISK_K_STR, DISK_M_STR, DISK_G_STR, DISK_T_STR );
     tr_formatter_speed_init( SPEED_K, SPEED_K_STR, SPEED_M_STR, SPEED_G_STR, SPEED_T_STR );
     mySession = tr_sessionInit( "daemon", configDir, TRUE, &settings );
+    tr_sessionSetRPCCallback( mySession, on_rpc_callback, NULL );
     tr_ninf( NULL, "Using settings from \"%s\"", configDir );
     tr_sessionSaveSettings( mySession, configDir, &settings );
 

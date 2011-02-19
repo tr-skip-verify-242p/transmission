@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -43,6 +43,8 @@ void tr_sessionSetWebConfigFunc( tr_session * session, void (*config)(tr_session
 void tr_webClose( tr_session * session, tr_web_close_mode close_mode );
 
 typedef void ( tr_web_done_func )( tr_session       * session,
+                                   tr_bool            timeout_flag,
+                                   tr_bool            did_connect_flag,
                                    long               response_code,
                                    const void       * response,
                                    size_t             response_byte_count,

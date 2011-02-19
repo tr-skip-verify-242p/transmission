@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -34,6 +34,7 @@
  * @{
  */
 
+struct UTPSocket;
 struct tr_peer_stat;
 struct tr_torrent;
 typedef struct tr_peerMgr tr_peerMgr;
@@ -131,6 +132,12 @@ typedef struct tr_peer
 }
 tr_peer;
 
+static inline tr_bool
+tr_isPex( const tr_pex * pex )
+{
+    return pex && tr_isAddress( &pex->addr );
+}
+
 const tr_address * tr_peerAddress( const tr_peer * );
 
 int tr_pexCompare( const void * a, const void * b );
@@ -141,6 +148,13 @@ void tr_peerMgrFree( tr_peerMgr * manager );
 
 tr_bool tr_peerMgrPeerIsSeed( const tr_torrent * tor,
                               const tr_address * addr );
+
+void tr_peerMgrSetUtpSupported( tr_torrent       * tor,
+                                const tr_address * addr );
+
+void tr_peerMgrSetUtpFailed( tr_torrent *tor,
+                             const tr_address *addr,
+                             tr_bool failed );
 
 void tr_peerMgrGetNextRequests( tr_torrent          * torrent,
                                 tr_peer             * peer,
@@ -157,7 +171,8 @@ void tr_peerMgrRebuildRequests( tr_torrent * torrent );
 void tr_peerMgrAddIncoming( tr_peerMgr  * manager,
                             tr_address  * addr,
                             tr_port       port,
-                            int           socket );
+                            int           socket,
+                            struct UTPSocket *utp_socket );
 
 tr_pex * tr_peerMgrCompactToPex( const void    * compact,
                                  size_t          compactLen,

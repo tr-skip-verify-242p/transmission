@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -129,7 +129,7 @@ gtr_notify_send( TrTorrent *tor )
         NotifyNotification * n;
 
         n = notify_notification_new( _( "Torrent Complete" ),
-                                     info->name, NULL
+                                     tr_torrentName( tr_torrent_handle( tor ) ), NULL
 /* the fourth argument was removed in libnotify 0.7.0 */
 #if !defined(NOTIFY_VERSION_MINOR) || (NOTIFY_VERSION_MAJOR == 0 && NOTIFY_VERSION_MINOR < 7)
                                                      , NULL

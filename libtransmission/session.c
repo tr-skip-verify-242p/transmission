@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
  * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -44,6 +44,7 @@
 #include "stats.h"
 #include "torrent.h"
 #include "tr-udp.h"
+#include "tr-utp.h"
 #include "tr-lpd.h"
 #include "trevent.h"
 #include "utils.h"
@@ -53,9 +54,14 @@
 
 enum
 {
-    SAVE_INTERVAL_SECS = 360,
-
-    DEFAULT_CACHE_SIZE_MB = 4
+#ifdef TR_LIGHTWEIGHT
+    DEFAULT_CACHE_SIZE_MB = 2,
+    DEFAULT_PREFETCH_ENABLED = FALSE,
+#else
+    DEFAULT_CACHE_SIZE_MB = 4,
+    DEFAULT_PREFETCH_ENABLED = TRUE,
+#endif
+    SAVE_INTERVAL_SECS = 360
 };
 
 
@@ -189,7 +195,8 @@ accept_incoming_peer( int fd, short what UNUSED, void * vsession )
     if( clientSocket > 0 ) {
         tr_deepLog( __FILE__, __LINE__, NULL, "new incoming connection %d (%s)",
                    clientSocket, tr_peerIoAddrStr( &clientAddr, clientPort ) );
-        tr_peerMgrAddIncoming( session->peerMgr, &clientAddr, clientPort, clientSocket );
+        tr_peerMgrAddIncoming( session->peerMgr, &clientAddr, clientPort,
+                               clientSocket, NULL );
     }
 }
 
@@ -251,11 +258,52 @@ tr_sessionGetPublicAddress( const tr_session * session, int tr_af_type, tr_bool 
 ****
 ***/
 
-#ifdef TR_EMBEDDED
+#ifdef TR_LIGHTWEIGHT
  #define TR_DEFAULT_ENCRYPTION   TR_CLEAR_PREFERRED
 #else
  #define TR_DEFAULT_ENCRYPTION   TR_ENCRYPTION_PREFERRED
 #endif
+
+static int
+parse_tos(const char *string)
+{
+    char *p;
+    int value;
+
+    if(strcasecmp(string, "") == 0 || strcasecmp(string, "default") == 0)
+        return 0;
+    else if(strcasecmp(string, "lowcost") == 0 ||
+            strcasecmp(string, "mincost") == 0)
+        return 0x10;
+    else if(strcasecmp(string, "throughput") == 0)
+        return 0x08;
+    else if(strcasecmp(string, "reliability") == 0)
+        return 0x04;
+    else if(strcasecmp(string, "lowdelay") == 0)
+        return 0x02;
+
+    value = strtol(string, &p, 0);
+    if(p == NULL || p == string)
+        return 0;
+
+    return value;
+}
+
+static const char *
+format_tos(int value)
+{
+    static char buf[8];
+    switch(value) {
+    case 0: return "default";
+    case 0x10: return "lowcost";
+    case 0x08: return "throughput";
+    case 0x04: return "reliability";
+    case 0x02: return "lowdelay";
+    default:
+        snprintf(buf, 8, "%d", value);
+        return buf;
+    }
+}
 
 void
 tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
@@ -267,6 +315,7 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddStr ( d, TR_PREFS_KEY_BLOCKLIST_URL,            "http://www.example.com/blocklist" );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_MAX_CACHE_SIZE_MB,        DEFAULT_CACHE_SIZE_MB );
     tr_bencDictAddBool( d, TR_PREFS_KEY_DHT_ENABLED,              TRUE );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_UTP_ENABLED,              FALSE );
     tr_bencDictAddBool( d, TR_PREFS_KEY_LPD_ENABLED,              FALSE );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_DOWNLOAD_DIR,             tr_getDefaultDownloadDir( ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_DSPEED_KBps,              100 );
@@ -286,7 +335,7 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddBool( d, TR_PREFS_KEY_PEER_PORT_RANDOM_ON_START, FALSE );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PORT_RANDOM_LOW,     49152 );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PORT_RANDOM_HIGH,    65535 );
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_SOCKET_TOS,          atoi( TR_DEFAULT_PEER_SOCKET_TOS_STR ) );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_SOCKET_TOS,          TR_DEFAULT_PEER_SOCKET_TOS_STR );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PEX_ENABLED,              TRUE );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PORT_FORWARDING,          TRUE );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PREALLOCATION,            TR_PREALLOCATE_SPARSE );
@@ -297,6 +346,7 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PROXY_PORT,               80 );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PROXY_TYPE,               TR_PROXY_HTTP );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_PROXY_USERNAME,           "" );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_PREFETCH_ENABLED,         DEFAULT_PREFETCH_ENABLED );
     tr_bencDictAddReal( d, TR_PREFS_KEY_RATIO,                    2.0 );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RATIO_ENABLED,            FALSE );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RENAME_PARTIAL_FILES,     TRUE );
@@ -338,6 +388,7 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddStr ( d, TR_PREFS_KEY_BLOCKLIST_URL,            tr_blocklistGetURL( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_MAX_CACHE_SIZE_MB,        tr_sessionGetCacheLimit_MB( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_DHT_ENABLED,              s->isDHTEnabled );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_UTP_ENABLED,              s->isUTPEnabled );
     tr_bencDictAddBool( d, TR_PREFS_KEY_LPD_ENABLED,              s->isLPDEnabled );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_DOWNLOAD_DIR,             s->downloadDir );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_DSPEED_KBps,              tr_sessionGetSpeedLimit_KBps( s, TR_DOWN ) );
@@ -357,9 +408,8 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddBool( d, TR_PREFS_KEY_PEER_PORT_RANDOM_ON_START, s->isPortRandom );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PORT_RANDOM_LOW,     s->randomPortLow );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PORT_RANDOM_HIGH,    s->randomPortHigh );
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_SOCKET_TOS,          s->peerSocketTOS );
-    if(s->peer_congestion_algorithm && s->peer_congestion_algorithm[0])
-        tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_CONGESTION_ALGORITHM, s->peer_congestion_algorithm );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_SOCKET_TOS,          format_tos(s->peerSocketTOS) );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_CONGESTION_ALGORITHM, s->peer_congestion_algorithm );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PEX_ENABLED,              s->isPexEnabled );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PORT_FORWARDING,          tr_sessionIsPortForwardingEnabled( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PREALLOCATION,            s->preallocationMode );
@@ -370,6 +420,7 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PROXY_PORT,               s->proxyPort );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PROXY_TYPE,               s->proxyType );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_PROXY_USERNAME,           s->proxyUsername );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_PREFETCH_ENABLED,         s->isPrefetchEnabled );
     tr_bencDictAddReal( d, TR_PREFS_KEY_RATIO,                    s->desiredRatio );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RATIO_ENABLED,            s->isRatioLimited );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RENAME_PARTIAL_FILES,     tr_sessionIsIncompleteFileNamingEnabled( s ) );
@@ -682,7 +733,7 @@ tr_sessionInitImpl( void * vdata )
 
     tr_sessionSet( session, &settings );
 
-    tr_udpInit( session, &session->public_ipv4->addr );
+    tr_udpInit( session );
 
     if( session->isLPDEnabled )
         tr_lpdInit( session, &session->public_ipv4->addr );
@@ -731,14 +782,18 @@ sessionSetImpl( void * vdata )
         tr_sessionSetPexEnabled( session, boolVal );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_DHT_ENABLED, &boolVal ) )
         tr_sessionSetDHTEnabled( session, boolVal );
+    if( tr_bencDictFindBool( settings, TR_PREFS_KEY_UTP_ENABLED, &boolVal ) )
+        tr_sessionSetUTPEnabled( session, boolVal );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_LPD_ENABLED, &boolVal ) )
         tr_sessionSetLPDEnabled( session, boolVal );
     if( tr_bencDictFindInt( settings, TR_PREFS_KEY_ENCRYPTION, &i ) )
         tr_sessionSetEncryption( session, i );
-    if( tr_bencDictFindInt( settings, TR_PREFS_KEY_PEER_SOCKET_TOS, &i ) )
-        session->peerSocketTOS = i;
+    if( tr_bencDictFindStr( settings, TR_PREFS_KEY_PEER_SOCKET_TOS, &str ) )
+        session->peerSocketTOS = parse_tos( str );
     if( tr_bencDictFindStr( settings, TR_PREFS_KEY_PEER_CONGESTION_ALGORITHM, &str ) )
         session->peer_congestion_algorithm = tr_strdup(str);
+    else
+        session->peer_congestion_algorithm = tr_strdup("");
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_BLOCKLIST_ENABLED, &boolVal ) )
         tr_blocklistSetEnabled( session, boolVal );
     if( tr_bencDictFindStr( settings, TR_PREFS_KEY_BLOCKLIST_URL, &str ) )
@@ -749,6 +804,8 @@ sessionSetImpl( void * vdata )
         tr_sessionSetDeleteSource( session, boolVal );
 
     /* files and directories */
+    if( tr_bencDictFindBool( settings, TR_PREFS_KEY_PREFETCH_ENABLED, &boolVal ) )
+        session->isPrefetchEnabled = boolVal;
     if( tr_bencDictFindInt( settings, TR_PREFS_KEY_PREALLOCATION, &i ) )
         session->preallocationMode = i;
     if( tr_bencDictFindStr( settings, TR_PREFS_KEY_DOWNLOAD_DIR, &str ) )
@@ -1666,11 +1723,6 @@ tr_sessionGetPieceSpeed_Bps( const tr_session * session, tr_direction dir )
 {
     return tr_isSession( session ) ? tr_bandwidthGetPieceSpeed_Bps( session->bandwidth, 0, dir ) : 0;
 }
-double
-tr_sessionGetPieceSpeed_KBps( const tr_session * session, tr_direction dir )
-{
-    return toSpeedKBps( tr_sessionGetPieceSpeed_Bps( session, dir ) );
-}
 
 int
 tr_sessionGetRawSpeed_Bps( const tr_session * session, tr_direction dir )
@@ -1721,6 +1773,7 @@ sessionCloseImpl( void * vsession )
     if( session->isLPDEnabled )
         tr_lpdUninit( session );
 
+    tr_utpClose( session );
     tr_udpUninit( session );
 
     event_free( session->saveTimer );
@@ -1941,7 +1994,7 @@ toggleDHTImpl(  void * data )
 
     tr_udpUninit( session );
     session->isDHTEnabled = !session->isDHTEnabled;
-    tr_udpInit( session, &session->public_ipv4->addr );
+    tr_udpInit( session );
 }
 
 void
@@ -1953,6 +2006,50 @@ tr_sessionSetDHTEnabled( tr_session * session, tr_bool enabled )
     if( ( enabled != 0 ) != ( session->isDHTEnabled != 0 ) )
         tr_runInEventThread( session, toggleDHTImpl, session );
 }
+
+/***
+****
+***/
+
+tr_bool
+tr_sessionIsUTPEnabled( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+
+#ifdef WITH_UTP
+    return session->isUTPEnabled;
+#else
+    return FALSE;
+#endif
+}
+
+static void
+toggle_utp(  void * data )
+{
+    tr_session * session = data;
+    assert( tr_isSession( session ) );
+
+    session->isUTPEnabled = !session->isUTPEnabled;
+
+    tr_udpSetSocketBuffers( session );
+
+    /* But don't call tr_utpClose -- see reset_timer in tr-utp.c for an
+       explanation. */
+}
+
+void
+tr_sessionSetUTPEnabled( tr_session * session, tr_bool enabled )
+{
+    assert( tr_isSession( session ) );
+    assert( tr_isBool( enabled ) );
+
+    if( ( enabled != 0 ) != ( session->isUTPEnabled != 0 ) )
+        tr_runInEventThread( session, toggle_utp, session );
+}
+
+/***
+****
+***/
 
 static void
 toggleLPDImpl(  void * data )
@@ -2363,24 +2460,6 @@ tr_sessionSetTorrentFile( tr_session * session,
         tr_bencDictAddStr( session->metainfoLookup, hashString, filename );
 }
 
-tr_torrent*
-tr_torrentNext( tr_session * session,
-                tr_torrent * tor )
-{
-    tr_torrent * ret;
-
-    assert( !session || tr_isSession( session ) );
-
-    if( !session )
-        ret = NULL;
-    else if( !tor )
-        ret = session->torrentList;
-    else
-        ret = tor->next;
-
-    return ret;
-}
-
 /***
 ****
 ***/
@@ -2727,4 +2806,37 @@ void
 tr_sessionSetWebConfigFunc( tr_session * session, void (*func)(tr_session*, void*, const char* ) )
 {
     session->curl_easy_config_func = func;
+}
+
+/***
+****
+***/
+
+uint64_t
+tr_sessionGetTimeMsec( tr_session * session )
+{
+    struct timeval tv;
+
+    if( event_base_gettimeofday_cached( session->event_base, &tv ) )
+    {
+        return tr_time_msec( );
+    }
+    else
+    {
+        /* event_base_gettimeofday_cached() might be implemented using
+           clock_gettime(CLOCK_MONOTONIC), so calculate the offset to
+           real time... */
+        static uint64_t offset;
+        static tr_bool offset_calculated = FALSE;
+
+        const uint64_t val = (uint64_t) tv.tv_sec * 1000 + ( tv.tv_usec / 1000 );
+
+        if( !offset_calculated )
+        {
+            offset = tr_time_msec() - val;
+            offset_calculated = TRUE;
+        }
+
+        return val + offset;
+    }
 }
