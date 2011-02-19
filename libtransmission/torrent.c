@@ -2457,9 +2457,8 @@ tr_torrentSetAnnounceList( tr_torrent             * tor,
     tr_bool ok = TRUE;
     tr_tracker_info * trackers;
 
-    tr_torrentLock( tor );
-
     assert( tr_isTorrent( tor ) );
+    tr_torrentLock( tor );
 
     /* ensure the trackers' tiers are in ascending order */
     trackers = tr_memdup( trackers_in, sizeof( tr_tracker_info ) * trackerCount );
