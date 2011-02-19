@@ -465,7 +465,7 @@ compareByQueue( GtkTreeModel * model,
     gtk_tree_model_get( model, a, MC_TORRENT_RAW, &ta, -1 );
     gtk_tree_model_get( model, b, MC_TORRENT_RAW, &tb, -1 );
 
-    return -tr_sessionCompareTorrentByQueueRank( ta, tb );
+    return tr_torrentCompareByQueueRank( ta, tb );
 }
 
 static int

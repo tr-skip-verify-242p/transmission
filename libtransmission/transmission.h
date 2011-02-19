@@ -1400,12 +1400,9 @@ int tr_torrentGetQueueRank( const tr_torrent * tor );
 void tr_torrentSetQueueRank( tr_torrent * tor, int rank );
 
 /**
- * @brief comparator for sorting torrents by queue rank
- *
- * Compares first by queue and then by name and hash for torrents that have
- * equal queue rankings.
+ * @brief Comparator for sorting torrents by queue rank.
  */
-int tr_sessionCompareTorrentByQueueRank( const void * va, const void * vb );
+int tr_torrentCompareByQueueRank( const tr_torrent * a, const tr_torrent * b );
 
 typedef enum
 {

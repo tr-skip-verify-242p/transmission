@@ -1826,6 +1826,13 @@ accumulateSelectedTorrentsRaw( GtkTreeModel *      model,
     *data = g_slist_prepend( *data, tor );
 }
 
+static gint
+compareTorrentByQueueRank( gconstpointer va, gconstpointer vb )
+{
+    const tr_torrent * a = va, * b = vb;
+    return tr_torrentCompareByQueueRank( a, b );
+}
+
 static gboolean
 moveTorrentQueue( struct cbdata      * data,
                   tr_queue_direction   dir )
@@ -1835,7 +1842,7 @@ moveTorrentQueue( struct cbdata      * data,
     GSList * l = NULL;
 
     gtk_tree_selection_selected_foreach( s, accumulateSelectedTorrentsRaw, &l );
-    l = g_slist_sort( l, tr_sessionCompareTorrentByQueueRank );
+    l = g_slist_sort( l, compareTorrentByQueueRank );
 
     switch( dir )
     {

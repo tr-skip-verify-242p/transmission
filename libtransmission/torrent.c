@@ -477,6 +477,15 @@ tr_torrentCheckSeedLimit( tr_torrent * tor )
 ****
 ***/
 
+int
+tr_torrentCompareByQueueRank( const tr_torrent * a,
+                              const tr_torrent * b )
+{
+    assert( tr_isTorrent( a ) );
+    assert( tr_isTorrent( b ) );
+    return a->queueRank - b->queueRank;
+}
+
 static void
 torrentSetQueueRank( tr_torrent * tor, int rank )
 {
@@ -920,6 +929,14 @@ setLocalErrorIfFilesDisappeared( tr_torrent * tor )
     return disappeared;
 }
 
+static int
+compareTorrentByQueueRank( const void * va, const void * vb )
+{
+    const tr_torrent * a = *(const tr_torrent**)va;
+    const tr_torrent * b = *(const tr_torrent**)vb;
+    return tr_torrentCompareByQueueRank( a, b );
+}
+
 static void
 torrentInit( tr_torrent * tor, const tr_ctor * ctor )
 {
@@ -1037,13 +1054,13 @@ torrentInit( tr_torrent * tor, const tr_ctor * ctor )
     if( !( loaded & TR_FR_QUEUERANK ) )
     {
         tor->queueRank = tr_ptrArraySize( session->queueList );
-        tr_ptrArrayInsertSorted( session->queueList, tor, tr_sessionCompareTorrentByQueueRank );
+        tr_ptrArrayInsertSorted( session->queueList, tor, compareTorrentByQueueRank );
         if( tr_sessionGetQueueNewTorrentsTop( session ) )
             tr_torrentMoveQueueRankTop( tor );
     }
     else
     {
-        tr_ptrArrayInsertSorted( session->queueList, tor, tr_sessionCompareTorrentByQueueRank );
+        tr_ptrArrayInsertSorted( session->queueList, tor, compareTorrentByQueueRank );
     }
 
     if( isNewTorrent )

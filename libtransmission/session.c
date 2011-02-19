@@ -589,13 +589,7 @@ compareTorrentByQueueRank( const void * va, const void * vb )
 {
     const tr_torrent * a = *(const tr_torrent**)va;
     const tr_torrent * b = *(const tr_torrent**)vb;
-    return a->queueRank - b->queueRank;
-}
-
-int
-tr_sessionCompareTorrentByQueueRank( const void * va, const void * vb )
-{
-    return compareTorrentByQueueRank( &va, &vb );
+    return tr_torrentCompareByQueueRank( a, b );
 }
 
 static tr_ptrArray *
