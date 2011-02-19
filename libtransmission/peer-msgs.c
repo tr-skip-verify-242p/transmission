@@ -2444,7 +2444,7 @@ sendTex( tr_peermsgs * msgs )
 
     bencdata = tr_bencToStr( &d, TR_FMT_BENC, &benclen );
     if( !bencdata || benclen <= 0 )
-        return;
+        goto OUT;
 
     evbuffer_add_uint32( out, 2 + benclen );
     evbuffer_add_uint8 ( out, BT_LTEP );
@@ -2452,6 +2452,8 @@ sendTex( tr_peermsgs * msgs )
     evbuffer_add       ( out, bencdata, benclen );
     pokeBatchPeriod( msgs, HIGH_PRIORITY_INTERVAL_SECS );
 
+OUT:
+    tr_bencFree( &d );
     tr_free( bencdata );
 }
 
