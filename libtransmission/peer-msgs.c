@@ -95,6 +95,10 @@ enum
     /* number of pieces we'll allow in our fast set */
     MAX_FAST_SET_SIZE = 3,
 
+    /* when torrents have incomplete metadata never accept
+     * BITFIELD messages with more pieces than this */
+    MAX_UNKNOWN_PIECE_COUNT = 1 << 20,
+
     /* defined in BEP #9 */
     METADATA_MSG_TYPE_REQUEST = 0,
     METADATA_MSG_TYPE_DATA = 1,
@@ -1299,6 +1303,8 @@ messageLengthIsCorrect( const tr_peermsgs * msg, uint8_t id, uint32_t len )
             return len == 5;
 
         case BT_BITFIELD:
+            if( !tr_torrentHasMetadata( msg->torrent ) )
+                return len <= ( MAX_UNKNOWN_PIECE_COUNT + 7u ) / 8u + 1u;
             return len == ( msg->torrent->info.pieceCount + 7u ) / 8u + 1u;
 
         case BT_REQUEST:
