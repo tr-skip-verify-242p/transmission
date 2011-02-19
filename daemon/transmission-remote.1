@@ -57,6 +57,7 @@ and
 .Op Fl hl
 .Op Fl HL
 .Op Fl u Ar number | Fl U
+.Op Fl utp | no-utp
 .Op Fl v
 .Op Fl V
 .Op Fl w Ar download-dir
@@ -231,7 +232,7 @@ Let the current torrent(s) seed until a specific
 Let the current torrent(s) seed regardless of ratio
 .It Fl srd Fl -seedratio-default
 Let the current torrent(s) use the global seedratio settings
-.It Fl ta Fl -tracker-add Ar tracker
+.It Fl td Fl -tracker-add Ar tracker
 Add a tracker to a torrent
 .It Fl tr Fl -tracker-remove Ar trackerId
 Remove a tracker from a torrent
@@ -267,6 +268,10 @@ KiB/s.
 If current torrent(s) are selected this operates on them. Otherwise, it changes the global setting.
 .It Fl U Fl -no-uplimit
 Disable upload speed limits.
+.It Fl -utp
+Enable uTP for peer connections.
+.It Fl -no-utp
+Disable uTP for peer connections.
 If current torrent(s) are selected this operates on them. Otherwise, it changes the global setting.
 .It Fl v Fl -verify
 Verify the current torrent(s)

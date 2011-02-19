@@ -1,27 +1,27 @@
 /*
-Copyright (c) 2009-2010 by Juliusz Chroboczek
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-
- $Id$
-
-*/
+ * Copyright (c) 2009-2010 by Juliusz Chroboczek
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ *
+ * $Id$
+ *
+ */
 
 /* ansi */
 #include <errno.h>
@@ -230,15 +230,21 @@ dht_bootstrap(void *closure)
         tr_free( bootstrap_file );
     }
 
-    /* We really don't want to abuse our bootstrap nodes.
-       Be glacially slow. */
-    if(!bootstrap_done(cl->session, 0))
-        nap(30);
-
     if(!bootstrap_done(cl->session, 0)) {
-        tr_ninf("DHT", "Attempting bootstrap from dht.transmissionbt.com");
-        bootstrap_from_name( "dht.transmissionbt.com", 6881,
-                             bootstrap_af(session) );
+        for(i = 0; i < 6; i++) {
+            /* We don't want to abuse our bootstrap nodes, so be very
+               slow.  The initial wait is to give other nodes a chance
+               to contact us before we attempt to contact a bootstrap
+               node, for example because we've just been restarted. */
+            nap(40);
+            if(bootstrap_done(cl->session, 0))
+                break;
+            if(i == 0)
+                tr_ninf("DHT",
+                        "Attempting bootstrap from dht.transmissionbt.com");
+            bootstrap_from_name( "dht.transmissionbt.com", 6881,
+                                 bootstrap_af(session) );
+        }
     }
 
     if( cl->nodes )
@@ -586,11 +592,10 @@ tr_dhtCallback(unsigned char *buf, int buflen,
                struct sockaddr *from, socklen_t fromlen,
                void *sv )
 {
-    tr_session *ss = (tr_session*)sv;
     time_t tosleep;
     int rc;
 
-    assert(tr_isSession(ss));
+    assert(tr_isSession(sv));
 
     if(sv != session)
         return;
