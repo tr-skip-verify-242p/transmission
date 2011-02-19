@@ -62,8 +62,6 @@
 #define KEY_IDLELIMIT_MINS         "idle-limit"
 #define KEY_IDLELIMIT_MODE         "idle-mode"
 
-#define KEY_PROGRESS_CHECKTIME "time-checked"
-#define KEY_PROGRESS_MTIMES    "mtimes"
 #define KEY_PROGRESS_BITFIELD  "bitfield"
 #define KEY_PROGRESS_HAVE      "have"
 
@@ -409,80 +407,28 @@ loadIdleLimits( tr_benc *    dict,
 static void
 saveProgress( tr_benc * dict, const tr_torrent * tor )
 {
-    tr_benc * l;
-    tr_benc * prog;
-    tr_file_index_t fi;
-    const struct tr_bitfield * bitfield;
-    const tr_info * inf = tr_torrentInfo( tor );
-    const time_t now = tr_time( );
-
-    prog = tr_bencDictAddDict( dict, KEY_PROGRESS, 3 );
-
-    /* add the file/piece check timestamps... */
-    l = tr_bencDictAddList( prog, KEY_PROGRESS_CHECKTIME, inf->fileCount );
-    for( fi=0; fi<inf->fileCount; ++fi )
-    {
-        const tr_piece * p;
-        const tr_piece * pend;
-        time_t oldest_nonzero = now;
-        time_t newest = 0;
-        tr_bool has_zero = FALSE;
-        const time_t mtime = tr_torrentGetFileMTime( tor, fi );
-        const tr_file * f = &inf->files[fi];
-
-        /* get the oldest and newest nonzero timestamps for pieces in this file */
-        for( p=&inf->pieces[f->firstPiece], pend=&inf->pieces[f->lastPiece]; p!=pend; ++p )
-        {
-            if( !p->timeChecked )
-                has_zero = TRUE;
-            else if( oldest_nonzero > p->timeChecked )
-                oldest_nonzero = p->timeChecked;
-            if( newest < p->timeChecked )
-                newest = p->timeChecked;
-        }
-
-        /* If some of a file's pieces have been checked more recently than
-           the file's mtime, and some lest recently, then that file will
-           have a list containing timestamps for each piece.
-           
-           However, the most common use case is that the file doesn't change
-           after it's downloaded. To reduce overhead in the .resume file,
-           only a single timestamp is saved for the file if *all* or *none*
-           of the pieces were tested more recently than the file's mtime. */
-
-        if( !has_zero && ( mtime <= oldest_nonzero ) ) /* all checked */
-            tr_bencListAddInt( l, oldest_nonzero );
-        else if( newest < mtime ) /* none checked */
-            tr_bencListAddInt( l, newest );
-        else { /* some are checked, some aren't... so list piece by piece */
-            const int offset = oldest_nonzero - 1;
-            tr_benc * ll = tr_bencListAddList( l, 2 + f->lastPiece - f->firstPiece );
-            tr_bencListAddInt( ll, offset );
-            for( p=&inf->pieces[f->firstPiece], pend=&inf->pieces[f->lastPiece]+1; p!=pend; ++p )
-                tr_bencListAddInt( ll, p->timeChecked ? p->timeChecked - offset : 0 );
-        }
-    }
+    tr_benc * p = tr_bencDictAdd( dict, KEY_PROGRESS );
+    tr_bencInitDict( p, 1 );
 
     /* add the progress */
     if( tor->completeness == TR_SEED )
-        tr_bencDictAddStr( prog, KEY_PROGRESS_HAVE, "all" );
-
-    /* add the pieces bitfield */
-    bitfield = tr_cpBlockBitfield( &tor->completion );
-    tr_bencDictAddRaw( prog, KEY_PROGRESS_BITFIELD, bitfield->bits,
-                                                    bitfield->byteCount );
+    {
+        tr_bencDictAddStr( p, KEY_PROGRESS_HAVE, "all" );
+    }
+    else
+    {
+        const tr_bitfield * bitfield;
+        bitfield = tr_cpBlockBitfield( &tor->completion );
+        tr_bencDictAddRaw( p, KEY_PROGRESS_BITFIELD,
+                           bitfield->bits, bitfield->byteCount );
+    }
 }
 
 static uint64_t
 loadProgress( tr_benc * dict, tr_torrent * tor )
 {
-    size_t i, n;
     uint64_t ret = 0;
     tr_benc * prog;
-    const tr_info * inf = tr_torrentInfo( tor );
-
-    for( i=0, n=inf->pieceCount; i<n; ++i )
-        inf->pieces[i].timeChecked = 0;
 
     if( tr_bencDictFindDict( dict, KEY_PROGRESS, &prog ) )
     {
@@ -490,79 +436,6 @@ loadProgress( tr_benc * dict, tr_torrent * tor )
         const char * str;
         const uint8_t * raw;
         size_t rawlen;
-        tr_benc * l;
-
-        if( tr_bencDictFindList( prog, KEY_PROGRESS_CHECKTIME, &l ) )
-        {
-            /* per-piece timestamps were added in 2.20.
-              
-               If some of a file's pieces have been checked more recently than
-               the file's mtime, and some lest recently, then that file will
-               have a list containing timestamps for each piece.
-              
-               However, the most common use case is that the file doesn't change
-               after it's downloaded. To reduce overhead in the .resume file,
-               only a single timestamp is saved for the file if *all* or *none*
-               of the pieces were tested more recently than the file's mtime. */
-
-            tr_file_index_t fi;
-
-            for( fi=0; fi<inf->fileCount; ++fi )
-            {
-                tr_benc * b = tr_bencListChild( l, fi );
-                const tr_file * f = &inf->files[fi];
-                tr_piece * p = &inf->pieces[f->firstPiece];
-                const tr_piece * pend = &inf->pieces[f->lastPiece]+1;
-
-                if( tr_bencIsInt( b ) )
-                {
-                    int64_t t;
-                    tr_bencGetInt( b, &t );
-                    for( ; p!=pend; ++p )
-                        p->timeChecked = (time_t)t;
-                }
-                else if( tr_bencIsList( b ) )
-                {
-                    int i = 0;
-                    int64_t offset = 0;
-                    const int pieces = f->lastPiece + 1 - f->firstPiece;
-
-                    tr_bencGetInt( tr_bencListChild( b, 0 ), &offset );
-
-                    for( i=0; i<pieces; ++i )
-                    {
-                        int64_t t = 0;
-                        tr_bencGetInt( tr_bencListChild( b, i+1 ), &t );
-                        inf->pieces[f->firstPiece+i].timeChecked = (time_t)(t ? t + offset : 0);
-                    }
-                }
-            }
-        }
-        else if( tr_bencDictFindList( prog, KEY_PROGRESS_MTIMES, &l ) )
-        {
-            tr_file_index_t fi;
-
-            /* Before 2.20, we stored the files' mtimes in the .resume file.
-               When loading the .resume file, a torrent's file would be flagged
-               as untested if its stored mtime didn't match its real mtime. */
-
-            for( fi=0; fi<inf->fileCount; ++fi )
-            {
-                int64_t t;
-
-                if( tr_bencGetInt( tr_bencListChild( l, fi ), &t ) )
-                {
-                    const tr_file * f = &inf->files[fi];
-                    tr_piece * p = &inf->pieces[f->firstPiece];
-                    const tr_piece * pend = &inf->pieces[f->lastPiece];
-                    const time_t mtime = tr_torrentGetFileMTime( tor, fi );
-                    const time_t timeChecked = mtime==t ? mtime : 0;
-
-                    for( ; p!=pend; ++p )
-                        p->timeChecked = timeChecked;
-                }
-            }
-        }
 
         err = NULL;
         if( tr_bencDictFindStr( prog, KEY_PROGRESS_HAVE, &str ) )
@@ -583,8 +456,9 @@ loadProgress( tr_benc * dict, tr_torrent * tor )
         }
         else err = "Couldn't find 'have' or 'bitfield'";
 
-        if( err != NULL )
-            tr_tordbg( tor, "Torrent needs to be verified - %s", err );
+        if( err )
+            tr_torrentSetLocalError( tor,
+                _( "Failed loading progress information: %s" ), err );
 
         ret = TR_FR_PROGRESS;
     }

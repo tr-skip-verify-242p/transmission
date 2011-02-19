@@ -1952,11 +1952,6 @@ fillOutputBuffer( tr_peermsgs * msgs, time_t now )
             iovec[0].iov_len = req.length;
             evbuffer_commit_space( out, iovec, 1 );
 
-            /* check the piece if it needs checking... */
-            if( !err && tr_torrentPieceNeedsCheck( msgs->torrent, req.index ) )
-                if(( err = !tr_torrentCheckPiece( msgs->torrent, req.index )))
-                    tr_torrentSetLocalError( msgs->torrent, _( "Please Verify Local Data! Piece #%zu is corrupt." ), (size_t)req.index );
-
             if( err )
             {
                 if( fext )

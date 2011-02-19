@@ -1726,13 +1726,13 @@ typedef struct tr_file
     tr_piece_index_t  firstPiece;  /* We need pieces [firstPiece... */
     tr_piece_index_t  lastPiece;   /* ...lastPiece] to dl this file */
     uint64_t          offset;      /* file begins at the torrent's nth byte */
+    int8_t            exists;      /* file should exist in filesystem */
 }
 tr_file;
 
 /** @brief a part of tr_info that represents a single piece of the torrent's content */
 typedef struct tr_piece
 {
-    time_t   timeChecked;              /* the last time we tested this piece */
     uint8_t  hash[SHA_DIGEST_LENGTH];  /* pieces hash */
     int8_t   priority;                 /* TR_PRI_HIGH, _NORMAL, or _LOW */
     int8_t   dnd;                      /* "do not download" flag */
