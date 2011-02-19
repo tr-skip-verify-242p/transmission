@@ -2440,7 +2440,11 @@ compareTrackerByTier( const void * va, const void * vb )
         return a->tier - b->tier;
 
     /* get the effects of a stable sort by comparing the two elements' addresses */
-    return a - b;
+    if( a < b )
+        return -1;
+    if( a > b )
+        return 1;
+    return 0;
 }
 
 tr_bool
