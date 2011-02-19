@@ -214,8 +214,6 @@ void tr_peerMgrStopTorrent( tr_torrent * tor );
 void tr_peerMgrAddTorrent( tr_peerMgr         * manager,
                            struct tr_torrent  * tor );
 
-void tr_peerMgrGotTorrentMetadata( const tr_torrent * tor );
-
 void tr_peerMgrRemoveTorrent( tr_torrent * tor );
 
 void tr_peerMgrTorrentAvailability( const tr_torrent * tor,
