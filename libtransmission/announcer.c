@@ -30,6 +30,9 @@
 #include "utils.h"
 #include "web.h"
 
+#include "announcer-common.h"
+#include "announcer-udp.h"
+
 #define STARTED "started"
 
 #define dbgmsg( tier, ... ) \
@@ -39,33 +42,6 @@ if( tr_deepLoggingIsActive( ) ) do { \
       ( tier->currentTracker ? tier->currentTracker->hostname : "" ) ); \
   tr_deepLog( __FILE__, __LINE__, name, __VA_ARGS__ ); \
 } while( 0 )
-
-enum
-{
-    /* unless the tracker says otherwise, rescrape this frequently */
-    DEFAULT_SCRAPE_INTERVAL_SEC = ( 60 * 30 ),
-
-    /* unless the tracker says otherwise, this is the announce interval */
-    DEFAULT_ANNOUNCE_INTERVAL_SEC = ( 60 * 10 ),
-
-    /* unless the tracker says otherwise, this is the announce min_interval */
-    DEFAULT_ANNOUNCE_MIN_INTERVAL_SEC = ( 60 * 2 ),
-
-    /* the length of the 'key' argument passed in tracker requests */
-    KEYLEN = 8,
-
-    /* how many web tasks we allow at one time */
-    MAX_CONCURRENT_TASKS = 48,
-
-    /* the value of the 'numwant' argument passed in tracker requests. */
-    NUMWANT = 80,
-
-    UPKEEP_INTERVAL_SECS = 1,
-
-    /* this is an upper limit for the frequency of LDS announces */
-    LPD_HOUSEKEEPING_INTERVAL_SECS = 30
-
-};
 
 /***
 ****
@@ -78,15 +54,51 @@ enum
  */
 struct stop_message
 {
-    char * url;
+    tr_tracker_type type;
+    char * hostname;
+    struct evbuffer * data;
     uint64_t up;
     uint64_t down;
 };
 
+static char *
+createAnnounceURL( const tr_announcer * announcer,
+                   const tr_torrent   * torrent,
+                   const tr_tier      * tier,
+                   const char         * eventName );
+
+static struct stop_message *
+stopNew( tr_announcer * announcer, tr_torrent * tor, tr_tier * tier )
+{
+    struct stop_message * s;
+    tr_tracker_item * tracker = tier->currentTracker;
+
+    s = tr_new0( struct stop_message, 1 );
+    s->type = tracker->type;
+    s->up = tier->byteCounts[TR_ANN_UP];
+    s->down = tier->byteCounts[TR_ANN_DOWN];
+    if( s->type == TR_TRACKER_TYPE_UDP )
+    {
+        s->data = au_create_stop( announcer, tor, tier );
+    }
+    else
+    {
+        char * url;
+        s->data = evbuffer_new( );
+        url = createAnnounceURL( announcer, tor, tier, "stopped" );
+        evbuffer_add_printf( s->data, "%s", url );
+        tr_free( url );
+    }
+    s->hostname = tr_strdup( tracker->hostname );
+    return s;
+}
+
 static void
 stopFree( struct stop_message * stop )
 {
-    tr_free( stop->url );
+    if( stop->data )
+        evbuffer_free( stop->data );
+    tr_free( stop->hostname );
     tr_free( stop );
 }
 
@@ -113,22 +125,24 @@ compareStops( const void * va, const void * vb )
     return compareTransfer( a->up, a->down, b->up, b->down);
 }
 
+static void
+stopSend( struct stop_message * stop, tr_announcer * announcer )
+{
+    if( stop->type == TR_TRACKER_TYPE_UDP )
+    {
+        au_send_stop( announcer, stop->hostname, stop->data );
+        stop->data = NULL;
+    }
+    else
+    {
+        const char * url = (const char *) evbuffer_pullup( stop->data, -1 );
+        tr_webRun( announcer->session, url, NULL, NULL, NULL );
+    }
+}
+
 /***
 ****
 ***/
-
-/**
- * "global" (per-tr_session) fields
- */
-typedef struct tr_announcer
-{
-    tr_ptrArray stops; /* struct stop_message */
-    tr_session * session;
-    struct event * upkeepTimer;
-    int slotsAvailable;
-    time_t lpdHouseKeepingAt;
-}
-tr_announcer;
 
 tr_bool
 tr_announcerHasBacklog( const struct tr_announcer * announcer )
@@ -177,6 +191,7 @@ tr_announcerInit( tr_session * session )
     a = tr_new0( tr_announcer, 1 );
     a->stops = TR_PTR_ARRAY_INIT;
     a->session = session;
+    a->udpctx = au_context_new( session );
     a->slotsAvailable = MAX_CONCURRENT_TASKS;
     a->lpdHouseKeepingAt = lpdAt;
     a->upkeepTimer = evtimer_new( session->event_base, onUpkeepTimer, a );
@@ -199,6 +214,8 @@ tr_announcerClose( tr_session * session )
 
     tr_ptrArrayDestruct( &announcer->stops, NULL );
 
+    au_context_free( announcer->udpctx );
+
     session->announcer = NULL;
     tr_free( announcer );
 }
@@ -206,32 +223,6 @@ tr_announcerClose( tr_session * session )
 /***
 ****
 ***/
-
-/* a row in tr_tier's list of trackers */
-typedef struct
-{
-    char * hostname;
-    char * announce;
-    char * scrape;
-
-    char * tracker_id;
-
-    int seederCount;
-    int leecherCount;
-    int downloadCount;
-    int downloaderCount;
-
-    int consecutiveAnnounceFailures;
-
-    uint32_t id;
-
-    /* Sent as the "key" argument in tracker requests
-     * to verify us if our IP address changes.
-     * This is immutable for the life of the tracker object.
-     * The +1 is for '\0' */
-    unsigned char key_param[KEYLEN + 1];
-}
-tr_tracker_item;
 
 static void
 generateKeyParam( unsigned char * msg, size_t msglen )
@@ -246,12 +237,21 @@ generateKeyParam( unsigned char * msg, size_t msglen )
     msg[msglen] = '\0';
 }
 
+static tr_tracker_type
+getTrackerType( const char * announce_url )
+{
+    if( !strncmp( announce_url, "udp://", 6 ) )
+        return TR_TRACKER_TYPE_UDP;
+    return TR_TRACKER_TYPE_WEB;
+}
+
 static tr_tracker_item*
 trackerNew( const char  * announce,
             const char  * scrape,
             uint32_t      id )
 {
     tr_tracker_item * tracker = tr_new0( tr_tracker_item, 1  );
+    tracker->type = getTrackerType( announce );
     tracker->hostname = getHostName( announce );
     tracker->announce = tr_strdup( announce );
     tracker->scrape = tr_strdup( scrape );
@@ -278,55 +278,6 @@ trackerFree( void * vtracker )
 /***
 ****
 ***/
-
-struct tr_torrent_tiers;
-
-/** @brief A group of trackers in a single tier, as per the multitracker spec */
-typedef struct
-{
-    /* number of up/down/corrupt bytes since the last time we sent an
-     * "event=stopped" message that was acknowledged by the tracker */
-    uint64_t byteCounts[3];
-
-    tr_ptrArray trackers; /* tr_tracker_item */
-    tr_tracker_item * currentTracker;
-    int currentTrackerIndex;
-
-    tr_torrent * tor;
-
-    time_t scrapeAt;
-    time_t lastScrapeStartTime;
-    time_t lastScrapeTime;
-    tr_bool lastScrapeSucceeded;
-    tr_bool lastScrapeTimedOut;
-
-    time_t announceAt;
-    time_t manualAnnounceAllowedAt;
-    time_t lastAnnounceStartTime;
-    time_t lastAnnounceTime;
-    tr_bool lastAnnounceSucceeded;
-    tr_bool lastAnnounceTimedOut;
-
-    tr_ptrArray announceEvents; /* const char* */
-
-    /* unique lookup key */
-    int key;
-
-    int scrapeIntervalSec;
-    int announceIntervalSec;
-    int announceMinIntervalSec;
-
-    int lastAnnouncePeerCount;
-
-    tr_bool isRunning;
-    tr_bool isAnnouncing;
-    tr_bool isScraping;
-    tr_bool wasCopied;
-
-    char lastAnnounceStr[128];
-    char lastScrapeStr[128];
-}
-tr_tier;
 
 static tr_tier *
 tierNew( tr_torrent * tor )
@@ -458,7 +409,7 @@ getTier( tr_announcer * announcer, int torrentId, int tierId )
 
 static const tr_tracker_event emptyEvent = { 0, NULL, NULL, NULL, 0, 0 };
 
-static void
+void
 publishMessage( tr_tier * tier, const char * msg, int type )
 {
     if( tier && tier->tor && tier->tor->tiers )
@@ -474,7 +425,7 @@ publishMessage( tr_tier * tier, const char * msg, int type )
     }
 }
 
-static void
+void
 publishErrorClear( tr_tier * tier )
 {
     publishMessage( tier, NULL, TR_TRACKER_ERROR_CLEAR );
@@ -513,7 +464,7 @@ publishPeersPex( tr_tier * tier, int seeds, int leechers,
         tier->tor->tiers->callback( tier->tor, &e, NULL );
 }
 
-static size_t
+size_t
 publishPeersCompact( tr_tier * tier, int seeds, int leechers,
                         const void * compact, int compactLen )
 {
@@ -862,10 +813,7 @@ tr_announcerRemoveTorrent( tr_announcer * announcer, tr_torrent * tor )
 
             if( tier->isRunning )
             {
-                struct stop_message * s = tr_new0( struct stop_message, 1 );
-                s->up = tier->byteCounts[TR_ANN_UP];
-                s->down = tier->byteCounts[TR_ANN_DOWN];
-                s->url = createAnnounceURL( announcer, tor, tier, "stopped" );
+                struct stop_message * s = stopNew( announcer, tor, tier );
                 tr_ptrArrayInsertSorted( &announcer->stops, s, compareStops );
             }
         }
@@ -888,7 +836,12 @@ parseAnnounceResponse( tr_tier     * tier,
     tr_benc benc;
     tr_bool success = FALSE;
     int scrapeFields = 0;
-    const int bencLoaded = !tr_bencLoad( response, responseLen, &benc, NULL );
+    tr_bool bencLoaded;
+
+    if( tier->currentTracker->type == TR_TRACKER_TYPE_UDP )
+        return au_parse_announce( tier, response, responseLen, gotScrape );
+
+    bencLoaded = !tr_bencLoad( response, responseLen, &benc, NULL );
 
     if( getenv( "TR_CURL_VERBOSE" ) != NULL )
     {
@@ -1225,10 +1178,10 @@ tierAnnounce( tr_announcer * announcer, tr_tier * tier )
 
     if( announceEvent != NULL )
     {
-        char * url;
         struct announce_data * data;
         const tr_torrent * tor = tier->tor;
         const time_t now = tr_time( );
+        const tr_tracker_item * tracker = tier->currentTracker;
 
         data = tr_new0( struct announce_data, 1 );
         data->torrentId = tr_torrentId( tor );
@@ -1236,14 +1189,22 @@ tierAnnounce( tr_announcer * announcer, tr_tier * tier )
         data->isRunningOnSuccess = tor->isRunning;
         data->timeSent = now;
         data->event = announceEvent;
-        url = createAnnounceURL( announcer, tor, tier, data->event );
 
         tier->isAnnouncing = TRUE;
         tier->lastAnnounceStartTime = now;
         --announcer->slotsAvailable;
-        tr_webRun( announcer->session, url, NULL, onAnnounceDone, data );
 
-        tr_free( url );
+        if( tracker->type == TR_TRACKER_TYPE_UDP )
+        {
+            au_send_announce( announcer, tor, tier, data->event,
+                              onAnnounceDone, data );
+        }
+        else
+        {
+            char * url = createAnnounceURL( announcer, tor, tier, data->event );
+            tr_webRun( announcer->session, url, NULL, onAnnounceDone, data );
+            tr_free( url );
+        }
     }
 }
 
@@ -1260,7 +1221,12 @@ parseScrapeResponse( tr_tier     * tier,
 {
     tr_bool success = FALSE;
     tr_benc benc, *files;
-    const int bencLoaded = !tr_bencLoad( response, responseLen, &benc, NULL );
+    tr_bool bencLoaded;
+
+    if( tier->currentTracker->type == TR_TRACKER_TYPE_UDP )
+        return au_parse_scrape( tier, response, responseLen, result, resultlen );
+
+    bencLoaded = !tr_bencLoad( response, responseLen, &benc, NULL );
     if( bencLoaded && tr_bencDictFindDict( &benc, "files", &files ) )
     {
         const char * key;
@@ -1391,9 +1357,8 @@ onScrapeDone( tr_session   * session,
 static void
 tierScrape( tr_announcer * announcer, tr_tier * tier )
 {
-    char * url;
-    const char * scrape;
     struct announce_data * data;
+    const tr_tracker_item * tracker;
 
     assert( tier );
     assert( !tier->isScraping );
@@ -1404,20 +1369,29 @@ tierScrape( tr_announcer * announcer, tr_tier * tier )
     data->torrentId = tr_torrentId( tier->tor );
     data->tierId = tier->key;
 
-    scrape = tier->currentTracker->scrape;
-
-    url = tr_strdup_printf( "%s%cinfo_hash=%s",
-                            scrape,
-                            strchr( scrape, '?' ) ? '&' : '?',
-                            tier->tor->info.hashEscaped );
 
     tier->isScraping = TRUE;
     tier->lastScrapeStartTime = tr_time( );
     --announcer->slotsAvailable;
-    dbgmsg( tier, "scraping \"%s\"", url );
-    tr_webRun( announcer->session, url, NULL, onScrapeDone, data );
 
-    tr_free( url );
+    tracker = tier->currentTracker;
+    if( tracker->type == TR_TRACKER_TYPE_UDP )
+    {
+        au_send_scrape( announcer, tier->tor, tier, onScrapeDone, data );
+    }
+    else
+    {
+        const char * scrape = tracker->scrape;
+        char * url;
+
+        url = tr_strdup_printf( "%s%cinfo_hash=%s",
+                                scrape,
+                                strchr( scrape, '?' ) ? '&' : '?',
+                                tier->tor->info.hashEscaped );
+        dbgmsg( tier, "scraping \"%s\"", url );
+        tr_webRun( announcer->session, url, NULL, onScrapeDone, data );
+        tr_free( url );
+    }
 }
 
 static void
@@ -1429,7 +1403,7 @@ flushCloseMessages( tr_announcer * announcer )
     for( i=0; i<n; ++i )
     {
         struct stop_message * stop = tr_ptrArrayNth( &announcer->stops, i );
-        tr_webRun( announcer->session, stop->url, NULL, NULL, NULL );
+        stopSend( stop, announcer );
         stopFree( stop );
     }
 
@@ -1584,6 +1558,8 @@ onUpkeepTimer( int foo UNUSED, short bar UNUSED, void * vannouncer )
 
     /* maybe send out some announcements to trackers */
     announceMore( announcer );
+
+    au_context_periodic( announcer->udpctx );
 
     /* set up the next timer */
     tr_timerAdd( announcer->upkeepTimer, UPKEEP_INTERVAL_SECS, 0 );
