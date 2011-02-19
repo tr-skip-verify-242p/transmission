@@ -1739,6 +1739,7 @@ tierCopyAttributes( tr_tier * t, const tr_tier * o )
     bak = *t;
     *t = *o;
     t->tor = bak.tor;
+    t->key = bak.key;
     t->trackers = bak.trackers;
     t->announceEvents = bak.announceEvents;
     t->currentTracker = bak.currentTracker;
