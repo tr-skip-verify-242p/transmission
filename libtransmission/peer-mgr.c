@@ -2045,8 +2045,6 @@ tr_peerMgrAddIncoming( tr_peerMgr        * manager,
 
     if( tr_sessionIsAddressBlocked( session, &endpoint->addr ) )
     {
-        tr_dbg( "Banned IP address \"%s\" tried to connect to us", tr_ntop_non_ts( addr ) );
-        tr_netClose( session, socket );
         tr_dbg( "Banned IP address \"%s\" tried to connect to us",
                 tr_peerIoEndpointStr( endpoint ) );
         if(socket >= 0)
