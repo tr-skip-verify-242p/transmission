@@ -297,7 +297,7 @@ netOpenPeerSocket( tr_session        * session,
     assert( tr_isAddress( addr ) );
 
     if( ( isPeerProxy && !tr_isValidPeerProxyAddress( addr, port ) )
-      || ( !isPeerProxy && !tr_isValidPeerAddress( addr, port ) ) )
+        || ( !isPeerProxy && !tr_isValidPeerAddress( addr, port ) ) )
         return -EINVAL;
 
     s = tr_fdSocketCreate( session, domains[addr->type], SOCK_STREAM );
@@ -730,6 +730,5 @@ tr_isValidPeerAddress( const tr_address * addr, tr_port port )
 tr_bool
 tr_isValidPeerProxyAddress( const tr_address * addr, tr_port port )
 {
-    return ( port != 0 )
-        && ( tr_isAddress( addr ) );
+    return port != 0 && tr_isAddress( addr );
 }
