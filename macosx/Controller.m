@@ -319,6 +319,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         tr_bencDictAddInt(&settings, TR_PREFS_KEY_MSGLEVEL, TR_MSG_DBG);
         tr_bencDictAddInt(&settings, TR_PREFS_KEY_PEER_LIMIT_GLOBAL, [fDefaults integerForKey: @"PeersTotal"]);
         tr_bencDictAddInt(&settings, TR_PREFS_KEY_PEER_LIMIT_TORRENT, [fDefaults integerForKey: @"PeersTorrent"]);
+        tr_bencDictAddBool(&settings, TR_PREFS_KEY_UTP_ENABLED, [fDefaults boolForKey: @"UTPGlobal"]);
         
         const BOOL randomPort = [fDefaults boolForKey: @"RandomPort"];
         tr_bencDictAddBool(&settings, TR_PREFS_KEY_PEER_PORT_RANDOM_ON_START, randomPort);
@@ -1329,10 +1330,10 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 - (void) removeTorrents: (NSArray *) torrents deleteData: (BOOL) deleteData
 {
     [torrents retain];
-    NSInteger active = 0, downloading = 0;
 
     if ([fDefaults boolForKey: @"CheckRemove"])
     {
+        NSInteger active = 0, downloading = 0;
         for (Torrent * torrent in torrents)
             if ([torrent isActive])
             {
@@ -1412,6 +1413,9 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 
 - (void) confirmRemoveTorrents: (NSArray *) torrents deleteData: (BOOL) deleteData
 {
+    NSMutableArray * selectedValues = [NSMutableArray arrayWithArray: [fTableView selectedValues]];
+    [selectedValues removeObjectsInArray: torrents];
+    
     //don't want any of these starting then stopping
     for (Torrent * torrent in torrents)
         [torrent setWaitToStart: NO];
@@ -1438,9 +1442,10 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         [torrent closeRemoveTorrent: deleteData];
     }
     
+    #warning why do we need them retained?
     [torrents release];
     
-    [fTableView deselectAll: nil];
+    [fTableView selectValues: selectedValues];
     
     [self updateTorrentsInQueue];
 }
@@ -1453,6 +1458,17 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 - (void) removeDeleteData: (id) sender
 {
     [self removeTorrents: [fTableView selectedTorrents] deleteData: YES];
+}
+
+- (void) clearCompleted: (id) sender
+{
+    NSMutableArray * torrents = [[NSMutableArray alloc] init];
+    
+    for (Torrent * torrent in fTorrents)
+        if ([torrent isFinishedSeeding])
+            [torrents addObject: torrent];
+    
+    [self confirmRemoveTorrents: torrents deleteData: NO];
 }
 
 - (void) moveDataFilesSelected: (id) sender
@@ -3906,6 +3922,15 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         }
         
         return canUseTable && [fTableView numberOfSelectedRows] > 0;
+    }
+    
+    //clear completed transfers item
+    if (action == @selector(clearCompleted:))
+    {
+        for (Torrent * torrent in fTorrents)
+            if ([torrent isFinishedSeeding])
+                return YES;
+        return NO;
     }
 
     //enable pause all item
