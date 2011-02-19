@@ -192,6 +192,7 @@ static void au_state_error( au_state * s,
 
 static void au_state_send( au_state * s, au_transaction * t );
 static tr_bool au_state_connect( au_state * s );
+static tr_bool au_state_is_connected( const au_state * s );
 static tr_session * au_state_get_session( const au_state * s );
 static const char * au_state_get_endpoint( const au_state * s );
 
@@ -369,6 +370,7 @@ au_transaction_notify( au_transaction * t, const void * data, size_t len )
 {
     tr_session * session;
     int code;
+    tr_bool toflag, conflag;
 
     if( !t->callback )
         return;
@@ -381,7 +383,9 @@ au_transaction_notify( au_transaction * t, const void * data, size_t len )
         code = HTTP_OK;
 
     session = au_state_get_session( t->state );
-    t->callback( session, code, data, len, t->cbdata );
+    conflag = au_state_is_connected( t->state );
+    toflag = code == 0;
+    t->callback( session, toflag, conflag, code, data, len, t->cbdata );
     t->callback = NULL;
     t->cbdata = NULL;
 }
