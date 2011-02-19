@@ -989,6 +989,8 @@ struct announce_data
 
 static void
 onAnnounceDone( tr_session   * session,
+                tr_bool        didConnect,
+                tr_bool        didTimeout,
                 long           responseCode,
                 const void   * response,
                 size_t         responseLen,
@@ -1005,7 +1007,7 @@ onAnnounceDone( tr_session   * session,
         tr_tracker_item * tracker;
 
         tier->lastAnnounceTime = now;
-        tier->lastAnnounceTimedOut = responseCode == 0;
+        tier->lastAnnounceTimedOut = didTimeout;
         tier->lastAnnounceSucceeded = FALSE;
         tier->isAnnouncing = FALSE;
         tier->manualAnnounceAllowedAt = now + tier->announceMinIntervalSec;
@@ -1058,9 +1060,11 @@ onAnnounceDone( tr_session   * session,
         {
             int interval;
 
-            if( !responseCode )
-                tr_strlcpy( tier->lastAnnounceStr,
-                            _( "Tracker did not respond" ),
+            if( !didConnect )
+                tr_strlcpy( tier->lastAnnounceStr, _( "Could not connect to tracker" ),
+                            sizeof( tier->lastAnnounceStr ) );
+            else if( !responseCode )
+                tr_strlcpy( tier->lastAnnounceStr, _( "Tracker did not respond" ),
                             sizeof( tier->lastAnnounceStr ) );
             else {
                 /* %1$ld - http status code, such as 404
@@ -1274,6 +1278,8 @@ parseScrapeResponse( tr_tier     * tier,
 
 static void
 onScrapeDone( tr_session   * session,
+              tr_bool        didConnect,
+              tr_bool        didTimeout,
               long           responseCode,
               const void   * response,
               size_t         responseLen,
@@ -1329,7 +1335,10 @@ onScrapeDone( tr_session   * session,
 
             /* %1$ld - http status code, such as 404
              * %2$s - human-readable explanation of the http status code */
-            if( !responseCode )
+            if( !didConnect )
+                tr_strlcpy( tier->lastScrapeStr, _( "Could not connect to tracker" ),
+                            sizeof( tier->lastScrapeStr ) );
+            else if( !responseCode )
                 tr_strlcpy( tier->lastScrapeStr, _( "tracker did not respond" ),
                             sizeof( tier->lastScrapeStr ) );
             else
@@ -1339,7 +1348,7 @@ onScrapeDone( tr_session   * session,
         }
 
         tier->lastScrapeSucceeded = success;
-        tier->lastScrapeTimedOut = responseCode == 0;
+        tier->lastScrapeTimedOut = didTimeout;
     }
 
     tr_free( data );
