@@ -1071,6 +1071,9 @@ struct url_dialog_data
     TrCore * core;
     tr_ctor * ctor;
     char * url;
+
+    tr_bool did_connect;
+    tr_bool did_timeout;
     long response_code;
 };
 
@@ -1104,6 +1107,8 @@ onURLDoneIdle( gpointer vdata )
 
 static void
 onURLDone( tr_session   * session,
+           tr_bool        did_connect, 
+           tr_bool        did_timeout,
            long           response_code,
            const void   * response,
            size_t         response_byte_count,
@@ -1111,6 +1116,8 @@ onURLDone( tr_session   * session,
 {
     struct url_dialog_data * data = vdata;
 
+    data->did_connect = did_connect;
+    data->did_timeout = did_timeout;
     data->response_code = response_code;
     data->ctor = tr_ctorNew( session );
     tr_core_apply_defaults( data->ctor );
