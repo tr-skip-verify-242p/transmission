@@ -115,6 +115,12 @@ int  tr_netOpenPeerProxySocket( tr_session       * session,
                                 tr_port            proxy_port,
                                 tr_bool            clientIsSeed );
 
+struct UTPSocket *
+tr_netOpenPeerUTPSocket( tr_session        * session,
+                         const tr_address  * addr,
+                         tr_port             port,
+                         tr_bool             clientIsSeed);
+
 int  tr_netBindTCP( const tr_address * addr,
                     tr_port            port,
                     tr_bool            suppressMsgs );

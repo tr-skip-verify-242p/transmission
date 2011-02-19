@@ -46,6 +46,7 @@
 #include <unistd.h>
 
 #include <event2/util.h>
+#include <libutp/utp.h>
 
 #include "transmission.h"
 #include "fdlimit.h"
@@ -54,6 +55,7 @@
 #include "peer-io.h"
 #include "platform.h"
 #include "session.h"
+#include "tr-utp.h"
 #include "utils.h"
 
 #ifndef IN_MULTICAST
@@ -393,7 +395,7 @@ netOpenPeerSocket( tr_session        * session,
     assert( tr_isAddress( addr ) );
 
     if( ( isPeerProxy && !tr_isValidPeerProxyAddress( addr, port ) )
-      || ( !isPeerProxy && !tr_isValidPeerAddress( addr, port ) ) )
+        || ( !isPeerProxy && !tr_isValidPeerAddress( addr, port ) ) )
         return -EINVAL;
 
     s = tr_fdSocketCreate( session, domains[addr->type], SOCK_STREAM );
@@ -472,6 +474,20 @@ tr_netOpenPeerSocket( tr_session        * session,
                       tr_bool             clientIsSeed )
 {
     return netOpenPeerSocket( session, addr, port, clientIsSeed, FALSE );
+}
+
+struct UTPSocket *
+tr_netOpenPeerUTPSocket( tr_session        * session,
+                         const tr_address  * addr,
+                         tr_port             port,
+                         tr_bool             clientIsSeed UNUSED )
+{
+    struct sockaddr_storage ss;
+    socklen_t sslen;
+    sslen = setup_sockaddr( addr, port, &ss );
+
+    return UTP_Create( tr_utpSendTo, (void*)session,
+                       (struct sockaddr*)&ss, sslen );
 }
 
 static int
@@ -819,8 +835,7 @@ tr_isValidPeerAddress( const tr_address * addr, tr_port port )
 tr_bool
 tr_isValidPeerProxyAddress( const tr_address * addr, tr_port port )
 {
-    return ( port != 0 )
-        && ( tr_isAddress( addr ) );
+    return port != 0 && tr_isAddress( addr );
 }
 
 tr_bool

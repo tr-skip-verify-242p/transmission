@@ -106,6 +106,7 @@ transmission_gtk_LDADD = \
     @LIBCANBERRA_LIBS@ \
     @GCONF2_LIBS@ \
     @DHT_LIBS@ \
+    @LIBUTP_LIBS@ \
     @GTK_LIBS@ \
     @GIO_LIBS@ \
     @LIBAPPINDICATOR_LIBS@ \
