@@ -943,7 +943,7 @@ parseLtepHandshake( tr_peermsgs *     msgs,
             /* Mysterious µTorrent extension that we don't grok.  However,
                it implies support for µTP, so use it to indicate that. */
             tr_peerMgrSetUtpFailed( msgs->torrent,
-                                    tr_peerIoGetAddress( msgs->peer->io, NULL ),
+                                    tr_peerIoGetEndpoint( msgs->peer->io ),
                                     FALSE );
         }
     }
@@ -2386,9 +2386,9 @@ tr_peerMsgsNew( struct tr_torrent    * torrent,
     tr_timerAdd( m->pexTimer, PEX_INTERVAL_SECS, 0 );
 
     if( tr_peerIoSupportsUTP( peer->io ) ) {
-        const tr_address * addr = tr_peerIoGetAddress( peer->io, NULL );
-        tr_peerMgrSetUtpSupported( torrent, addr );
-        tr_peerMgrSetUtpFailed( torrent, addr, FALSE );
+        const tr_endpoint * endpoint = tr_peerIoGetEndpoint( peer->io );
+        tr_peerMgrSetUtpSupported( torrent, endpoint );
+        tr_peerMgrSetUtpFailed( torrent, endpoint, FALSE );
     }
 
     if( tr_peerIoSupportsLTEP( peer->io ) )

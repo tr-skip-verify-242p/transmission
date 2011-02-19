@@ -677,18 +677,18 @@ tr_peerMgrPeerIsSeed( const tr_torrent  * tor,
 }
 
 void
-tr_peerMgrSetUtpSupported( tr_torrent * tor, const tr_address * addr )
+tr_peerMgrSetUtpSupported( tr_torrent * tor, const tr_endpoint * endpoint )
 {
-    struct peer_atom * atom = getExistingAtom( tor->torrentPeers, addr );
+    struct peer_atom * atom = getExistingAtom( tor->torrentPeers, endpoint );
 
     if( atom )
         atom->flags |= ADDED_F_UTP_FLAGS;
 }
 
 void
-tr_peerMgrSetUtpFailed( tr_torrent *tor, const tr_address *addr, tr_bool failed )
+tr_peerMgrSetUtpFailed( tr_torrent *tor, const tr_endpoint * endpoint, tr_bool failed )
 {
-    struct peer_atom * atom = getExistingAtom( tor->torrentPeers, addr );
+    struct peer_atom * atom = getExistingAtom( tor->torrentPeers, endpoint );
 
     if( atom )
         atom->utp_failed = failed;

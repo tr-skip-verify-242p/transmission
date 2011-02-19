@@ -633,7 +633,7 @@ tr_peerIoNewOutgoing( tr_session        * session,
     assert( torrentHash );
 
     if( utp )
-        utp_socket = tr_netOpenPeerUTPSocket( session, addr, port, isSeed );
+        utp_socket = tr_netOpenPeerUTPSocket( session, &endpoint->addr, endpoint->port, isSeed );
 
     if( !utp_socket ) {
         fd = tr_netOpenPeerSocket( session, endpoint, isSeed );
