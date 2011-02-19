@@ -1140,10 +1140,10 @@ gotError( tr_peerIo  * io,
             NULL;
         /* Don't mark a peer as non-uTP unless it's really a connect failure. */
         if( tor && ( errcode == ETIMEDOUT || errcode == ECONNREFUSED ) ) {
+            const tr_endpoint * endpoint;
             tr_torrentLock( tor );
-            tr_peerMgrSetUtpFailed( tor,
-                                    tr_peerIoGetAddress( io, NULL ),
-                                    TRUE );
+            endpoint = tr_peerIoGetEndpoint( io );
+            tr_peerMgrSetUtpFailed( tor, &endpoint->addr, TRUE );
             tr_torrentUnlock( tor );
         }
 
