@@ -130,7 +130,7 @@ void tr_announcerGetVerifiedTrackers( const tr_torrent   * torrent,
  * @note Only the @a tr_tracker_info.announce field is used,
  *       and it is assumed to be a NULL-terminated string.
  *
- * @see parseUtTex
+ * @see parseLtTex
  */
 void tr_announcerAddTex( tr_torrent            * tor,
                          const tr_tracker_info * trackers,

@@ -1175,7 +1175,7 @@ parseUtPex( tr_peermsgs * msgs, int msglen, struct evbuffer * inbuf )
 }
 
 static void
-parseUtTex( tr_peermsgs * msgs, int msglen, struct evbuffer * inbuf )
+parseLtTex( tr_peermsgs * msgs, int msglen, struct evbuffer * inbuf )
 {
     tr_bool loaded = FALSE;
     uint8_t * tmp = tr_new( uint8_t, msglen );
@@ -1257,7 +1257,7 @@ parseLtep( tr_peermsgs * msgs, int msglen, struct evbuffer  * inbuf )
     {
         dbgmsg( msgs, "got lt tex" );
         msgs->peerSupportsTex = 1;
-        parseUtTex( msgs, msglen, inbuf );
+        parseLtTex( msgs, msglen, inbuf );
     }
     else
     {
