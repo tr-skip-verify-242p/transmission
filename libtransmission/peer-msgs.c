@@ -2466,7 +2466,7 @@ sendTex( tr_peermsgs * msgs )
     const uint8_t * hash;
     tr_ptrArray trackers = TR_PTR_ARRAY_INIT;
     tr_benc d, * list;
-    char * bencdata;
+    char * bencdata = NULL;
     int i, n, benclen;
 
     if( !msgs->peerSupportsTex || !tr_torrentAllowsTex( tor )
