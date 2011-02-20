@@ -75,6 +75,7 @@ void tr_announcerClose( tr_session * );
 struct tr_torrent_tiers * tr_announcerAddTorrent( tr_torrent          * torrent,
                                                   tr_tracker_callback * cb,
                                                   void                * cbdata );
+
 tr_bool tr_announcerHasBacklog( const struct tr_announcer * );
 
 void tr_announcerResetTorrent( struct tr_announcer*, tr_torrent* );
