@@ -69,7 +69,7 @@ enum
     LTEP_HANDSHAKE          = 0,
 
     UT_PEX_ID               = 1,
-    UT_TEX_ID               = 2,
+    LT_TEX_ID               = 2,
     UT_METADATA_ID          = 3,
 
     MAX_PEX_PEER_COUNT      = 50,
@@ -192,7 +192,7 @@ struct tr_peermsgs
 
     uint8_t         state;
     uint8_t         ut_pex_id;
-    uint8_t         ut_tex_id;
+    uint8_t         lt_tex_id;
     uint8_t         ut_metadata_id;
     uint16_t        pexCount;
     uint16_t        pexCount6;
@@ -896,7 +896,7 @@ sendLtepHandshake( tr_peermsgs * msgs )
         const uint8_t * hash = tr_torrentGetTexHash( msgs->torrent );
         if( hash )
         {
-            tr_bencDictAddInt( m, "ut_tex", UT_TEX_ID );
+            tr_bencDictAddInt( m, "lt_tex", LT_TEX_ID );
             tr_bencDictAddStr( &val, "tr", (const char *) hash );
         }
     }
@@ -968,15 +968,13 @@ parseLtepHandshake( tr_peermsgs *     msgs,
             dbgmsg( msgs, "msgs->ut_metadata_id is %d", (int)msgs->ut_metadata_id );
         }
         /* Tracker Exchange extension (BEP 28) */
-        if( tr_bencDictFindInt( sub, "ut_tex", &i ) )
+        if( tr_bencDictFindInt( sub, "lt_tex", &i ) )
         {
             const uint8_t * hash;
             size_t hashlen;
-
-            msgs->ut_tex_id = (uint8_t) i;
-            msgs->peerSupportsTex = msgs->ut_tex_id == 0 ? 0 : 1;
-            dbgmsg( msgs, "msgs->ut_tex is %d", (int) msgs->ut_tex_id );
-
+            msgs->peerSupportsTex = i != 0;
+            msgs->lt_tex_id = (uint8_t) i;
+            dbgmsg( msgs, "msgs->lt_tex is %d", (int) msgs->lt_tex_id );
             if( tr_bencDictFindRaw( &val, "tr", &hash, &hashlen ) )
             {
                 assert( hashlen == SHA_DIGEST_LENGTH );
@@ -1255,9 +1253,9 @@ parseLtep( tr_peermsgs * msgs, int msglen, struct evbuffer  * inbuf )
         msgs->peerSupportsMetadataXfer = 1;
         parseUtMetadata( msgs, msglen, inbuf );
     }
-    else if( ltep_msgid == UT_TEX_ID )
+    else if( ltep_msgid == LT_TEX_ID )
     {
-        dbgmsg( msgs, "got ut tex" );
+        dbgmsg( msgs, "got lt tex" );
         msgs->peerSupportsTex = 1;
         parseUtTex( msgs, msglen, inbuf );
     }
@@ -2492,7 +2490,7 @@ sendTex( tr_peermsgs * msgs )
 
     evbuffer_add_uint32( out, 2 + benclen );
     evbuffer_add_uint8 ( out, BT_LTEP );
-    evbuffer_add_uint8 ( out, msgs->ut_tex_id );
+    evbuffer_add_uint8 ( out, msgs->lt_tex_id );
     evbuffer_add       ( out, bencdata, benclen );
     pokeBatchPeriod( msgs, HIGH_PRIORITY_INTERVAL_SECS );
 
@@ -2518,7 +2516,7 @@ tr_peerMsgsSendTexAdded( tr_peermsgs * msgs,
 
     evbuffer_add_uint32( out, 2 + benclen );
     evbuffer_add_uint8 ( out, BT_LTEP );
-    evbuffer_add_uint8 ( out, msgs->ut_tex_id );
+    evbuffer_add_uint8 ( out, msgs->lt_tex_id );
     evbuffer_add       ( out, bencdata, benclen );
     pokeBatchPeriod( msgs, HIGH_PRIORITY_INTERVAL_SECS );
 
