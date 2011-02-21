@@ -11,6 +11,7 @@
  */
 
 #include <assert.h>
+#include <ctype.h>
 #include <errno.h> /* error codes ERANGE, ... */
 #include <limits.h> /* INT_MAX */
 #include <string.h> /* memcpy, memcmp, strstr */
@@ -388,6 +389,8 @@ peerConstructor( struct peer_atom * atom )
 
     peer->atom = atom;
     atom->peer = peer;
+    peer->extensions = tr_new0( tr_ptrArray, 1 );
+    *peer->extensions = TR_PTR_ARRAY_INIT;
 
     peer->blocksSentToClient  = tr_historyNew( CANCEL_HISTORY_SEC, ( RECHOKE_PERIOD_MSEC / 1000 ) );
     peer->blocksSentToPeer    = tr_historyNew( CANCEL_HISTORY_SEC, ( RECHOKE_PERIOD_MSEC / 1000 ) );
@@ -415,6 +418,17 @@ getPeer( Torrent * torrent, struct peer_atom * atom )
     return peer;
 }
 
+static void
+peerExtensionPtrFree( void * ve )
+{
+    tr_peer_extension * e = ve;
+    if( !e )
+        return;
+    tr_free( e->name );
+    memset( e, 0, sizeof( *e ) );
+    tr_free( e );
+}
+
 static void peerDeclinedAllRequests( Torrent *, const tr_peer * );
 
 static void
@@ -438,6 +452,11 @@ peerDestructor( Torrent * t, tr_peer * peer )
     tr_bitsetDestructor( &peer->have );
     tr_bitfieldFree( peer->blame );
     tr_free( peer->client );
+    tr_free( peer->peer_id_string );
+    tr_free( peer->user_agent );
+    tr_ptrArrayDestruct( peer->extensions, peerExtensionPtrFree );
+    tr_free( peer->extensions );
+    tr_free( peer->extension_string );
     peer->atom->peer = NULL;
 
     tr_free( peer );
@@ -1902,6 +1921,22 @@ getPeerCount( const Torrent * t )
     return tr_ptrArraySize( &t->peers );/* + tr_ptrArraySize( &t->outgoingHandshakes ); */
 }
 
+static char *
+makePeerIdString( const uint8_t * peer_id )
+{
+    struct evbuffer * buf;
+    int i;
+    buf = evbuffer_new( );
+    for( i = 0; i < 20; ++i )
+    {
+        if( isgraph( peer_id[i] ) )
+            evbuffer_add( buf, &peer_id[i], 1 );
+        else
+            evbuffer_add_printf( buf, "\\x%02x", peer_id[i] );
+    }
+    return evbuffer_free_to_str( buf );
+}
+
 /* FIXME: this is kind of a mess. */
 static tr_bool
 myHandshakeDoneCB( tr_handshake  * handshake,
@@ -2009,6 +2044,8 @@ myHandshakeDoneCB( tr_handshake  * handshake,
                     char client[128];
                     tr_clientForId( client, sizeof( client ), peer_id );
                     peer->client = tr_strdup( client );
+                    tr_free( peer->peer_id_string );
+                    peer->peer_id_string = makePeerIdString( peer_id );
                 }
 
                 peer->io = tr_handshakeStealIO( handshake ); /* this steals its refcount too, which is
@@ -2593,7 +2630,6 @@ tr_peerGetPieceSpeed_Bps( const tr_peer * peer, uint64_t now, tr_direction direc
     return peer->io ? tr_peerIoGetPieceSpeed_Bps( peer->io, now, direction ) : 0.0;
 }
 
-
 struct tr_peer_stat *
 tr_peerMgrPeerStats( const tr_torrent * tor, int * setmeCount )
 {
@@ -2619,6 +2655,9 @@ tr_peerMgrPeerStats( const tr_torrent * tor, int * setmeCount )
         tr_ntop( &atom->addr, stat->addr, sizeof( stat->addr ) );
         tr_strlcpy( stat->client, ( peer->client ? peer->client : "" ),
                    sizeof( stat->client ) );
+        stat->peer_id             = tr_strdup( peer->peer_id_string );
+        stat->user_agent          = tr_strdup( peer->user_agent );
+        stat->extensions          = tr_strdup( peer->extension_string );
         stat->port                = ntohs( peer->atom->port );
         stat->from                = atom->fromFirst;
         stat->progress            = peer->progress;

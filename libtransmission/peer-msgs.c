@@ -884,6 +884,82 @@ sendLtepHandshake( tr_peermsgs * msgs )
     tr_free( buf );
 }
 
+static int
+peerExtensionCompare( const void * va, const void * vb )
+{
+    const tr_peer_extension * a = (const tr_peer_extension *) va;
+    const tr_peer_extension * b = (const tr_peer_extension *) vb;
+    return strcmp( a->name, b->name );
+}
+
+static tr_peer_extension *
+peerGetExtension( tr_peer * peer, const char * name )
+{
+    tr_peer_extension * e, key;
+    key.name = (char *) name;
+    e = tr_ptrArrayFindSorted( peer->extensions, &key,
+                               peerExtensionCompare );
+    if( !e )
+    {
+        e = tr_new0( tr_peer_extension, 1 );
+        e->name = tr_strdup( name );
+        tr_ptrArrayInsertSorted( peer->extensions, e,
+                                 peerExtensionCompare );
+    }
+    return e;
+}
+
+static void
+peerUpdateExtensionString( tr_peer * peer )
+{
+    const int n = tr_ptrArraySize( peer->extensions );
+    int i = 0, nb, rem;
+    size_t len = 0;
+    char * s, * p;
+
+    for( i = 0; i < n; ++i )
+    {
+        const tr_peer_extension * e = tr_ptrArrayNth( peer->extensions, i );
+        if( !e || !e->name || !e->id )
+            continue;
+        len += strlen( e->name ) + 4 + ( i == n - 1 ? 0 : 1 );
+    }
+    s = p = tr_malloc( len + 1 );
+    rem = len;
+    for( i = 0; i < n && rem > 0; ++i )
+    {
+        const tr_peer_extension * e = tr_ptrArrayNth( peer->extensions, i );
+        if( !e || !e->name || !e->id )
+            continue;
+        nb = tr_snprintf( p, rem, "%s=%d%s", e->name, e->id,
+                          i == n - 1 ? "" : " " );
+        p += nb;
+        rem -= nb;
+    }
+    s[len] = '\0';
+    tr_free( peer->extension_string );
+    peer->extension_string = s;
+}
+
+static void
+peerUpdateExtensionList( tr_peer * peer, tr_benc * d )
+{
+    int i;
+    const char * key;
+    tr_benc * val;
+    int64_t integer;
+    for( i = 0; tr_bencDictChild( d, i, &key, &val ); ++i )
+    {
+        tr_peer_extension * e;
+        if( !tr_bencGetInt( val, &integer ) )
+            continue;
+        e = peerGetExtension( peer, key );
+        e->id = integer;
+    }
+    tr_free( peer->extension_string );
+    peerUpdateExtensionString( peer );
+}
+
 static void
 parseLtepHandshake( tr_peermsgs *     msgs,
                     int               len,
@@ -896,6 +972,7 @@ parseLtepHandshake( tr_peermsgs *     msgs,
     size_t addr_len;
     tr_pex pex;
     int8_t seedProbability = -1;
+    const char * str;
 
     memset( &pex, 0, sizeof( tr_pex ) );
 
@@ -924,6 +1001,7 @@ parseLtepHandshake( tr_peermsgs *     msgs,
     msgs->peerSupportsMetadataXfer = 0;
 
     if( tr_bencDictFindDict( &val, "m", &sub ) ) {
+        peerUpdateExtensionList( msgs->peer, sub );
         if( tr_bencDictFindInt( sub, "ut_pex", &i ) ) {
             msgs->peerSupportsPex = i != 0;
             msgs->ut_pex_id = (uint8_t) i;
@@ -956,6 +1034,13 @@ parseLtepHandshake( tr_peermsgs *     msgs,
         pex.port = htons( (uint16_t)i );
         fireClientGotPort( msgs, pex.port );
         dbgmsg( msgs, "peer's port is now %d", (int)i );
+    }
+
+    /* get peer's user agent string */
+    if( tr_bencDictFindStr( &val, "v", &str ) )
+    {
+        tr_free( msgs->peer->user_agent );
+        msgs->peer->user_agent = tr_utf8clean( str, -1 );
     }
 
     if( tr_peerIoIsIncoming( msgs->peer->io )

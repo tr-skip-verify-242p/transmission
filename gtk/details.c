@@ -1114,6 +1114,9 @@ enum
     PEER_COL_UPLOAD_RATE_DOUBLE,
     PEER_COL_UPLOAD_RATE_STRING,
     PEER_COL_CLIENT,
+    PEER_COL_PEER_ID,
+    PEER_COL_USER_AGENT,
+    PEER_COL_EXTENSIONS,
     PEER_COL_PROGRESS,
     PEER_COL_UPLOAD_REQUEST_COUNT_INT,
     PEER_COL_UPLOAD_REQUEST_COUNT_STRING,
@@ -1144,6 +1147,9 @@ getPeerColumnName( int column )
         case PEER_COL_UPLOAD_RATE_STRING:
         case PEER_COL_UPLOAD_RATE_DOUBLE: return _( "Up" );
         case PEER_COL_CLIENT: return _( "Client" );
+        case PEER_COL_PEER_ID: return _( "Peer ID" );
+        case PEER_COL_USER_AGENT: return _( "User Agent" );
+        case PEER_COL_EXTENSIONS: return _( "Extensions" );
         case PEER_COL_PROGRESS: return _( "%" );
         case PEER_COL_UPLOAD_REQUEST_COUNT_INT:
         case PEER_COL_UPLOAD_REQUEST_COUNT_STRING: return _( "Up Reqs" );
@@ -1175,6 +1181,9 @@ peer_store_new( void )
                                G_TYPE_DOUBLE,   /* upload speed int */
                                G_TYPE_STRING,   /* upload speed string  */
                                G_TYPE_STRING,   /* client */
+                               G_TYPE_STRING,   /* peer id */
+                               G_TYPE_STRING,   /* user agent */
+                               G_TYPE_STRING,   /* extensions */
                                G_TYPE_INT,      /* progress [0..100] */
                                G_TYPE_INT,      /* upload request count int */
                                G_TYPE_STRING,   /* upload request count string */
@@ -1217,6 +1226,7 @@ initPeerRow( GtkListStore        * store,
                         PEER_COL_ADDRESS, peer->addr,
                         PEER_COL_ADDRESS_COLLATED, collated_name,
                         PEER_COL_CLIENT, client,
+                        PEER_COL_PEER_ID, peer->peer_id,
                         PEER_COL_ENCRYPTION_STOCK_ID, peer->isEncrypted ? "transmission-lock" : NULL,
                         PEER_COL_KEY, key,
                         PEER_COL_TORRENT_NAME, torrentName,
@@ -1273,6 +1283,8 @@ refreshPeerRow( GtkListStore        * store,
         PEER_COL_UPLOAD_RATE_STRING, up_speed,
         PEER_COL_FLAGS, peer->flagStr,
         PEER_COL_WAS_UPDATED, TRUE,
+        PEER_COL_EXTENSIONS, peer->extensions,
+        PEER_COL_USER_AGENT, peer->user_agent,
         PEER_COL_BLOCKS_DOWNLOADED_COUNT_INT, (int)peer->blocksToClient,
         PEER_COL_BLOCKS_DOWNLOADED_COUNT_STRING, blocks_to_client,
         PEER_COL_BLOCKS_UPLOADED_COUNT_INT, (int)peer->blocksToPeer,
@@ -1561,6 +1573,9 @@ setPeerViewColumns( GtkTreeView * peer_view )
     view_columns[n++] = PEER_COL_FLAGS;
     view_columns[n++] = PEER_COL_ADDRESS;
     view_columns[n++] = PEER_COL_CLIENT;
+    if( more ) view_columns[n++] = PEER_COL_PEER_ID;
+    if( more ) view_columns[n++] = PEER_COL_USER_AGENT;
+    if( more ) view_columns[n++] = PEER_COL_EXTENSIONS;
 
     /* remove any existing columns */
     while(( c = gtk_tree_view_get_column( peer_view, 0 )))
@@ -1581,6 +1596,9 @@ setPeerViewColumns( GtkTreeView * peer_view )
                 break;
 
             case PEER_COL_CLIENT:
+            case PEER_COL_PEER_ID:
+            case PEER_COL_USER_AGENT:
+            case PEER_COL_EXTENSIONS:
                 r = gtk_cell_renderer_text_new( );
                 c = gtk_tree_view_column_new_with_attributes( t, r, "text", col, NULL );
                 break;
