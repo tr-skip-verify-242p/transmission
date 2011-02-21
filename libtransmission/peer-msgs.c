@@ -2214,7 +2214,7 @@ tellPeerWhatWeHave( tr_peermsgs * msgs )
 }
 
 /**
-*** Peer Exchange extension
+***
 **/
 
 /* some peers give us error messages if we send
