@@ -1466,6 +1466,9 @@ typedef struct tr_peer_stat
 
     char     addr[TR_INET6_ADDRSTRLEN];
     char     client[80];
+    char   * peer_id;
+    char   * user_agent;
+    char   * extensions;
     char     flagStr[32];
 
     float    progress;

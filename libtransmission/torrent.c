@@ -1435,8 +1435,17 @@ tr_torrentPeers( const tr_torrent * tor, int * peerCount )
 }
 
 void
-tr_torrentPeersFree( tr_peer_stat * peers, int peerCount UNUSED )
+tr_torrentPeersFree( tr_peer_stat * peers, int peerCount )
 {
+    int i;
+    for( i = 0; i < peerCount; ++i )
+    {
+        tr_free( peers[i].peer_id );
+        tr_free( peers[i].user_agent );
+        tr_free( peers[i].extensions );
+    }
+    if( peers && peerCount > 0 )
+        memset( peers, 0, sizeof( *peers ) * peerCount );
     tr_free( peers );
 }
 
