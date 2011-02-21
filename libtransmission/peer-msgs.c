@@ -894,11 +894,8 @@ sendLtepHandshake( tr_peermsgs * msgs )
     if( allow_tex )
     {
         const uint8_t * hash = tr_torrentGetTexHash( msgs->torrent );
-        if( hash )
-        {
-            tr_bencDictAddInt( m, "lt_tex", LT_TEX_ID );
-            tr_bencDictAddStr( &val, "tr", (const char *) hash );
-        }
+        tr_bencDictAddInt( m, "lt_tex", LT_TEX_ID );
+        tr_bencDictAddStr( &val, "tr", (const char *) hash );
     }
 
     buf = tr_bencToStr( &val, TR_FMT_BENC, &len );
@@ -2468,9 +2465,11 @@ sendTex( tr_peermsgs * msgs )
     char * bencdata = NULL;
     int i, n, benclen;
 
-    if( !msgs->peerSupportsTex || !tr_torrentAllowsTex( tor )
-        || !msgs->texHash || !( hash = tr_torrentGetTexHash( tor ) )
-        || !memcmp( hash, msgs->texHash, SHA_DIGEST_LENGTH ) )
+    if( !msgs->peerSupportsTex || !tr_torrentAllowsTex( tor ) )
+        return;
+
+    hash = tr_torrentGetTexHash( tor );
+    if( !msgs->texHash || !memcmp( hash, msgs->texHash, SHA_DIGEST_LENGTH ) )
         return;
 
     tr_announcerGetVerifiedTrackers( tor, &trackers );
@@ -2507,10 +2506,14 @@ tr_peerMsgsSendTexAdded( tr_peermsgs * msgs,
     struct evbuffer * out = msgs->outMessages;
     const uint8_t * hash;
 
-    if( !msgs->peerSupportsTex || !tr_torrentAllowsTex( tor )
-        || !bencdata || !benclen
-        || !msgs->texHash || !( hash = tr_torrentGetTexHash( tor ) )
-        || !memcmp( hash, msgs->texHash, SHA_DIGEST_LENGTH ) )
+    if( !bencdata || !benclen )
+        return;
+
+    if( !msgs->peerSupportsTex || !tr_torrentAllowsTex( tor ) )
+        return;
+
+    hash = tr_torrentGetTexHash( tor );
+    if( !msgs->texHash || !memcmp( hash, msgs->texHash, SHA_DIGEST_LENGTH ) )
         return;
 
     evbuffer_add_uint32( out, 2 + benclen );

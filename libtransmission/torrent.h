@@ -99,9 +99,9 @@ void             tr_torrentSave( tr_torrent * tor );
 void             tr_torrentSetLocalError( tr_torrent * tor, const char * fmt, ... ) TR_GNUC_PRINTF( 2, 3 );
 
 /**
- * Returns a pointer to an @a SHA_DIGEST_LENGTH sized byte
- * array containing the SHA1 hash of all verified trackers
- * (as per BEP 28), or NULL if there are no trackers.
+ * Returns a non-NULL pointer to an @a SHA_DIGEST_LENGTH
+ * sized byte array containing the SHA1 hash of all verified
+ * trackers as per BEP 28.
  */
 const uint8_t * tr_torrentGetTexHash( tr_torrent * tor );
 

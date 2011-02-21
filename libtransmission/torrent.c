@@ -2084,18 +2084,15 @@ tr_torrentGetTexHash( tr_torrent * tor )
 {
     tr_ptrArray trackers = TR_PTR_ARRAY_INIT;
     struct evbuffer * buf = NULL;
-    uint8_t * ret = NULL;
     int i;
 
     assert( tr_isTorrent( tor ) );
-    tr_torrentLock( tor );
 
     if( !tor->texHashIsDirty )
-        goto OUT;
+        return tor->texHash;
 
+    tr_torrentLock( tor );
     tr_announcerGetVerifiedTrackers( tor, &trackers );
-    if( !tr_ptrArraySize( &trackers ) )
-        goto OUT;
 
     /* FIXME: Avoid the extra copy by adding to the
      *        SHA1 context directly. */
@@ -2113,12 +2110,9 @@ tr_torrentGetTexHash( tr_torrent * tor )
              NULL );
     tor->texHashIsDirty = FALSE;
     evbuffer_free( buf );
-
-OUT:
-    if( !tor->texHashIsDirty )
-        ret = tor->texHash;
     tr_torrentUnlock( tor );
-    return ret;
+
+    return tor->texHash;
 }
 
 void
