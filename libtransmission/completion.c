@@ -19,7 +19,7 @@
 #include "torrent-magnet.h"
 #include "utils.h"
 
-static void
+void
 tr_cpReset( tr_completion * cp )
 {
     tr_bitfieldClear( &cp->pieceBitfield );

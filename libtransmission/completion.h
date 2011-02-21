@@ -169,6 +169,8 @@ tr_bool   tr_cpBlockBitfieldSet( tr_completion      * completion,
 
 void      tr_cpSetHaveAll( tr_completion * completion );
 
+void      tr_cpReset( tr_completion * completion );
+
 /***
 ****
 ***/
