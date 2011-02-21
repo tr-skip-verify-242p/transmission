@@ -1496,7 +1496,7 @@ refillUpkeep( int foo UNUSED, short bar UNUSED, void * vmgr )
 }
 
 /**
-*** Tracker Exchange extension
+*** Tracker exchange extension (BEP 28).
 **/
 
 static void

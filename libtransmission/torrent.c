@@ -2076,7 +2076,7 @@ tr_torrentSetMetadataCallback( tr_torrent                * tor,
 }
 
 /***
-****  Tracker Exchange extension (BEP 28)
+****  Tracker exchange extension (BEP 28).
 ***/
 
 const uint8_t *

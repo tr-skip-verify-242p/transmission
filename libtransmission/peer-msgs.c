@@ -966,7 +966,7 @@ parseLtepHandshake( tr_peermsgs *     msgs,
             msgs->ut_metadata_id = (uint8_t) i;
             dbgmsg( msgs, "msgs->ut_metadata_id is %d", (int)msgs->ut_metadata_id );
         }
-        /* Tracker Exchange extension (BEP 28) */
+        /* Tracker exchange extension (BEP 28). */
         if( tr_bencDictFindInt( sub, "lt_tex", &i ) )
         {
             const uint8_t * hash;
@@ -2450,7 +2450,7 @@ pexPulse( int foo UNUSED, short bar UNUSED, void * vmsgs )
 }
 
 /**
-*** Tracker Exchange extension
+*** Tracker exchange extension (BEP 28).
 **/
 
 /**
