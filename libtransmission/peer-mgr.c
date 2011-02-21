@@ -479,7 +479,7 @@ replicationNew( Torrent * t )
         uint16_t r = 0;
 
         for( peer_i=0; peer_i<peer_count; ++peer_i )
-            if( tr_bitsetHasFast( &peers[peer_i]->have, piece_i ) )
+            if( tr_bitsetHas( &peers[peer_i]->have, piece_i ) )
                 ++r;
 
         t->pieceReplication[piece_i] = r;
@@ -1028,7 +1028,7 @@ assertReplicationCountIsExact( Torrent * t )
         uint16_t r = 0;
 
         for( peer_i=0; peer_i<peer_count; ++peer_i )
-            if( tr_bitsetHasFast( &peers[peer_i]->have, piece_i ) )
+            if( tr_bitsetHas( &peers[peer_i]->have, piece_i ) )
                 ++r;
 
         assert( rep[piece_i] == r );
@@ -1338,7 +1338,7 @@ tr_peerMgrGetNextRequests( tr_torrent           * tor,
         struct weighted_piece * p = pieces + i;
 
         /* if the peer has this piece that we want... */
-        if( tr_bitsetHasFast( have, p->index ) )
+        if( tr_bitsetHas( have, p->index ) )
         {
             tr_block_index_t b = tr_torPieceFirstBlock( tor, p->index );
             const tr_block_index_t e = b + tr_torPieceCountBlocks( tor, p->index );
@@ -3155,29 +3155,8 @@ shouldPeerBeClosed( const Torrent    * t,
 
     /* if we're seeding and the peer has everything we have,
      * and enough time has passed for a pex exchange, then disconnect */
-    if( tr_torrentIsSeed( tor ) )
-    {
-        tr_bool peerHasEverything;
-
-        if( atom->seedProbability != -1 )
-        {
-            peerHasEverything = atomIsSeed( atom );
-        }
-        else
-        {
-            tr_bitfield * tmp = tr_bitfieldDup( tr_cpPieceBitfield( &tor->completion ) );
-            tr_bitsetDifference( tmp, &peer->have );
-            peerHasEverything = tr_bitfieldCountTrueBits( tmp ) == 0;
-            tr_bitfieldFree( tmp );
-        }
-
-        if( peerHasEverything && ( !tr_torrentAllowsPex(tor) || (now-atom->time>=30 )))
-        {
-            tordbg( t, "purging peer %s because we're both seeds",
-                    tr_atomAddrStr( atom ) );
-            return TRUE;
-        }
-    }
+    if( tr_torrentIsSeed( tor ) && ( peer->progress >= 1.0f ) )
+        return !tr_torrentAllowsPex(tor) || (now-atom->time>=30);
 
     /* disconnect if it's been too long since piece data has been transferred.
      * this is on a sliding scale based on number of available peers... */
