@@ -1833,7 +1833,7 @@ tr_announcerAddTex( tr_torrent            * tor,
     tiers_array = &tor->tiers->tiers;
     i = tr_ptrArraySize( tiers_array );
 
-    for( it = trackers, end = trackers + count; it != end; ++it )
+    for( it = trackers, end = trackers + count; it < end; ++it )
     {
         tr_tier * tier;
         char * scrape;
