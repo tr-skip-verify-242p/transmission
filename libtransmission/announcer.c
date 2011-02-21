@@ -228,6 +228,7 @@ typedef struct
      * @see addTorrentToTier
      * @see onAnnounceDone
      * @see tr_announcerGetVerifiedTrackers
+     * @see tr_torrentSetAnnounceList
      */
     tr_bool verified;
 
