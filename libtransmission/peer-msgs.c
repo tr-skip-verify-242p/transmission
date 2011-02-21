@@ -2504,16 +2504,11 @@ tr_peerMsgsSendTexAdded( tr_peermsgs * msgs,
 {
     tr_torrent * tor = msgs->torrent;
     struct evbuffer * out = msgs->outMessages;
-    const uint8_t * hash;
 
     if( !bencdata || !benclen )
         return;
 
     if( !msgs->peerSupportsTex || !tr_torrentAllowsTex( tor ) )
-        return;
-
-    hash = tr_torrentGetTexHash( tor );
-    if( !msgs->texHash || !memcmp( hash, msgs->texHash, SHA_DIGEST_LENGTH ) )
         return;
 
     evbuffer_add_uint32( out, 2 + benclen );
