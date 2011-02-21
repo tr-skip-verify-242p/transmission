@@ -790,6 +790,22 @@ setLocalErrorIfFilesDisappeared( tr_torrent * tor )
     return disappeared;
 }
 
+static tr_bool fileExists( const char * );
+
+static tr_bool
+torrentDataExists( const tr_torrent * tor )
+{
+    char * path;
+    tr_bool exists;
+    if( !tr_torrentHasMetadata( tor ) )
+        return FALSE;
+    path = tr_buildPath( tr_torrentGetCurrentDir( tor ),
+                         tr_torrentName( tor ), NULL );
+    exists = fileExists( path );
+    tr_free( path );
+    return exists;
+}
+
 static void
 torrentInit( tr_torrent * tor, const tr_ctor * ctor )
 {
@@ -1685,6 +1701,17 @@ torrentRecheckDoneCB( tr_torrent * tor )
     tr_runInEventThread( tor->session, torrentRecheckDoneImpl, tor );
 }
 
+static tr_bool
+quickVerify( tr_torrent * tor )
+{
+    if( torrentDataExists( tor ) )
+        return FALSE;
+    tr_cpReset( &tor->completion );
+    tor->anyDate = tr_time( );
+    tr_torrentSetDirty( tor );
+    return TRUE;
+}
+
 static void
 verifyTorrent( void * vtor )
 {
@@ -1706,7 +1733,12 @@ verifyTorrent( void * vtor )
     if( setLocalErrorIfFilesDisappeared( tor ) )
         tor->startAfterVerify = FALSE;
     else
-        tr_verifyAdd( tor, torrentRecheckDoneCB );
+    {
+        if( quickVerify( tor ) )
+            torrentRecheckDoneCB( tor );
+        else
+            tr_verifyAdd( tor, torrentRecheckDoneCB );
+    }
 
     tr_sessionUnlock( tor->session );
 }
