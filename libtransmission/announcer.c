@@ -1096,8 +1096,11 @@ onAnnounceDone( tr_session   * session,
                     tracker->consecutiveAnnounceFailures = 0;
                     if( !tracker->verified )
                     {
+                        tr_torrent * tor = tier->tor;
+                        const char * url = tracker->announce;
                         tracker->verified = TRUE;
-                        tr_torrentTexListChanged( tier->tor );
+                        tr_torrentTexAddedTracker( tor, url );
+                        tr_torrentTexListChanged( tor );
                     }
                 }
 
@@ -1848,7 +1851,6 @@ tr_announcerAddTex( tr_torrent            * tor,
         /* FIXME: What should the 'id' argument be? */
         tierAddTracker( tier, it->announce, scrape, 0, FALSE );
         tr_free( scrape );
-        tr_torrentTexAddedTracker( tor, it->announce );
     }
 
     if( tor->isRunning )

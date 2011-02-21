@@ -2128,10 +2128,12 @@ void
 tr_torrentTexAddedTracker( tr_torrent * tor, const char * url )
 {
     tr_benc * list;
-
+    assert( tr_isTorrent( tor ) );
+    tr_torrentLock( tor );
     if( !tr_bencDictFindList( &tor->texDict, "added", &list ) )
         list = tr_bencDictAddList( &tor->texDict, "added", 0 );
     tr_bencListAddStr( list, url );
+    tr_torrentUnlock( tor );
 }
 
 /**
