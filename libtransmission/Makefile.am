@@ -22,6 +22,7 @@ libtransmission_a_SOURCES = \
     bandwidth.c \
     bencode.c \
     bitfield.c \
+    bitset.c \
     blocklist.c \
     cache.c \
     clients.c \
