@@ -1760,8 +1760,6 @@ tr_announcerGetVerifiedTrackers( const tr_torrent * tor,
     assert( tor->tiers != NULL );
 
     tiers_array = &tor->tiers->tiers;
-    tr_ptrArrayClear( setme_trackers );
-
     for( i = 0; i < tr_ptrArraySize( tiers_array ); ++i )
     {
         tier = tr_ptrArrayNth( tiers_array, i );

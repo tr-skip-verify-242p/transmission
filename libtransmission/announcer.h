@@ -109,20 +109,24 @@ struct tr_ptrArray;
 
 /**
  * Add all verified trackers for the given torrent to the pointer
- * array @a trackers. The array is cleared beforehand.
+ * array @a fillmeTrackers, which is assumed to be empty.
  *
- * The elements of the array will be newly allocated NULL-terminated
- * strings containing the normalized announce URLs and will be sorted
- * in ascending lexicographical order (as per BEP 28).
+ * The added elements of the array will be newly allocated NULL-
+ * terminated strings containing the normalized announce URLs and
+ * will be sorted in ascending lexicographical order (as per BEP 28).
+ *
+ * @note The pointer array @a fillmeTrackers must be empty prior to
+ *       the invocation of this function.
  *
  * @note You must destroy the pointer array and free the strings when
  *       they are no longer needed, e.g. by
- *       @code tr_ptrArrayDestruct( trackers, tr_free ); @endcode
+ *       @code tr_ptrArrayDestruct( fillmeTrackers, tr_free ); @endcode
  *
+ * @see tr_normalizeURL
  * @see tr_torrentGetTexHash
  */
 void tr_announcerGetVerifiedTrackers( const tr_torrent   * torrent,
-                                      struct tr_ptrArray * trackers );
+                                      struct tr_ptrArray * fillmeTrackers );
 
 /**
  * Adds the trackers in @a trackers to the torrent's tiers.
