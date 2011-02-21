@@ -3257,8 +3257,8 @@ tr_torrentDeleteLocalData( tr_torrent * tor, tr_fileFunc fileFunc )
 struct LocationData
 {
     tr_bool move_from_old_location;
-    int * setme_state;
-    double * setme_progress;
+    volatile int * setme_state;
+    volatile double * setme_progress;
     char * location;
     tr_torrent * tor;
 };
@@ -3354,11 +3354,11 @@ setLocation( void * vdata )
 }
 
 void
-tr_torrentSetLocation( tr_torrent  * tor,
-                       const char  * location,
-                       tr_bool       move_from_old_location,
-                       double      * setme_progress,
-                       int         * setme_state )
+tr_torrentSetLocation( tr_torrent       * tor,
+                       const char       * location,
+                       tr_bool             move_from_old_location,
+                       volatile double  * setme_progress,
+                       volatile int     * setme_state )
 {
     struct LocationData * data;
 
