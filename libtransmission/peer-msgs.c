@@ -2551,8 +2551,8 @@ tr_peerMsgsNew( struct tr_torrent    * torrent,
     m->outMessagesBatchedAt = 0;
     m->outMessagesBatchPeriod = LOW_PRIORITY_INTERVAL_SECS;
     m->incoming.block = evbuffer_new( );
-    peer->msgs = m;
     m->pexTimer = evtimer_new( torrent->session->event_base, pexPulse, m );
+    peer->msgs = m;
     tr_timerAdd( m->pexTimer, PEX_INTERVAL_SECS, 0 );
 
     if( tr_peerIoSupportsUTP( peer->io ) ) {
