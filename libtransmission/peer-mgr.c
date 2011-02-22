@@ -62,6 +62,9 @@ enum
     /* how frequently to decide which peers live and die */
     RECONNECT_PERIOD_MSEC = 500,
 
+    /* how frequently to send added trackers for TEX (BEP 28) */
+    TEX_INTERVAL_SECS = 120,
+
     /* when many peers are available, keep idle ones this long */
     MIN_UPLOAD_IDLE_SECS = ( 60 ),
 
@@ -241,6 +244,7 @@ struct tr_peerMgr
     struct event  * rechokeTimer;
     struct event  * refillUpkeepTimer;
     struct event  * atomTimer;
+    struct event  * texTimer;
 };
 
 #define tordbg( t, ... ) \
@@ -579,6 +583,7 @@ deleteTimers( struct tr_peerMgr * m )
     deleteTimer( &m->bandwidthTimer );
     deleteTimer( &m->rechokeTimer );
     deleteTimer( &m->refillUpkeepTimer );
+    deleteTimer( &m->texTimer );
 }
 
 void
@@ -1513,6 +1518,48 @@ refillUpkeep( int foo UNUSED, short bar UNUSED, void * vmgr )
     managerUnlock( mgr );
 }
 
+/**
+*** Tracker exchange extension (BEP 28).
+**/
+
+static void
+texPulse( int foo UNUSED, short bar UNUSED, void * vmgr )
+{
+    tr_peerMgr * mgr = vmgr;
+    tr_torrent * tor = NULL;
+    Torrent * t;
+    tr_peer ** peers;
+    int n, i, benclen;
+    char * bencdata;
+    tr_benc * list;
+
+    managerLock( mgr );
+    while( ( tor = tr_torrentNext( mgr->session, tor ) ) )
+    {
+        if( !tr_torrentAllowsTex( tor )
+            || !tr_bencDictFindList( &tor->texDict, "added", &list )
+            || !tr_bencListSize( list ) )
+            continue;
+        t = tor->torrentPeers;
+        peers = (tr_peer **) tr_ptrArrayPeek( &t->peers, &n );
+        if( n <= 0 )
+            continue;
+        bencdata = tr_bencToStr( &tor->texDict,
+                                 TR_FMT_BENC, &benclen );
+        for( i = 0; i < n; ++i )
+            tr_peerMsgsSendTexAdded( peers[i]->msgs, bencdata, benclen );
+        tr_free( bencdata );
+        tr_bencDictRemove( &tor->texDict, "added" );
+    }
+
+    tr_timerAdd( mgr->texTimer, TEX_INTERVAL_SECS, 0 );
+    managerUnlock( mgr );
+}
+
+/**
+***
+**/
+
 static void
 addStrike( Torrent * t, tr_peer * peer )
 {
@@ -2404,6 +2451,9 @@ ensureMgrTimersExist( struct tr_peerMgr * m )
 
     if( m->refillUpkeepTimer == NULL )
         m->refillUpkeepTimer = createTimer( m->session, REFILL_UPKEEP_PERIOD_MSEC, refillUpkeep, m );
+
+    if( m->texTimer == NULL )
+        m->texTimer = createTimer( m->session, TEX_INTERVAL_SECS * 1000, texPulse, m );
 }
 
 void

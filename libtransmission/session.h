@@ -94,6 +94,7 @@ struct tr_session
 {
     tr_bool                      isPortRandom;
     tr_bool                      isPexEnabled;
+    tr_bool                      isTexEnabled;
     tr_bool                      isDHTEnabled;
     tr_bool                      isUTPEnabled;
     tr_bool                      isLPDEnabled;

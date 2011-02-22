@@ -95,6 +95,21 @@ typedef struct
     char * announce;
     char * scrape;
 
+    /**
+     * This field is TRUE for trackers loaded from the original
+     * .torrent file and for trackers that we have successfully
+     * announced with at least once, as per BEP 28.
+     *
+     * @note Currently this field is also set to TRUE for
+     *       trackers added by the user.
+     *
+     * @see addTorrentToTier
+     * @see onAnnounceDone
+     * @see tr_announcerGetVerifiedTrackers
+     * @see tr_torrentSetAnnounceList
+     */
+    tr_bool verified;
+
     char * tracker_id;
 
     int seederCount;

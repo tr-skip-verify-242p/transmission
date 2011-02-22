@@ -21,6 +21,7 @@
 #include "announcer.h"
 #include "crypto.h"
 #include "net.h"
+#include "metainfo.h" /* tr_convertAnnounceToScrape() */
 #include "peer-mgr.h" /* tr_peerMgrCompactToPex() */
 #include "ptrarray.h"
 #include "session.h"
@@ -248,13 +249,15 @@ getTrackerType( const char * announce_url )
 static tr_tracker_item*
 trackerNew( const char  * announce,
             const char  * scrape,
-            uint32_t      id )
+            uint32_t      id,
+            tr_bool       verified )
 {
     tr_tracker_item * tracker = tr_new0( tr_tracker_item, 1  );
     tracker->type = getTrackerType( announce );
     tracker->hostname = getHostName( announce );
     tracker->announce = tr_strdup( announce );
     tracker->scrape = tr_strdup( scrape );
+    tracker->verified = verified;
     tracker->id = id;
     generateKeyParam( tracker->key_param, KEYLEN );
     tracker->seederCount = -1;
@@ -333,9 +336,10 @@ static void
 tierAddTracker( tr_tier      * tier,
                 const char   * announce,
                 const char   * scrape,
-                uint32_t       id )
+                uint32_t       id,
+                tr_bool        verified )
 {
-    tr_tracker_item * tracker = trackerNew( announce, scrape, id );
+    tr_tracker_item * tracker = trackerNew( announce, scrape, id, verified );
 
     tr_ptrArrayAppend( &tier->trackers, tracker );
     dbgmsg( tier, "adding tracker %s", announce );
@@ -645,10 +649,11 @@ addTorrentToTier( tr_torrent_tiers  * tiers,
                 tr_ptrArrayAppend( &tiers->tiers, tier );
             }
 
-            tierAddTracker( tier, info->announce, info->scrape, info->id );
+            tierAddTracker( tier, info->announce, info->scrape, info->id, TRUE );
         }
     }
 
+    tr_torrentTexListChanged( tor );
     tr_free( infos );
 }
 
@@ -1032,6 +1037,14 @@ onAnnounceDone( tr_session   * session,
                 if(( tracker = tier->currentTracker ))
                 {
                     tracker->consecutiveAnnounceFailures = 0;
+                    if( !tracker->verified )
+                    {
+                        tr_torrent * tor = tier->tor;
+                        const char * url = tracker->announce;
+                        tracker->verified = TRUE;
+                        tr_torrentTexAddedTracker( tor, url );
+                        tr_torrentTexListChanged( tor );
+                    }
                 }
 
                 if( gotScrape )
@@ -1691,6 +1704,135 @@ tr_announcerStatsFree( tr_tracker_stat * trackers,
                        int trackerCount UNUSED )
 {
     tr_free( trackers );
+}
+
+/***
+****
+***/
+
+void
+tr_announcerGetVerifiedTrackers( const tr_torrent * tor,
+                                 tr_ptrArray      * setme_trackers )
+{
+    /* FIXME: These two should be const. */
+    tr_ptrArray * tiers_array;
+    tr_tier * tier;
+
+    const tr_tracker_item * tracker;
+    int i, j, pos;
+    tr_bool exists;
+    char * url;
+
+    assert( tr_isTorrent( tor ) );
+    assert( setme_trackers != NULL );
+    tr_torrentLock( tor );
+
+    assert( tor->tiers != NULL );
+
+    tiers_array = &tor->tiers->tiers;
+    for( i = 0; i < tr_ptrArraySize( tiers_array ); ++i )
+    {
+        tier = tr_ptrArrayNth( tiers_array, i );
+
+        for( j = 0; j < tr_ptrArraySize( &tier->trackers ); ++j )
+        {
+            tracker = tr_ptrArrayNth( &tier->trackers, j );
+            if( !tracker->verified )
+                continue;
+            url = tr_normalizeURL( tracker->announce );
+            if( !url )
+                continue;
+            pos = tr_ptrArrayLowerBound( setme_trackers,
+                                         url, vstrcmp,
+                                         &exists );
+            if( !exists )
+                tr_ptrArrayInsert( setme_trackers, url, pos );
+            else
+                tr_free( url );
+        }
+    }
+
+    tr_torrentUnlock( tor );
+}
+
+tr_bool
+torrentHasTracker( const tr_torrent * tor, const char * announce_url )
+{
+    /* FIXME: Make these const. */
+    tr_ptrArray * tiers_array;
+    tr_tier * tier;
+
+    const tr_tracker_item * tracker;
+    int i, j;
+
+    assert( tor->tiers != NULL );
+    tiers_array = &tor->tiers->tiers;
+
+    /* FIXME: Make this more efficient, at least O(log n). */
+    for( i = 0; i < tr_ptrArraySize( tiers_array ); ++i )
+    {
+        tier = tr_ptrArrayNth( tiers_array, i );
+        for( j = 0; j < tr_ptrArraySize( &tier->trackers ); ++j )
+        {
+            tracker = tr_ptrArrayNth( &tier->trackers, j );
+            /* FIXME: Are the URLs always normalized? */
+            if( !strcmp( tracker->announce, announce_url ) )
+                return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+void
+tr_announcerAddTex( tr_torrent            * tor,
+                    const tr_tracker_info * trackers,
+                    int                     count )
+{
+    const tr_tracker_info * it, * end;
+    tr_ptrArray * tiers_array;
+    int i;
+
+    if( !trackers || count < 1 )
+        return;
+
+    assert( tr_isTorrent( tor ) );
+    tr_torrentLock( tor );
+
+    assert( tor->tiers != NULL );
+    tiers_array = &tor->tiers->tiers;
+    i = tr_ptrArraySize( tiers_array );
+
+    for( it = trackers, end = trackers + count; it < end; ++it )
+    {
+        tr_tier * tier;
+        char * scrape;
+
+        if( torrentHasTracker( tor, it->announce ) )
+            continue;
+
+        scrape = tr_convertAnnounceToScrape( it->announce );
+
+        /* FIXME: Should some trackers go into the same tier,
+         *        or tiers that already exist? */
+        tier = tierNew( tor );
+        tr_ptrArrayAppend( tiers_array, tier );
+
+        /* FIXME: What should the 'id' argument be? */
+        tierAddTracker( tier, it->announce, scrape, 0, FALSE );
+        tr_free( scrape );
+    }
+
+    if( tor->isRunning )
+    {
+        for( ; i < tr_ptrArraySize( tiers_array ); ++i )
+        {
+            tr_tier * tier = tr_ptrArrayNth( tiers_array, i );
+            tierAddAnnounce( tier, STARTED, tr_time( ) );
+        }
+    }
+
+    tr_torrentTexListChanged( tor );
+    tr_torrentUnlock( tor );
 }
 
 /***

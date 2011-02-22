@@ -1226,6 +1226,70 @@ tr_urlParse( const char * url_in,
     return err;
 }
 
+static tr_bool
+is_reserved_url_char( int c )
+{
+    return c == ';' || c == '/' || c == '?' || c == ':' || c == '@'
+        || c == '&' || c == '=' || c == '+' || c == '$' || c == ',';
+}
+
+static int
+hexchar_to_number( int c )
+{
+    return '0' <= c && c <= '9' ? c - '0' : c - 'A' + 10;
+}
+
+static int
+unescape_sequence( const char * s )
+{
+    int s0, s1;
+    if( !s || !s[0] || !s[1] )
+        return 0;
+    s0 = toupper( s[0] );
+    s1 = toupper( s[1] );
+    if( !isxdigit( s0 ) || !isxdigit( s1 ) )
+        return 0;
+    return hexchar_to_number( s0 ) * 16 + hexchar_to_number( s1 );
+}
+
+char *
+tr_normalizeURL( const char * url )
+{
+    char * scheme, * host, * path, * p, c;
+    struct evbuffer * buf;
+    int port;
+
+    if( tr_urlParse( url, -1, &scheme, &host, &port, &path ) )
+        return NULL;
+    buf = evbuffer_new( );
+    for( p = scheme; *p; ++p )
+        *p = tolower( *p );
+    for( p = host; *p; ++p )
+        *p = tolower( *p );
+    evbuffer_add_printf( buf, "%s://%s", scheme, host );
+    if( port > 0 )
+        evbuffer_add_printf( buf, ":%d", port );
+    for( p = path; *p; ++p )
+    {
+        if( *p == '%' && ( c = unescape_sequence( p + 1 ) ) )
+        {
+            if( is_reserved_url_char( c ) )
+                evbuffer_add_printf( buf, "%%%02x", c );
+            else
+                evbuffer_add( buf, &c, 1 );
+            p += 2;
+        }
+        else
+            evbuffer_add( buf, p, 1 );
+    }
+    tr_free( scheme );
+    tr_free( host );
+    tr_free( path );
+
+    return evbuffer_free_to_str( buf );
+}
+
+
 #include <string.h>
 #include <openssl/sha.h>
 #include <openssl/hmac.h>

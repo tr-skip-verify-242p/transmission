@@ -244,7 +244,7 @@ parseFiles( tr_info * inf, tr_benc * files, const tr_benc * length )
     return NULL;
 }
 
-static char *
+char *
 tr_convertAnnounceToScrape( const char * announce )
 {
     char *       scrape = NULL;

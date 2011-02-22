@@ -1545,6 +1545,8 @@ sessionSet( tr_session               * session,
         tr_sessionSetPeerLimitPerTorrent( session, i );
     if( tr_bencDictFindBool( args_in, TR_PREFS_KEY_PEX_ENABLED, &boolVal ) )
         tr_sessionSetPexEnabled( session, boolVal );
+    if( tr_bencDictFindBool( args_in, TR_PREFS_KEY_TEX_ENABLED, &boolVal ) )
+        tr_sessionSetTexEnabled( session, boolVal );
     if( tr_bencDictFindBool( args_in, TR_PREFS_KEY_DHT_ENABLED, &boolVal ) )
         tr_sessionSetDHTEnabled( session, boolVal );
     if( tr_bencDictFindBool( args_in, TR_PREFS_KEY_UTP_ENABLED, &boolVal ) )
@@ -1675,6 +1677,7 @@ sessionGet( tr_session               * s,
     tr_bencDictAddStr ( d, TR_PREFS_KEY_INCOMPLETE_DIR, tr_sessionGetIncompleteDir( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED, tr_sessionIsIncompleteDirEnabled( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PEX_ENABLED, tr_sessionIsPexEnabled( s ) );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_TEX_ENABLED, tr_sessionIsTexEnabled( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_UTP_ENABLED, tr_sessionIsUTPEnabled( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_DHT_ENABLED, tr_sessionIsDHTEnabled( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_LPD_ENABLED, tr_sessionIsLPDEnabled( s ) );

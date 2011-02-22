@@ -311,6 +311,8 @@ static tr_option opts[] =
     { 'w', "download-dir",           "When adding a new torrent, set its download folder. Otherwise, set the default download folder", "w",  1, "<path>" },
     { 'x', "pex",                    "Enable peer exchange (PEX)", "x",  0, NULL },
     { 'X', "no-pex",                 "Disable peer exchange (PEX)", "X",  0, NULL },
+    { 750, "tex",                    "Enable tracker exchange (TEX)", NULL, 0, NULL },
+    { 751, "no-tex",                 "Disable tracker exchange (TEX)", NULL, 0, NULL },
     { 'y', "lpd",                    "Enable local peer discovery (LPD)", "y",  0, NULL },
     { 'Y', "no-lpd",                 "Disable local peer discovery (LPD)", "Y",  0, NULL },
     { 941, "peer-info",              "List the current torrent(s)' peers", "pi",  0, NULL },
@@ -386,6 +388,8 @@ getOptMode( int val )
         case 'P': /* random incoming peer port */
         case 'x': /* pex */
         case 'X': /* no-pex */
+        case 750: /* tex */
+        case 751: /* no-tex */
         case 'y': /* lpd */
         case 'Y': /* no-lpd */
         case 800: /* torrent-done-script */
@@ -1504,6 +1508,8 @@ printSession( tr_benc * top )
             printf( "  Local peer discovery enabled: %s\n", ( boolVal ? "Yes" : "No" ) );
         if( tr_bencDictFindBool( args, TR_PREFS_KEY_PEX_ENABLED, &boolVal ) )
             printf( "  Peer exchange allowed: %s\n", ( boolVal ? "Yes" : "No" ) );
+        if( tr_bencDictFindBool( args, TR_PREFS_KEY_TEX_ENABLED, &boolVal ) )
+            printf( "  Tracker exchange allowed: %s\n", ( boolVal ? "Yes" : "No" ) );
         if( tr_bencDictFindStr( args,  TR_PREFS_KEY_ENCRYPTION, &str ) )
             printf( "  Encryption: %s\n", str );
         if( tr_bencDictFindStr( args, TR_PREFS_KEY_EXTERNAL_IP_ADDRESS, &str ) )
@@ -2038,6 +2044,10 @@ processArgs( const char * rpcurl, int argc, const char ** argv )
                 case 'x': tr_bencDictAddBool( args, TR_PREFS_KEY_PEX_ENABLED, TRUE );
                           break;
                 case 'X': tr_bencDictAddBool( args, TR_PREFS_KEY_PEX_ENABLED, FALSE );
+                          break;
+                case 750: tr_bencDictAddBool( args, TR_PREFS_KEY_TEX_ENABLED, TRUE );
+                          break;
+                case 751: tr_bencDictAddBool( args, TR_PREFS_KEY_TEX_ENABLED, FALSE );
                           break;
                 case 'y': tr_bencDictAddBool( args, TR_PREFS_KEY_LPD_ENABLED, TRUE );
                           break;

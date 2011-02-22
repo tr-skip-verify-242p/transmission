@@ -1481,6 +1481,10 @@ on_prefs_changed( TrCore * core UNUSED, const char * key, gpointer data )
     {
         tr_sessionSetPexEnabled( tr, gtr_pref_flag_get( key ) );
     }
+    else if( !strcmp( key, TR_PREFS_KEY_TEX_ENABLED ) )
+    {
+        tr_sessionSetTexEnabled( tr, gtr_pref_flag_get( key ) );
+    }
     else if( !strcmp( key, TR_PREFS_KEY_RENAME_PARTIAL_FILES ) )
     {
         tr_sessionSetIncompleteFileNamingEnabled( tr, gtr_pref_flag_get( key ) );

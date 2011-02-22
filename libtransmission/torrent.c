@@ -28,6 +28,7 @@
 #include <string.h> /* memcmp */
 #include <stdlib.h> /* qsort */
 
+#include <event2/buffer.h>
 #include <event2/util.h> /* evutil_vsnprintf() */
 
 #include "transmission.h"
@@ -824,6 +825,7 @@ torrentInit( tr_torrent * tor, const tr_ctor * ctor )
     tor->session   = session;
     tor->uniqueId = nextUniqueId++;
     tor->magicNumber = TORRENT_MAGIC_NUMBER;
+    tr_bencInitDict( &tor->texDict, 0 );
 
     tr_sha1( tor->obfuscatedHash, "req2", 4,
              tor->info.hash, SHA_DIGEST_LENGTH,
@@ -1548,6 +1550,7 @@ freeTorrent( tr_torrent * tor )
     tr_free( tor->incompleteDir );
     tr_free( tor->pieceTempDir );
     tr_free( tor->peer_id );
+    tr_bencFree( &tor->texDict );
 
     if( tor == session->torrentList )
         session->torrentList = tor->next;
@@ -2200,6 +2203,66 @@ tr_torrentSetMetadataCallback( tr_torrent                * tor,
     tor->metadata_func_user_data = user_data;
 }
 
+/***
+****  Tracker exchange extension (BEP 28).
+***/
+
+const uint8_t *
+tr_torrentGetTexHash( tr_torrent * tor )
+{
+    tr_ptrArray trackers = TR_PTR_ARRAY_INIT;
+    struct evbuffer * buf = NULL;
+    int i;
+
+    assert( tr_isTorrent( tor ) );
+
+    if( !tor->texHashIsDirty )
+        return tor->texHash;
+
+    tr_torrentLock( tor );
+    tr_announcerGetVerifiedTrackers( tor, &trackers );
+
+    /* FIXME: Avoid the extra copy by adding to the
+     *        SHA1 context directly. */
+    buf = evbuffer_new( );
+    for( i = 0; i < tr_ptrArraySize( &trackers ); ++i )
+    {
+        const char * tracker = tr_ptrArrayNth( &trackers, i );
+        evbuffer_add_printf( buf, "%s", tracker );
+    }
+    tr_ptrArrayDestruct( &trackers, tr_free );
+
+    tr_sha1( tor->texHash,
+             evbuffer_pullup( buf, -1 ),
+             evbuffer_get_length( buf ),
+             NULL );
+    tor->texHashIsDirty = FALSE;
+    evbuffer_free( buf );
+    tr_torrentUnlock( tor );
+
+    return tor->texHash;
+}
+
+void
+tr_torrentTexListChanged( tr_torrent * tor )
+{
+    assert( tr_isTorrent( tor ) );
+    tr_torrentLock( tor );
+    tor->texHashIsDirty = TRUE;
+    tr_torrentUnlock( tor );
+}
+
+void
+tr_torrentTexAddedTracker( tr_torrent * tor, const char * url )
+{
+    tr_benc * list;
+    assert( tr_isTorrent( tor ) );
+    tr_torrentLock( tor );
+    if( !tr_bencDictFindList( &tor->texDict, "added", &list ) )
+        list = tr_bencDictAddList( &tor->texDict, "added", 0 );
+    tr_bencListAddStr( list, url );
+    tr_torrentUnlock( tor );
+}
 
 /**
 ***  File priorities

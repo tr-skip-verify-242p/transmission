@@ -96,6 +96,26 @@ void             tr_torrentSave( tr_torrent * tor );
 
 void             tr_torrentSetLocalError( tr_torrent * tor, const char * fmt, ... ) TR_GNUC_PRINTF( 2, 3 );
 
+/**
+ * Returns a non-NULL pointer to an @a SHA_DIGEST_LENGTH
+ * sized byte array containing the SHA1 hash of all verified
+ * trackers as per BEP 28.
+ */
+const uint8_t * tr_torrentGetTexHash( tr_torrent * tor );
+
+/**
+ * When the verified state of any of the torrent's
+ * trackers changes, this function is called to
+ * ensure that the TEX tracker list hash is updated.
+ */
+void tr_torrentTexListChanged( tr_torrent * tor );
+
+/**
+ * Add the newly-added tracker to "added" list
+ * for the next TEX messages sent out to peers.
+ */
+void tr_torrentTexAddedTracker( tr_torrent * tor,
+                                const char * url );
 
 
 typedef enum
@@ -253,6 +273,10 @@ struct tr_torrent
     uint16_t                   idleLimitMinutes;
     tr_idlelimit               idleLimitMode;
     tr_bool                    finishedSeedingByIdle;
+
+    uint8_t                    texHash[SHA_DIGEST_LENGTH];
+    tr_bool                    texHashIsDirty;
+    tr_benc                    texDict;
 };
 
 static inline tr_torrent*
@@ -383,6 +407,12 @@ static inline tr_bool tr_torrentAllowsPex( const tr_torrent * tor )
     return ( tor != NULL )
         && ( tor->session->isPexEnabled )
         && ( !tr_torrentIsPrivate( tor ) );
+}
+
+static inline tr_bool tr_torrentAllowsTex( const tr_torrent * tor )
+{
+    return ( tor != NULL )
+        && ( tor->session->isTexEnabled );
 }
 
 static inline tr_bool tr_torrentAllowsDHT( const tr_torrent * tor )

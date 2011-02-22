@@ -35,5 +35,6 @@ void tr_metainfoMigrate( tr_session * session,
 
 char* tr_metainfoGetBasename( const tr_info * );
 
+char * tr_convertAnnounceToScrape( const char * announce );
 
 #endif
