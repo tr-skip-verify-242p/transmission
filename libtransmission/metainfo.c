@@ -250,6 +250,9 @@ tr_convertAnnounceToScrape( const char * announce )
     char *       scrape = NULL;
     const char * s;
 
+    if( !strncmp( announce, "udp://", 6 ) )
+        return tr_strdup( announce );
+
     /* To derive the scrape URL use the following steps:
      * Begin with the announce URL. Find the last '/' in it.
      * If the text immediately following that '/' isn't 'announce'
