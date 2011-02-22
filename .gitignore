@@ -48,6 +48,7 @@ Makefile.in
 /third-party/miniupnp/miniupnpcstrings.h
 /libtransmission/version.h
 /.pc/
+/debian/stamp-patched
 /debian/tmp/
 /debian/transmission/
 /debian/files
