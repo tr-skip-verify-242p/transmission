@@ -42,3 +42,14 @@ Makefile.in
 /qt/moc_*.cpp
 /third-party/miniupnp/miniupnpcstrings.h
 /libtransmission/version.h
+/.pc/
+/debian/tmp/
+/debian/transmission/
+/debian/files
+/debian/transmission*.debhelper*
+/debian/transmission*.substvars
+/debian/transmission-cli/
+/debian/transmission-common/
+/debian/transmission-daemon/
+/debian/transmission-gtk/
+/debian/transmission-qt/
