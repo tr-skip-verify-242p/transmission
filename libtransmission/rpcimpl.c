@@ -518,6 +518,8 @@ addField( const tr_torrent * tor, tr_benc * d, const char * key )
         tr_bencDictAddInt( d, key, st->doneDate );
     else if( tr_streq( key, keylen, "downloadDir" ) )
         tr_bencDictAddStr( d, key, tr_torrentGetDownloadDir( tor ) );
+    else if( tr_streq( key, keylen, "downloadDirFreeSpace" ) )
+        tr_bencDictAddInt( d, key, tr_torrentGetDownloadDirFreeSpace( tor ) );
     else if( tr_streq( key, keylen, "downloadedEver" ) )
         tr_bencDictAddInt( d, key, st->downloadedEver );
     else if( tr_streq( key, keylen, "downloadLimit" ) )

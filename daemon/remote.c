@@ -677,6 +677,7 @@ static const char * details_keys[] = {
     "desiredAvailable",
     "doneDate",
     "downloadDir",
+    "downloadDirFreeSpace",
     "downloadedEver",
     "downloadLimit",
     "downloadLimited",
@@ -873,6 +874,9 @@ printDetails( tr_benc * top )
 
             if( tr_bencDictFindStr( t, "downloadDir", &str ) )
                 printf( "  Location: %s\n", str );
+
+            if( tr_bencDictFindInt( t, "downloadDirFreeSpace", &i ) )
+                printf( "  Location free space: %s\n", strlsize( buf, i, sizeof( buf ) ) );
 
             if( tr_bencDictFindInt( t, "sizeWhenDone", &i )
               && tr_bencDictFindInt( t, "leftUntilDone", &j ) )
