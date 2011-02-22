@@ -234,12 +234,12 @@ struct tr_peerMgr
 {
     tr_session    * session;
     tr_ptrArray     incomingHandshakes; /* tr_handshake */
+    int             cppadd; /** @see tr_peerMgrSetMaxConnectionsPerSecond */
+    int             cppacc; /** @see makeNewPeerConnections */
     struct event  * bandwidthTimer;
     struct event  * rechokeTimer;
     struct event  * refillUpkeepTimer;
     struct event  * atomTimer;
-    int             cppadd;
-    int             cppacc;
 };
 
 #define tordbg( t, ... ) \
