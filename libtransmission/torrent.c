@@ -1798,9 +1798,9 @@ tr_torrentRemovePieceTemp( tr_torrent * tor )
     tr_list * files = NULL;
     const char * path = tor->pieceTempDir;
 
-    if(( dir = opendir( path )))
+    if( ( dir = opendir( path ) ) )
     {
-        while(( d = readdir( dir )))
+        while( ( d = readdir( dir ) ) )
         {
             const char * name = d->d_name;
 
@@ -2263,6 +2263,7 @@ usePieceTemp( tr_torrent * tor, tr_file_index_t i )
                              i, TR_FD_INDEX_FILE, FALSE );
     return fd < 0 && !tr_torrentFindFile2( tor, i, NULL, NULL );
 }
+
 /**
  * @note This function assumes @a tor is valid and already locked, and
  *       @a file_index is a valid file index for the torrent.
