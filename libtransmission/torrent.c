@@ -1778,13 +1778,8 @@ tr_torrentStop( tr_torrent * tor )
     }
 }
 
-static void
-deleteLocalFile( const char * filename, tr_fileFunc fileFunc )
-{
-    struct stat sb;
-    if( !stat( filename, &sb ) ) /* if file exists... */
-        fileFunc( filename );
-}
+static void deleteLocalFile( const char  * filename,
+                             tr_fileFunc   fileFunc );
 
 /**
  * @brief Delete all temporary piece files for the torrent.
@@ -2183,13 +2178,7 @@ tr_torrentGetFilePriorities( const tr_torrent * tor )
 ***
 **/
 
-static tr_bool
-fileExists( const char * filename )
-{
-    struct stat sb;
-    const tr_bool ok = !stat( filename, &sb );
-    return ok;
-}
+static tr_bool fileExists( const char * filename );
 
 tr_bool
 tr_torrentFindPieceTemp2( const tr_torrent  * tor,
@@ -2912,6 +2901,14 @@ walkLocalData( const tr_torrent * tor,
 }
 
 static void
+deleteLocalFile( const char * filename, tr_fileFunc fileFunc )
+{
+    struct stat sb;
+    if( !stat( filename, &sb ) ) /* if file exists... */
+        fileFunc( filename );
+}
+
+static void
 deleteLocalData( tr_torrent * tor, tr_fileFunc fileFunc )
 {
     int i, n;
@@ -3185,6 +3182,14 @@ tr_torrentFileCompleted( tr_torrent * tor, tr_file_index_t fileNum )
 /***
 ****
 ***/
+
+static tr_bool
+fileExists( const char * filename )
+{
+    struct stat sb;
+    const tr_bool ok = !stat( filename, &sb );
+    return ok;
+}
 
 tr_bool
 tr_torrentFindFile2( const tr_torrent * tor, tr_file_index_t fileNum,
