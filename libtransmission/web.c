@@ -331,10 +331,10 @@ tr_select( int nfds,
 static void
 tr_webThreadFunc( void * vsession )
 {
-    int unused;
     CURLM * multi;
     struct tr_web * web;
     int taskCount = 0;
+    struct tr_web_task * task;
     tr_session * session = vsession;
 
     /* try to enable ssl for https support; but if that fails,
@@ -352,9 +352,9 @@ tr_webThreadFunc( void * vsession )
     for( ;; )
     {
         long msec;
+        int unused;
         CURLMsg * msg;
         CURLMcode mcode;
-        struct tr_web_task * task;
 
         if( web->close_mode == TR_WEB_CLOSE_NOW )
             break;
@@ -427,6 +427,13 @@ tr_webThreadFunc( void * vsession )
                 --taskCount;
             }
         }
+    }
+
+    /* Discard any remaining tasks.
+     * This is rare, but can happen on shutdown with unresponsive trackers. */
+    while(( task = tr_list_pop_front( &web->tasks ))) {
+        dbgmsg( "Discarding task \"%s\"", task->url );
+        task_free( task );
     }
 
     /* cleanup */
