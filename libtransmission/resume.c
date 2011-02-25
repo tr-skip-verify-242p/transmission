@@ -437,17 +437,17 @@ loadProgress( tr_benc * dict, tr_torrent * tor )
 
         err = NULL;
 
-        if(( b = tr_bencDictFind( prog, KEY_PROGRESS_BLOCKS )))
-        {
-            if( !tr_bitsetFromBenc( &bitset, b ) )
-                err = "Invalid value for PIECES";
-        }
-        else if( tr_bencDictFindStr( prog, KEY_PROGRESS_HAVE, &str ) )
+        if( tr_bencDictFindStr( prog, KEY_PROGRESS_HAVE, &str ) )
         {
             if( !strcmp( str, "all" ) )
                 tr_bitsetSetHaveAll( &bitset );
             else
                 err = "Invalid value for HAVE";
+        }
+        else if(( b = tr_bencDictFind( prog, KEY_PROGRESS_BLOCKS )))
+        {
+            if( !tr_bitsetFromBenc( &bitset, b ) )
+                err = "Invalid value for PIECES";
         }
         else if( tr_bencDictFindRaw( prog, KEY_PROGRESS_BITFIELD, &raw, &rawlen ) )
         {
