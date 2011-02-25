@@ -186,6 +186,7 @@ tr_cpBlockAdd( tr_completion * cp, tr_block_index_t block )
     }
 }
 
+
 tr_bool
 tr_cpBlockBitsetInit( tr_completion * cp, const tr_bitset * blocks )
 {
@@ -249,7 +250,7 @@ tr_cpBlockBitsetInit( tr_completion * cp, const tr_bitset * blocks )
         }
     }
 
-    return TRUE;
+    return success;
 }
 
 /***
