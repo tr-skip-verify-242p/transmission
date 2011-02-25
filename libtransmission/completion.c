@@ -205,7 +205,7 @@ tr_cpBlockBitsetInit( tr_completion * cp, const tr_bitset * blocks )
         const tr_bitfield * src = &blocks->bitfield;
         tr_bitfield * tgt = &cp->blockBitset.bitfield;
 
-        tr_bitfieldConstruct( tgt, tor->blockCount );
+        tr_bitfieldConstruct( tgt, tor->block_count );
 
         /* The bitfield of block flags is typically loaded from a resume file.
            Test the bitfield's length in case the resume file is corrupt */
@@ -219,18 +219,19 @@ tr_cpBlockBitsetInit( tr_completion * cp, const tr_bitset * blocks )
 
             /* update cp.sizeNow and the cp.blockBitset flags */
             i = tr_bitfieldCountTrueBits( tgt );
-            if( i == tor->blockCount ) {
+            if( i == tor->block_count ) {
                 tr_bitsetSetHaveAll( &cp->blockBitset );
                 cp->sizeNow = cp->tor->info.totalSize;
             } else if( !i ) {
                 tr_bitsetSetHaveNone( &cp->blockBitset );
                 cp->sizeNow = 0;
             } else {
+                tr_block_index_t bi;
                 cp->blockBitset.haveAll = cp->blockBitset.haveNone = FALSE;
-                cp->sizeNow = tr_bitfieldCountRange( tgt, 0, tor->blockCount-1 );
-                cp->sizeNow *= tor->blockSize;
-                if( tr_bitfieldHas( tgt, tor->blockCount-1 ) )
-                    cp->sizeNow += tr_torBlockCountBytes( tor, tor->blockCount-1 );
+                cp->sizeNow = 0;
+                for( bi = 0; bi < tor->block_count; ++bi )
+                    if( tr_bitfieldHas( tgt, bi ) )
+                        cp->sizeNow += tr_torBlockCountBytes( tor, bi );
             }
 
             /* update complete_blocks_in_piece */
@@ -297,7 +298,7 @@ void
 tr_cpGetAmountDone( const tr_completion * cp, float * tab, int tabCount )
 {
     int i, b;
-    const int span = cp->tor->blockCount / tabCount;
+    const int span = cp->tor->block_count / tabCount;
 
     for( i=b=0; i<tabCount; ++i, b+=span )
         tab[i] = tr_bitsetCountRange(&cp->blockBitset,b,b+span) / (float)span;
