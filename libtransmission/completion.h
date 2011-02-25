@@ -156,6 +156,8 @@ void tr_cpBlockAdd( tr_completion * cp, tr_block_index_t i );
 
 tr_bool tr_cpBlockBitsetInit( tr_completion * cp, const tr_bitset * blocks );
 
+void      tr_cpReset( tr_completion * completion );
+
 /***
 ****
 ***/
