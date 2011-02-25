@@ -721,7 +721,9 @@ torrentInitFromInfo( tr_torrent * tor )
 
 OUT:
     tr_cpConstruct( &tor->completion, tor );
+
     tr_torrentInitFilePieces( tor );
+
     tor->completeness = tr_cpGetStatus( &tor->completion );
 }
 
