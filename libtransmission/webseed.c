@@ -155,7 +155,7 @@ on_idle( tr_webseed * w )
     {
         int i;
         int got = 0;
-        const int max = tor->blockCountInPiece;
+        const int max = tor->whole_piece_block_count;
         const int want = max - tr_list_size( w->tasks );
         tr_block_index_t * blocks = NULL;
 
@@ -174,8 +174,8 @@ on_idle( tr_webseed * w )
             task->torrent_id = w->torrent_id;
             task->block = b;
             task->piece_index = tr_torBlockPiece( tor, b );
-            task->piece_offset = ( tor->blockSize * b )
-                                - ( tor->info.pieceSize * task->piece_index );
+            task->piece_offset
+                = tr_torBlockPieceByte( tor, b, task->piece_index );
             task->length = tr_torBlockCountBytes( tor, b );
             task->content = evbuffer_new( );
             evbuffer_add_cb( task->content, on_content_changed, w );

@@ -36,7 +36,7 @@ tr_cpConstruct( tr_completion * cp, tr_torrent * tor )
 {
     cp->tor = tor;
     cp->completeBlocks = NULL;
-    tr_bitsetConstruct( &cp->blockBitset, tor->blockCount );
+    tr_bitsetConstruct( &cp->blockBitset, tor->block_count );
     tr_cpReset( cp );
     return cp;
 }
@@ -66,14 +66,6 @@ tr_cpGetStatus( const tr_completion * cp )
     if( cp->sizeNow == cp->tor->info.totalSize ) return TR_SEED;
     if( cp->sizeNow == tr_cpSizeWhenDone( cp ) ) return TR_PARTIAL_SEED;
     return TR_LEECH;
-}
-
-/* how many blocks are in this piece? */
-static inline uint16_t
-countBlocksInPiece( const tr_torrent * tor, const tr_piece_index_t piece )
-{
-    return piece + 1 == tor->info.pieceCount ? tor->blockCountInLastPiece
-                                             : tor->blockCountInPiece;
 }
 
 static uint16_t *
@@ -115,7 +107,7 @@ tr_cpBlocksMissing( const tr_completion * ccp )
         {
             if( !info->pieces[i].dnd )
             {
-                wanted += countBlocksInPiece( tor, i );
+                wanted += tr_torPieceCountBlocks( tor, i );
                 complete += complete_blocks[i];
             }
         }
@@ -213,7 +205,7 @@ tr_cpBlockBitsetInit( tr_completion * cp, const tr_bitset * blocks )
         const tr_bitfield * src = &blocks->bitfield;
         tr_bitfield * tgt = &cp->blockBitset.bitfield;
 
-        tr_bitfieldConstruct( tgt, tor->blockCount );
+        tr_bitfieldConstruct( tgt, tor->block_count );
 
         /* The bitfield of block flags is typically loaded from a resume file.
            Test the bitfield's length in case the resume file is corrupt */
@@ -227,18 +219,19 @@ tr_cpBlockBitsetInit( tr_completion * cp, const tr_bitset * blocks )
 
             /* update cp.sizeNow and the cp.blockBitset flags */
             i = tr_bitfieldCountTrueBits( tgt );
-            if( i == tor->blockCount ) {
+            if( i == tor->block_count ) {
                 tr_bitsetSetHaveAll( &cp->blockBitset );
                 cp->sizeNow = cp->tor->info.totalSize;
             } else if( !i ) {
                 tr_bitsetSetHaveNone( &cp->blockBitset );
                 cp->sizeNow = 0;
             } else {
+                tr_block_index_t bi;
                 cp->blockBitset.haveAll = cp->blockBitset.haveNone = FALSE;
-                cp->sizeNow = tr_bitfieldCountRange( tgt, 0, tor->blockCount-1 );
-                cp->sizeNow *= tor->blockSize;
-                if( tr_bitfieldHas( tgt, tor->blockCount-1 ) )
-                    cp->sizeNow += tr_torBlockCountBytes( tor, tor->blockCount-1 );
+                cp->sizeNow = 0;
+                for( bi = 0; bi < tor->block_count; ++bi )
+                    if( tr_bitfieldHas( tgt, bi ) )
+                        cp->sizeNow += tr_torBlockCountBytes( tor, bi );
             }
 
             /* update complete_blocks_in_piece */
@@ -305,7 +298,7 @@ void
 tr_cpGetAmountDone( const tr_completion * cp, float * tab, int tabCount )
 {
     int i, b;
-    const int span = cp->tor->blockCount / tabCount;
+    const int span = cp->tor->block_count / tabCount;
 
     for( i=b=0; i<tabCount; ++i, b+=span )
         tab[i] = tr_bitsetCountRange(&cp->blockBitset,b,b+span) / (float)span;
@@ -317,7 +310,26 @@ tr_cpMissingBlocksInPiece( const tr_completion * cp, tr_piece_index_t i )
     if( isSeed( cp ) )
         return 0;
 
-    return countBlocksInPiece( cp->tor, i ) - getCompleteBlocks(cp)[i];
+    return tr_torPieceCountBlocks( cp->tor, i ) - getCompleteBlocks( cp )[i];
+}
+
+uint64_t
+tr_cpMissingBytesInPiece( const tr_completion * cp, tr_piece_index_t pi )
+{
+    const tr_torrent * tor = cp->tor;
+    tr_block_index_t bs, be, bi;
+    uint64_t s = 0;
+
+    if( tr_cpMissingBlocksInPiece( cp, pi ) == 0 )
+    if( isSeed( cp ) )
+        return 0;
+
+    bs = tr_torPieceFirstBlock( tor, pi );
+    be = bs + tr_torPieceCountBlocks( tor, pi );
+    for( bi = bs; bi < be; ++bi )
+        if( !tr_cpBlockIsComplete( cp, bi ) )
+            s += tr_torBlockCountBytes( tor, bi );
+    return s;
 }
 
 tr_bool

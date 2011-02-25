@@ -1733,7 +1733,7 @@ updateDesiredRequestCount( tr_peermsgs * msgs )
 
         /* use this desired rate to figure out how
          * many requests we should send to this peer */
-        estimatedBlocksInPeriod = ( rate_Bps * seconds ) / torrent->blockSize;
+        estimatedBlocksInPeriod = ( rate_Bps * seconds ) / torrent->block_size;
         msgs->desiredRequestCount = MAX( floor, estimatedBlocksInPeriod );
 
         /* honor the peer's maximum request count, if specified */
@@ -1904,7 +1904,7 @@ fillOutputBuffer( tr_peermsgs * msgs, time_t now )
     ***  Data Blocks
     **/
 
-    if( ( tr_peerIoGetWriteBufferSpace( msgs->peer->io, now ) >= msgs->torrent->blockSize )
+    if( ( tr_peerIoGetWriteBufferSpace( msgs->peer->io, now ) >= msgs->torrent->block_size )
         && popNextRequest( msgs, &req ) )
     {
         --msgs->prefetchCount;
