@@ -130,9 +130,6 @@ int tr_cpMissingBlocksInPiece( const tr_completion * cp, tr_piece_index_t i );
 uint64_t tr_cpMissingBytesInPiece( const tr_completion * cp,
                                    tr_piece_index_t      piece );
 
-tr_bool  tr_cpPieceIsComplete( const tr_completion * cp,
-                               tr_piece_index_t      piece );
-
 static inline tr_bool
 tr_cpPieceIsComplete( const tr_completion * cp, tr_piece_index_t i )
 {
