@@ -323,7 +323,7 @@ tr_cpMissingBlocksInPiece( const tr_completion * cp, tr_piece_index_t i )
     if( isSeed( cp ) )
         return 0;
 
-    return tr_torPieceCountBlocks( cp->tor, i ) - getCompleteBlocks( cp )[i];
+    return countBlocksInPiece( cp->tor, i ) - getCompleteBlocks(cp)[i];
 }
 
 tr_bool
