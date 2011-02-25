@@ -305,6 +305,12 @@ tr_cpGetAmountDone( const tr_completion * cp, float * tab, int tabCount )
 }
 
 int
+tr_cpCompleteBlocksInPiece( const tr_completion * cp, tr_piece_index_t piece )
+{
+    return getCompleteBlocks( cp )[piece];
+}
+
+int
 tr_cpMissingBlocksInPiece( const tr_completion * cp, tr_piece_index_t i )
 {
     if( isSeed( cp ) )
