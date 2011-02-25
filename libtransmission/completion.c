@@ -313,6 +313,25 @@ tr_cpMissingBlocksInPiece( const tr_completion * cp, tr_piece_index_t i )
     return tr_torPieceCountBlocks( cp->tor, i ) - getCompleteBlocks( cp )[i];
 }
 
+uint64_t
+tr_cpMissingBytesInPiece( const tr_completion * cp, tr_piece_index_t pi )
+{
+    const tr_torrent * tor = cp->tor;
+    tr_block_index_t bs, be, bi;
+    uint64_t s = 0;
+
+    if( tr_cpMissingBlocksInPiece( cp, pi ) == 0 )
+    if( isSeed( cp ) )
+        return 0;
+
+    bs = tr_torPieceFirstBlock( tor, pi );
+    be = bs + tr_torPieceCountBlocks( tor, pi );
+    for( bi = bs; bi < be; ++bi )
+        if( !tr_cpBlockIsComplete( cp, bi ) )
+            s += tr_torBlockCountBytes( tor, bi );
+    return s;
+}
+
 tr_bool
 tr_cpFileIsComplete( const tr_completion * cp, tr_file_index_t i )
 {
