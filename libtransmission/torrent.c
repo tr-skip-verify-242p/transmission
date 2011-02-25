@@ -1690,7 +1690,7 @@ verifyTorrent( void * vtor )
     tr_torrentClearError( tor );
     if( quickVerify( tor ) )
         torrentRecheckDoneCB( tor );
-     else
+    else
         tr_verifyAdd( tor, torrentRecheckDoneCB );
 
     tr_sessionUnlock( tor->session );
