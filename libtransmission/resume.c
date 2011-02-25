@@ -409,17 +409,19 @@ loadIdleLimits( tr_benc *    dict,
 static void
 saveProgress( tr_benc * dict, tr_torrent * tor )
 {
-    tr_benc * p = tr_bencDictAdd( dict, KEY_PROGRESS );
-    tr_bencInitDict( p, 1 );
+    tr_benc * prog = tr_bencDictAdd( dict, KEY_PROGRESS );
+    tr_bencInitDict( prog, 1 );
 
+    /* add the progress */
     if( tor->completeness == TR_SEED )
     {
-        tr_bencDictAddStr( p, KEY_PROGRESS_HAVE, "all" );
+        tr_bencDictAddStr( prog, KEY_PROGRESS_HAVE, "all" );
         return;
     }
 
+    /* add the blocks bitfield */
     tr_bitsetToBenc( tr_cpBlockBitset( &tor->completion ),
-                     tr_bencDictAdd( p, KEY_PROGRESS_BLOCKS ) );
+                     tr_bencDictAdd( prog, KEY_PROGRESS_BLOCKS ) );
 }
 
 static uint64_t
