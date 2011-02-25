@@ -36,7 +36,6 @@
  #include <ws2tcpip.h>
 #else
  #include <sys/socket.h>
- #include <net/if.h>
  #include <netinet/in.h>
  #include <netinet/tcp.h>
  #include <arpa/inet.h> /* inet_addr */
@@ -250,15 +249,6 @@ tr_netSetCongestionControl( int s UNUSED, const char *algorithm UNUSED )
 #endif
 }
 
-int
-tr_netSetBindToDevice( int s, const char * devstr )
-{
-    struct ifreq ifr;
-    memset( &ifr, 0, sizeof( ifr ) );
-    tr_strlcpy( ifr.ifr_name, devstr, sizeof( ifr.ifr_name ) );
-    return setsockopt( s, SOL_SOCKET, SO_BINDTODEVICE, &ifr, sizeof( ifr ) );
-}
-
 static socklen_t
 setup_sockaddr( const tr_address        * addr,
                 tr_port                   port,
@@ -302,7 +292,6 @@ tr_netOpenPeerSocket( tr_session        * session,
     const tr_address      * source_addr;
     socklen_t               sourcelen;
     struct sockaddr_storage source_sock;
-    const char            * bindif;
 
     assert( tr_isAddress( addr ) );
 
@@ -323,13 +312,6 @@ tr_netOpenPeerSocket( tr_session        * session,
     if( evutil_make_socket_nonblocking( s ) < 0 ) {
         tr_netClose( session, s );
         return -1;
-    }
-
-    bindif = tr_sessionGetBindInterface( session );
-    if( bindif && bindif[0] != '\0' && tr_netSetBindToDevice( s, bindif ) < 0 )
-    {
-        tr_inf( "Unable to bind to interface \"%s\" for socket %d: %s",
-                bindif, s, tr_strerror( sockerrno ) );
     }
 
     addrlen = setup_sockaddr( addr, port, &sock );

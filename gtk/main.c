@@ -1439,10 +1439,6 @@ on_prefs_changed( TrCore * core UNUSED, const char * key, gpointer data )
     {
         tr_sessionSetPortForwardingEnabled( tr, gtr_pref_flag_get( key ) );
     }
-    else if( !strcmp( key, TR_PREFS_KEY_PEER_SOCKET_INTERFACE ) )
-    {
-        tr_sessionSetBindInterface( tr, gtr_pref_string_get( key ) );
-    }
     else if( !strcmp( key, TR_PREFS_KEY_PEX_ENABLED ) )
     {
         tr_sessionSetPexEnabled( tr, gtr_pref_flag_get( key ) );
