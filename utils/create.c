@@ -78,17 +78,18 @@ parseCommandLine( int argc, const char ** argv )
 static char*
 tr_getcwd( void )
 {
+    char * result;
     char buf[2048];
-    *buf = '\0';
 #ifdef WIN32
-    _getcwd( buf, sizeof( buf ) );
+    result = _getcwd( buf, sizeof( buf ) );
 #else
-    if( !getcwd( buf, sizeof( buf ) ) )
-    {
-        fprintf( stderr, "getcwd: %s", strerror( errno ) );
-        buf[0] = '\0';
-    }
+    result = getcwd( buf, sizeof( buf ) );
 #endif
+    if( result == NULL ) 
+    {
+        fprintf( stderr, "getcwd error: \"%s\"", tr_strerror( errno ) );
+        *buf = '\0';
+    }
     return tr_strdup( buf );
 }
 

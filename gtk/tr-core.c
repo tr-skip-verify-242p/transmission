@@ -771,6 +771,7 @@ tr_core_init( GTypeInstance *  instance,
                       G_TYPE_POINTER,   /* tr_torrent* */
                       G_TYPE_DOUBLE,    /* tr_stat.pieceUploadSpeed_KBps */
                       G_TYPE_DOUBLE,    /* tr_stat.pieceDownloadSpeed_KBps */
+                      G_TYPE_DOUBLE,    /* tr_stat.recheckProgress */
                       G_TYPE_BOOLEAN,   /* filter.c:ACTIVITY_FILTER_ACTIVE */
                       G_TYPE_INT,       /* tr_stat.activity */
                       G_TYPE_UCHAR,     /* tr_stat.finished */
@@ -865,9 +866,11 @@ tr_core_close( TrCore * core )
 }
 
 static char*
-get_collated_name( const tr_info * inf )
+get_collated_name( const tr_torrent * tor )
 {
-    char * down = g_utf8_strdown( inf->name ? inf->name : "", -1 );
+    const char * name = tr_torrentName( tor );
+    const tr_info * inf = tr_torrentInfo( tor );
+    char * down = g_utf8_strdown( name ? name : "", -1 );
     char * collated = g_strdup_printf( "%s\t%s", down, inf->hashString );
     g_free( down );
     return collated;
@@ -876,30 +879,31 @@ get_collated_name( const tr_info * inf )
 void
 tr_core_add_torrent( TrCore * self, TrTorrent * gtor, gboolean doNotify )
 {
-    const tr_info * inf = tr_torrent_info( gtor );
     const tr_stat * st = tr_torrent_stat( gtor );
     tr_torrent * tor = tr_torrent_handle( gtor );
-    char *  collated = get_collated_name( inf );
+    const char * name = tr_torrentName( tor );
+    char * collated = get_collated_name( tor );
     char *  trackers = torrentTrackerString( tor );
     GtkListStore *  store = GTK_LIST_STORE( tr_core_raw_model( self ) );
     GtkTreeIter  unused;
 
     gtk_list_store_insert_with_values( store, &unused, 0,
-                                       MC_NAME,          inf->name,
-                                       MC_NAME_COLLATED, collated,
-                                       MC_TORRENT,       gtor,
-                                       MC_TORRENT_RAW,   tor,
-                                       MC_SPEED_UP,      st->pieceUploadSpeed_KBps,
-                                       MC_SPEED_DOWN,    st->pieceDownloadSpeed_KBps,
-                                       MC_ACTIVE,        isTorrentActive( st ),
-                                       MC_ACTIVITY,      st->activity,
-                                       MC_FINISHED,      st->finished,
-                                       MC_PRIORITY,      tr_torrentGetPriority( tor ),
-                                       MC_TRACKERS,      trackers,
-                                       -1 );
+        MC_NAME,              name,
+        MC_NAME_COLLATED,     collated,
+        MC_TORRENT,           gtor,
+        MC_TORRENT_RAW,       tor,
+        MC_SPEED_UP,          st->pieceUploadSpeed_KBps,
+        MC_SPEED_DOWN,        st->pieceDownloadSpeed_KBps,
+        MC_RECHECK_PROGRESS,  st->recheckProgress,
+        MC_ACTIVE,            isTorrentActive( st ),
+        MC_ACTIVITY,          st->activity,
+        MC_FINISHED,          st->finished,
+        MC_PRIORITY,          tr_torrentGetPriority( tor ),
+        MC_TRACKERS,          trackers,
+        -1 );
 
     if( doNotify )
-        gtr_notify_added( inf->name );
+        gtr_notify_added( name );
 
     /* cleanup */
     g_object_unref( G_OBJECT( gtor ) );
@@ -1051,6 +1055,9 @@ struct url_dialog_data
     TrCore * core;
     tr_ctor * ctor;
     char * url;
+
+    tr_bool did_connect;
+    tr_bool did_timeout;
     long response_code;
 };
 
@@ -1084,6 +1091,8 @@ onURLDoneIdle( gpointer vdata )
 
 static void
 onURLDone( tr_session   * session,
+           tr_bool        did_connect, 
+           tr_bool        did_timeout,
            long           response_code,
            const void   * response,
            size_t         response_byte_count,
@@ -1091,6 +1100,8 @@ onURLDone( tr_session   * session,
 {
     struct url_dialog_data * data = vdata;
 
+    data->did_connect = did_connect;
+    data->did_timeout = did_timeout;
     data->response_code = response_code;
     data->ctor = tr_ctorNew( session );
     tr_core_apply_defaults( data->ctor );
@@ -1299,6 +1310,7 @@ update_foreach( GtkTreeModel * model,
     char * oldTrackers, * newTrackers;
     double oldUpSpeed, newUpSpeed;
     double oldDownSpeed, newDownSpeed;
+    double oldRecheckProgress, newRecheckProgress;
     gboolean oldActive, newActive;
     const tr_stat * st;
     TrTorrent * gtor;
@@ -1316,6 +1328,7 @@ update_foreach( GtkTreeModel * model,
                         MC_PRIORITY, &oldPriority,
                         MC_TRACKERS, &oldTrackers,
                         MC_SPEED_UP, &oldUpSpeed,
+                        MC_RECHECK_PROGRESS, &oldRecheckProgress,
                         MC_SPEED_DOWN, &oldDownSpeed,
                         -1 );
 
@@ -1329,9 +1342,10 @@ update_foreach( GtkTreeModel * model,
     newTrackers = torrentTrackerString( tor );
     newUpSpeed = st->pieceUploadSpeed_KBps;
     newDownSpeed = st->pieceDownloadSpeed_KBps;
+    newRecheckProgress = st->recheckProgress;
     newActivePeerCount = st->peersSendingToUs + st->peersGettingFromUs + st->webseedsSendingToUs;
     newError = st->error;
-    newCollatedName = get_collated_name( tr_torrent_info( gtor ) );
+    newCollatedName = get_collated_name( tor );
 
     /* updating the model triggers off resort/refresh,
        so don't do it unless something's actually changed... */
@@ -1344,7 +1358,8 @@ update_foreach( GtkTreeModel * model,
         || gtr_strcmp0( oldTrackers, newTrackers )
         || gtr_strcmp0( oldCollatedName, newCollatedName )
         || gtr_compare_double( newUpSpeed, oldUpSpeed, 3 )
-        || gtr_compare_double( newDownSpeed, oldDownSpeed, 3 ) )
+        || gtr_compare_double( newDownSpeed, oldDownSpeed, 3 )
+        || gtr_compare_double( newRecheckProgress, oldRecheckProgress, 2 ) )
     {
         gtk_list_store_set( GTK_LIST_STORE( model ), iter,
                             MC_ACTIVE, newActive,
@@ -1357,6 +1372,7 @@ update_foreach( GtkTreeModel * model,
                             MC_TRACKERS, newTrackers,
                             MC_SPEED_UP, newUpSpeed,
                             MC_SPEED_DOWN, newDownSpeed,
+                            MC_RECHECK_PROGRESS, newRecheckProgress,
                             -1 );
     }
 

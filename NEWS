@@ -1,4 +1,17 @@
-=== Transmission 2.20 (2011/xx/yy) ===
+=== Transmission 2.30 (2011/xx/yy) ===
+==== All Platforms ====
+  * The "lazy bitfield" feature has been superceded by the "Fast Extension" BEP6
+
+
+=== Transmission 2.21 (2011/02/08) ===
+==== All Platforms ====
+  * Fix compile error in the the 2.20 tarball
+==== GTK+ ====
+  * Several updated translations
+==== Qt ====
+  * Updated Spanish translation
+
+=== Transmission 2.20 (2011/02/06) ===
 [http://trac.transmissionbt.com/query?milestone=2.20&group=component&order=severity All tickets closed by this release]
 ==== All Platforms ====
   * Remember downloaded files when a drive is unplugged

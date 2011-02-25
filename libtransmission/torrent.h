@@ -82,6 +82,22 @@ uint64_t         tr_pieceOffset( const tr_torrent * tor,
                                  uint32_t           offset,
                                  uint32_t           length );
 
+void             tr_torrentGetBlockLocation( const tr_torrent * tor, 
+                                             tr_block_index_t   block,
+                                             tr_piece_index_t * piece, 
+                                             uint32_t         * offset,
+                                             uint32_t         * length );
+
+void             tr_torGetFileBlockRange( const tr_torrent        * tor,
+                                          const tr_file_index_t     file,
+                                          tr_block_index_t        * first,
+                                          tr_block_index_t        * last );
+
+void             tr_torGetPieceBlockRange( const tr_torrent        * tor,
+                                           const tr_piece_index_t    piece,
+                                           tr_block_index_t        * first,
+                                           tr_block_index_t        * last );
+
 void             tr_torrentInitFilePriority( tr_torrent       * tor,
                                              tr_file_index_t    fileIndex,
                                              tr_priority_t      priority );
@@ -255,13 +271,6 @@ tr_torrentNext( tr_session * session, tr_torrent * current )
     return current ? current->next : session->torrentList;
 }
 
-/* get the index of this piece's first block */
-static inline tr_block_index_t
-tr_torPieceFirstBlock( const tr_torrent * tor, const tr_piece_index_t piece )
-{
-    return piece * tor->blockCountInPiece;
-}
-
 /* what piece index is this block in? */
 static inline tr_piece_index_t
 tr_torBlockPiece( const tr_torrent * tor, const tr_block_index_t block )
@@ -269,21 +278,11 @@ tr_torBlockPiece( const tr_torrent * tor, const tr_block_index_t block )
     return block / tor->blockCountInPiece;
 }
 
-/* how many blocks are in this piece? */
-static inline uint16_t
-tr_torPieceCountBlocks( const tr_torrent * tor, const tr_piece_index_t piece )
-{
-    if( piece + 1 == tor->info.pieceCount )
-        return tor->blockCountInLastPiece;
-    else
-        return tor->blockCountInPiece;
-}
-
 /* how many bytes are in this piece? */
 static inline uint32_t
 tr_torPieceCountBytes( const tr_torrent * tor, const tr_piece_index_t piece )
 {
-    return piece == tor->info.pieceCount - 1 ? tor->lastPieceSize
+    return piece + 1 == tor->info.pieceCount ? tor->lastPieceSize
                                              : tor->info.pieceSize;
 }
 
@@ -291,7 +290,7 @@ tr_torPieceCountBytes( const tr_torrent * tor, const tr_piece_index_t piece )
 static inline uint32_t
 tr_torBlockCountBytes( const tr_torrent * tor, const tr_block_index_t block )
 {
-    return block == tor->blockCount - 1 ? tor->lastBlockSize
+    return block + 1 == tor->blockCount ? tor->lastBlockSize
                                         : tor->blockSize;
 }
 
@@ -374,14 +373,6 @@ void tr_torrentSetDirty( tr_torrent * tor )
     tor->isDirty = TRUE;
 }
 
-static inline
-const char * tr_torrentName( const tr_torrent * tor )
-{
-    assert( tr_isTorrent( tor ) );
-
-    return tor->info.name;
-}
-
 uint32_t tr_getBlockSize( uint32_t pieceSize );
 
 /**
@@ -430,6 +421,8 @@ tr_bool tr_torrentPieceNeedsCheck( const tr_torrent * tor, tr_piece_index_t piec
  * @return true if the piece's passes the checksum test
  */
 tr_bool tr_torrentCheckPiece( tr_torrent * tor, tr_piece_index_t pieceIndex );
+
+time_t tr_torrentGetFileMTime( const tr_torrent * tor, tr_file_index_t i );
 
 uint64_t tr_torrentGetCurrentSizeOnDisk( const tr_torrent * tor );
 
