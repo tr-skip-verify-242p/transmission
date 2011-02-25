@@ -2976,12 +2976,7 @@ dirExists( const char * path )
     return stat( path, &sb ) == 0 && S_ISDIR( sb.st_mode );
 }
 
-static tr_bool
-fileExists( const char * filename )
-{
-    struct stat sb;
-    return stat( filename, &sb ) == 0;
-}
+static tr_bool fileExists( const char * filename );
 
 int
 tr_torrentRename( tr_torrent * tor, const char * newname )
@@ -3158,6 +3153,14 @@ tr_torrentFileCompleted( tr_torrent * tor, tr_file_index_t fileNum )
 /***
 ****
 ***/
+
+static tr_bool
+fileExists( const char * filename )
+{
+    struct stat sb;
+    const tr_bool ok = !stat( filename, &sb );
+    return ok;
+}
 
 tr_bool
 tr_torrentFindFile2( const tr_torrent * tor, tr_file_index_t fileNum,
