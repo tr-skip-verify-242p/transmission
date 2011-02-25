@@ -198,7 +198,7 @@ readOrWriteBytes( tr_session       * session,
                                               indexNum, indexType,
                                               filename, doWrite,
                                               preallocationMode,
-                                              file->length ) ) < 0 )
+                                              desiredSize ) ) < 0 )
         {
             err = errno;
             tr_torerr( tor, "tr_fdFileCheckout failed for \"%s\": %s",
