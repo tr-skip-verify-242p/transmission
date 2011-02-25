@@ -68,14 +68,6 @@ tr_cpGetStatus( const tr_completion * cp )
     return TR_LEECH;
 }
 
-/* how many blocks are in this piece? */
-static inline uint16_t
-countBlocksInPiece( const tr_torrent * tor, const tr_piece_index_t piece )
-{
-    return piece + 1 == tor->info.pieceCount ? tor->blockCountInLastPiece
-                                             : tor->blockCountInPiece;
-}
-
 static uint16_t *
 getCompleteBlocks( const tr_completion * ccp )
 {
@@ -115,7 +107,7 @@ tr_cpBlocksMissing( const tr_completion * ccp )
         {
             if( !info->pieces[i].dnd )
             {
-                wanted += countBlocksInPiece( tor, i );
+                wanted += tr_torPieceCountBlocks( tor, i );
                 complete += complete_blocks[i];
             }
         }
@@ -317,7 +309,7 @@ tr_cpMissingBlocksInPiece( const tr_completion * cp, tr_piece_index_t i )
     if( isSeed( cp ) )
         return 0;
 
-    return countBlocksInPiece( cp->tor, i ) - getCompleteBlocks(cp)[i];
+    return tr_torPieceCountBlocks( cp->tor, i ) - getCompleteBlocks( cp )[i];
 }
 
 tr_bool
