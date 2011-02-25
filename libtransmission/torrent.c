@@ -3546,12 +3546,7 @@ dirExists( const char * path )
     return stat( path, &sb ) == 0 && S_ISDIR( sb.st_mode );
 }
 
-static tr_bool
-fileExists( const char * filename )
-{
-    struct stat sb;
-    return stat( filename, &sb ) == 0;
-}
+static tr_bool fileExists( const char * filename );
 
 int
 tr_torrentRename( tr_torrent * tor, const char * newname )
