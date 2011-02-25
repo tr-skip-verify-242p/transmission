@@ -34,6 +34,7 @@
  * @{
  */
 
+struct UTPSocket;
 struct tr_peer_stat;
 struct tr_torrent;
 typedef struct tr_peerMgr tr_peerMgr;
@@ -121,11 +122,11 @@ typedef struct tr_peer
 
     time_t                   chokeChangedAt;
 
-    tr_recentHistory       * blocksSentToClient;
-    tr_recentHistory       * blocksSentToPeer;
+    tr_recentHistory         blocksSentToClient;
+    tr_recentHistory         blocksSentToPeer;
 
-    tr_recentHistory       * cancelsSentToClient;
-    tr_recentHistory       * cancelsSentToPeer;
+    tr_recentHistory         cancelsSentToClient;
+    tr_recentHistory         cancelsSentToPeer;
 
     struct tr_peermsgs     * msgs;
 }
@@ -148,6 +149,13 @@ void tr_peerMgrFree( tr_peerMgr * manager );
 tr_bool tr_peerMgrPeerIsSeed( const tr_torrent * tor,
                               const tr_address * addr );
 
+void tr_peerMgrSetUtpSupported( tr_torrent       * tor,
+                                const tr_address * addr );
+
+void tr_peerMgrSetUtpFailed( tr_torrent *tor,
+                             const tr_address *addr,
+                             tr_bool failed );
+
 void tr_peerMgrGetNextRequests( tr_torrent          * torrent,
                                 tr_peer             * peer,
                                 int                   numwant,
@@ -163,7 +171,8 @@ void tr_peerMgrRebuildRequests( tr_torrent * torrent );
 void tr_peerMgrAddIncoming( tr_peerMgr  * manager,
                             tr_address  * addr,
                             tr_port       port,
-                            int           socket );
+                            int           socket,
+                            struct UTPSocket *utp_socket );
 
 tr_pex * tr_peerMgrCompactToPex( const void    * compact,
                                  size_t          compactLen,
@@ -221,6 +230,8 @@ void tr_peerMgrTorrentAvailability( const tr_torrent * tor,
                                     unsigned int       tabCount );
 
 struct tr_bitfield* tr_peerMgrGetAvailable( const tr_torrent * tor );
+
+void tr_peerMgrOnTorrentGotMetainfo( tr_torrent * tor );
 
 void tr_peerMgrOnBlocklistChanged( tr_peerMgr * manager );
 

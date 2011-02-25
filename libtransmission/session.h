@@ -95,10 +95,12 @@ struct tr_session
     tr_bool                      isPortRandom;
     tr_bool                      isPexEnabled;
     tr_bool                      isDHTEnabled;
+    tr_bool                      isUTPEnabled;
     tr_bool                      isLPDEnabled;
     tr_bool                      isBlocklistEnabled;
     tr_bool                      isProxyEnabled;
     tr_bool                      isProxyAuthEnabled;
+    tr_bool                      isPrefetchEnabled;
     tr_bool                      isTorrentDoneScriptEnabled;
     tr_bool                      isClosed;
     tr_bool                      useLazyBitfield;

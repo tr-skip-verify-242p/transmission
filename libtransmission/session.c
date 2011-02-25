@@ -44,6 +44,7 @@
 #include "stats.h"
 #include "torrent.h"
 #include "tr-udp.h"
+#include "tr-utp.h"
 #include "tr-lpd.h"
 #include "trevent.h"
 #include "utils.h"
@@ -53,13 +54,14 @@
 
 enum
 {
-    SAVE_INTERVAL_SECS = 360,
-
 #ifdef TR_LIGHTWEIGHT
-    DEFAULT_CACHE_SIZE_MB = 2
+    DEFAULT_CACHE_SIZE_MB = 2,
+    DEFAULT_PREFETCH_ENABLED = FALSE,
 #else
-    DEFAULT_CACHE_SIZE_MB = 4
+    DEFAULT_CACHE_SIZE_MB = 4,
+    DEFAULT_PREFETCH_ENABLED = TRUE,
 #endif
+    SAVE_INTERVAL_SECS = 360
 };
 
 
@@ -216,7 +218,8 @@ accept_incoming_peer( int fd, short what UNUSED, void * vsession )
     if( clientSocket > 0 ) {
         tr_deepLog( __FILE__, __LINE__, NULL, "new incoming connection %d (%s)",
                    clientSocket, tr_peerIoAddrStr( &clientAddr, clientPort ) );
-        tr_peerMgrAddIncoming( session->peerMgr, &clientAddr, clientPort, clientSocket );
+        tr_peerMgrAddIncoming( session->peerMgr, &clientAddr, clientPort,
+                               clientSocket, NULL );
     }
 }
 
@@ -335,6 +338,7 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddStr ( d, TR_PREFS_KEY_BLOCKLIST_URL,            "http://www.example.com/blocklist" );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_MAX_CACHE_SIZE_MB,        DEFAULT_CACHE_SIZE_MB );
     tr_bencDictAddBool( d, TR_PREFS_KEY_DHT_ENABLED,              TRUE );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_UTP_ENABLED,              FALSE );
     tr_bencDictAddBool( d, TR_PREFS_KEY_LPD_ENABLED,              FALSE );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_DOWNLOAD_DIR,             tr_getDefaultDownloadDir( ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_DSPEED_KBps,              100 );
@@ -344,7 +348,6 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddBool( d, TR_PREFS_KEY_IDLE_LIMIT_ENABLED,       FALSE );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_INCOMPLETE_DIR,           tr_getDefaultDownloadDir( ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED,   FALSE );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_LAZY_BITFIELD,            TRUE );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_MSGLEVEL,                 TR_MSG_INF );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_OPEN_FILE_LIMIT,          atoi( TR_DEFAULT_OPEN_FILE_LIMIT_STR ) );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_ID_PREFIX,           "" );
@@ -366,6 +369,7 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PROXY_PORT,               80 );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PROXY_TYPE,               TR_PROXY_HTTP );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_PROXY_USERNAME,           "" );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_PREFETCH_ENABLED,         DEFAULT_PREFETCH_ENABLED );
     tr_bencDictAddReal( d, TR_PREFS_KEY_RATIO,                    2.0 );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RATIO_ENABLED,            FALSE );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RENAME_PARTIAL_FILES,     TRUE );
@@ -407,6 +411,7 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddStr ( d, TR_PREFS_KEY_BLOCKLIST_URL,            tr_blocklistGetURL( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_MAX_CACHE_SIZE_MB,        tr_sessionGetCacheLimit_MB( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_DHT_ENABLED,              s->isDHTEnabled );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_UTP_ENABLED,              s->isUTPEnabled );
     tr_bencDictAddBool( d, TR_PREFS_KEY_LPD_ENABLED,              s->isLPDEnabled );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_DOWNLOAD_DIR,             s->downloadDir );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_DSPEED_KBps,              tr_sessionGetSpeedLimit_KBps( s, TR_DOWN ) );
@@ -416,7 +421,6 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddBool( d, TR_PREFS_KEY_IDLE_LIMIT_ENABLED,       tr_sessionIsIdleLimited( s ) );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_INCOMPLETE_DIR,           tr_sessionGetIncompleteDir( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED,   tr_sessionIsIncompleteDirEnabled( s ) );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_LAZY_BITFIELD,            s->useLazyBitfield );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_MSGLEVEL,                 tr_getMessageLevel( ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_OPEN_FILE_LIMIT,          tr_fdGetFileLimit( s ) );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_ID_PREFIX,           tr_sessionGetPeerIdPrefix( s ) );
@@ -439,6 +443,7 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PROXY_PORT,               s->proxyPort );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PROXY_TYPE,               s->proxyType );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_PROXY_USERNAME,           s->proxyUsername );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_PREFETCH_ENABLED,         s->isPrefetchEnabled );
     tr_bencDictAddReal( d, TR_PREFS_KEY_RATIO,                    s->desiredRatio );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RATIO_ENABLED,            s->isRatioLimited );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RENAME_PARTIAL_FILES,     tr_sessionIsIncompleteFileNamingEnabled( s ) );
@@ -793,8 +798,6 @@ sessionSetImpl( void * vdata )
     /* misc features */
     if( tr_bencDictFindInt( settings, TR_PREFS_KEY_MAX_CACHE_SIZE_MB, &i ) )
         tr_sessionSetCacheLimit_MB( session, i );
-    if( tr_bencDictFindBool( settings, TR_PREFS_KEY_LAZY_BITFIELD, &boolVal ) )
-        tr_sessionSetLazyBitfieldEnabled( session, boolVal );
     if( tr_bencDictFindStr( settings, TR_PREFS_KEY_PEER_ID_PREFIX, &str ) )
         tr_sessionSetPeerIdPrefix( session, str );
     if( tr_bencDictFindStr( settings, TR_PREFS_KEY_USER_AGENT, &str ) )
@@ -805,6 +808,8 @@ sessionSetImpl( void * vdata )
         tr_sessionSetPexEnabled( session, boolVal );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_DHT_ENABLED, &boolVal ) )
         tr_sessionSetDHTEnabled( session, boolVal );
+    if( tr_bencDictFindBool( settings, TR_PREFS_KEY_UTP_ENABLED, &boolVal ) )
+        tr_sessionSetUTPEnabled( session, boolVal );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_LPD_ENABLED, &boolVal ) )
         tr_sessionSetLPDEnabled( session, boolVal );
     if( tr_bencDictFindInt( settings, TR_PREFS_KEY_ENCRYPTION, &i ) )
@@ -825,6 +830,8 @@ sessionSetImpl( void * vdata )
         tr_sessionSetDeleteSource( session, boolVal );
 
     /* files and directories */
+    if( tr_bencDictFindBool( settings, TR_PREFS_KEY_PREFETCH_ENABLED, &boolVal ) )
+        session->isPrefetchEnabled = boolVal;
     if( tr_bencDictFindInt( settings, TR_PREFS_KEY_PREALLOCATION, &i ) )
         session->preallocationMode = i;
     if( tr_bencDictFindStr( settings, TR_PREFS_KEY_DOWNLOAD_DIR, &str ) )
@@ -1856,6 +1863,7 @@ sessionCloseImpl( void * vsession )
     if( session->isLPDEnabled )
         tr_lpdUninit( session );
 
+    tr_utpClose( session );
     tr_udpUninit( session );
 
     event_free( session->saveTimer );
@@ -2088,6 +2096,50 @@ tr_sessionSetDHTEnabled( tr_session * session, tr_bool enabled )
     if( ( enabled != 0 ) != ( session->isDHTEnabled != 0 ) )
         tr_runInEventThread( session, toggleDHTImpl, session );
 }
+
+/***
+****
+***/
+
+tr_bool
+tr_sessionIsUTPEnabled( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+
+#ifdef WITH_UTP
+    return session->isUTPEnabled;
+#else
+    return FALSE;
+#endif
+}
+
+static void
+toggle_utp(  void * data )
+{
+    tr_session * session = data;
+    assert( tr_isSession( session ) );
+
+    session->isUTPEnabled = !session->isUTPEnabled;
+
+    tr_udpSetSocketBuffers( session );
+
+    /* But don't call tr_utpClose -- see reset_timer in tr-utp.c for an
+       explanation. */
+}
+
+void
+tr_sessionSetUTPEnabled( tr_session * session, tr_bool enabled )
+{
+    assert( tr_isSession( session ) );
+    assert( tr_isBool( enabled ) );
+
+    if( ( enabled != 0 ) != ( session->isUTPEnabled != 0 ) )
+        tr_runInEventThread( session, toggle_utp, session );
+}
+
+/***
+****
+***/
 
 static void
 toggleLPDImpl(  void * data )

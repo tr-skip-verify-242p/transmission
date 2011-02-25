@@ -201,7 +201,7 @@ tr_getLogTimeStr( char * buf, int buflen )
     seconds = tv.tv_sec;
     tr_localtime_r( &seconds, &now_tm );
     strftime( tmp, sizeof( tmp ), "%H:%M:%S", &now_tm );
-    milliseconds = (int)( tv.tv_usec / 1000 );
+    milliseconds = tv.tv_usec / 1000;
     tr_snprintf( buf, buflen, "%s.%03d", tmp, milliseconds );
 
     return buf;
@@ -1154,6 +1154,7 @@ tr_base64_encode( const void * input, int length, int * setme_len )
 
         bmem = BIO_new( BIO_s_mem( ) );
         b64 = BIO_new( BIO_f_base64( ) );
+        BIO_set_flags( b64, BIO_FLAGS_BASE64_NO_NL );
         b64 = BIO_push( b64, bmem );
         BIO_write( b64, input, length );
         (void) BIO_flush( b64 );

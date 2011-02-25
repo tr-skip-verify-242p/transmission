@@ -36,6 +36,7 @@
 #import "PrefsController.h"
 #import "GroupsController.h"
 #import "AboutWindowController.h"
+#import "URLSheetWindowController.h"
 #import "AddWindowController.h"
 #import "AddMagnetWindowController.h"
 #import "MessageWindowController.h"
@@ -43,9 +44,8 @@
 #import "GroupToolbarItem.h"
 #import "ToolbarSegmentedCell.h"
 #import "BlocklistDownloader.h"
-#import "StatusBarView.h"
-#import "FilterBarView.h"
-#import "FilterButton.h"
+#import "StatusBarController.h"
+#import "FilterBarController.h"
 #import "BonjourController.h"
 #import "Badger.h"
 #import "DragOverlayWindow.h"
@@ -106,34 +106,6 @@ typedef enum
     SORT_DESC_TAG = 1
 } sortOrderTag;
 
-
-#define FILTER_NONE     @"None"
-#define FILTER_ACTIVE   @"Active"
-#define FILTER_DOWNLOAD @"Download"
-#define FILTER_SEED     @"Seed"
-#define FILTER_PAUSE    @"Pause"
-
-#define FILTER_TYPE_NAME    @"Name"
-#define FILTER_TYPE_TRACKER @"Tracker"
-
-#define FILTER_TYPE_TAG_NAME    401
-#define FILTER_TYPE_TAG_TRACKER 402
-
-#define GROUP_FILTER_ALL_TAG    -2
-
-#define STATUS_RATIO_TOTAL      @"RatioTotal"
-#define STATUS_RATIO_SESSION    @"RatioSession"
-#define STATUS_TRANSFER_TOTAL   @"TransferTotal"
-#define STATUS_TRANSFER_SESSION @"TransferSession"
-
-typedef enum
-{
-    STATUS_RATIO_TOTAL_TAG = 0,
-    STATUS_RATIO_SESSION_TAG = 1,
-    STATUS_TRANSFER_TOTAL_TAG = 2,
-    STATUS_TRANSFER_SESSION_TAG = 3
-} statusTag;
-
 #define GROWL_DOWNLOAD_COMPLETE @"Download Complete"
 #define GROWL_SEEDING_COMPLETE  @"Seeding Complete"
 #define GROWL_AUTO_ADD          @"Torrent Auto Added"
@@ -144,9 +116,6 @@ typedef enum
 #define ROW_HEIGHT_REGULAR      62.0
 #define ROW_HEIGHT_SMALL        22.0
 #define WINDOW_REGULAR_WIDTH    468.0
-
-#define SEARCH_FILTER_MIN_WIDTH 48.0
-#define SEARCH_FILTER_MAX_WIDTH 95.0
 
 #define UPDATE_UI_SECONDS   1.0
 
@@ -346,6 +315,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         tr_bencDictAddBool(&settings, TR_PREFS_KEY_START, [fDefaults boolForKey: @"AutoStartDownload"]);
         tr_bencDictAddBool(&settings, TR_PREFS_KEY_SCRIPT_TORRENT_DONE_ENABLED, [fDefaults boolForKey: @"DoneScriptEnabled"]);
         tr_bencDictAddStr(&settings, TR_PREFS_KEY_SCRIPT_TORRENT_DONE_FILENAME, [[fDefaults stringForKey: @"DoneScriptPath"] UTF8String]);
+        tr_bencDictAddBool(&settings, TR_PREFS_KEY_UTP_ENABLED, [fDefaults boolForKey: @"UTPGlobal"]);
         
         tr_formatter_size_init([NSApp isOnSnowLeopardOrBetter] ? 1000 : 1024,
                                     [NSLocalizedString(@"KB", "File size - kilobytes") UTF8String],
@@ -429,37 +399,12 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     [fWindow setContentBorderThickness: NSMinY([[fTableView enclosingScrollView] frame]) forEdge: NSMinYEdge];
     [fWindow setMovableByWindowBackground: YES];
     
-    [[fTotalDLField cell] setBackgroundStyle: NSBackgroundStyleRaised];
-    [[fTotalULField cell] setBackgroundStyle: NSBackgroundStyleRaised];
     [[fTotalTorrentsField cell] setBackgroundStyle: NSBackgroundStyleRaised];
     
-    [self updateGroupsFilterButton];
-    
     //set up filter bar
-    NSView * contentView = [fWindow contentView];
-    NSSize windowSize = [contentView convertSize: [fWindow frame].size fromView: nil];
-    [fFilterBar setHidden: YES];
-    
-    NSRect filterBarFrame = [fFilterBar frame];
-    filterBarFrame.size.width = windowSize.width;
-    [fFilterBar setFrame: filterBarFrame];
-    
-    [contentView addSubview: fFilterBar];
-    [fFilterBar setFrameOrigin: NSMakePoint(0, NSMaxY([contentView frame]))];
-
     [self showFilterBar: [fDefaults boolForKey: @"FilterBar"] animate: NO];
     
     //set up status bar
-    [fStatusBar setHidden: YES];
-    
-    [self updateSpeedFieldsToolTips];
-    
-    NSRect statusBarFrame = [fStatusBar frame];
-    statusBarFrame.size.width = windowSize.width;
-    [fStatusBar setFrame: statusBarFrame];
-    
-    [contentView addSubview: fStatusBar];
-    [fStatusBar setFrameOrigin: NSMakePoint(0, NSMaxY([contentView frame]))];
     [self showStatusBar: [fDefaults boolForKey: @"StatusBar"] animate: NO];
     
     [fActionButton setToolTip: NSLocalizedString(@"Shortcuts for changing global settings.",
@@ -501,43 +446,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         }
     }
     
-    //set filter
-    NSString * filterType = [fDefaults stringForKey: @"Filter"];
-    
-    NSButton * currentFilterButton;
-    if ([filterType isEqualToString: FILTER_ACTIVE])
-        currentFilterButton = fActiveFilterButton;
-    else if ([filterType isEqualToString: FILTER_PAUSE])
-        currentFilterButton = fPauseFilterButton;
-    else if ([filterType isEqualToString: FILTER_SEED])
-        currentFilterButton = fSeedFilterButton;
-    else if ([filterType isEqualToString: FILTER_DOWNLOAD])
-        currentFilterButton = fDownloadFilterButton;
-    else
-    {
-        //safety
-        if (![filterType isEqualToString: FILTER_NONE])
-            [fDefaults setObject: FILTER_NONE forKey: @"Filter"];
-        currentFilterButton = fNoFilterButton;
-    }
-    [currentFilterButton setState: NSOnState];
-    
-    //set filter search type
-    NSString * filterSearchType = [fDefaults stringForKey: @"FilterSearchType"];
-    
-    NSMenu * filterSearchMenu = [[fSearchFilterField cell] searchMenuTemplate];
-    NSString * filterSearchTypeTitle;
-    if ([filterSearchType isEqualToString: FILTER_TYPE_TRACKER])
-        filterSearchTypeTitle = [[filterSearchMenu itemWithTag: FILTER_TYPE_TAG_TRACKER] title];
-    else
-    {
-        //safety
-        if (![filterType isEqualToString: FILTER_TYPE_NAME])
-            [fDefaults setObject: FILTER_TYPE_NAME forKey: @"FilterSearchType"];
-        filterSearchTypeTitle = [[filterSearchMenu itemWithTag: FILTER_TYPE_TAG_NAME] title];
-    }
-    [[fSearchFilterField cell] setPlaceholderString: filterSearchTypeTitle];
-    
     fBadger = [[Badger alloc] initWithLib: fLib];
     
     //observe notifications
@@ -574,6 +482,9 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     [nc addObserver: self selector: @selector(updateTorrentsInQueue)
                     name: @"UpdateQueue" object: nil];
     
+    [nc addObserver: self selector: @selector(applyFilter)
+                    name: @"ApplyFilter" object: nil];
+    
     //open newly created torrent file
     [nc addObserver: self selector: @selector(beginCreateFile:)
                     name: @"BeginCreateTorrentFile" object: nil];
@@ -581,14 +492,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     //open newly created torrent file
     [nc addObserver: self selector: @selector(openCreatedFile:)
                     name: @"OpenCreatedTorrentFile" object: nil];
-    
-    //update when groups change
-    [nc addObserver: self selector: @selector(updateGroupsFilters:)
-                    name: @"UpdateGroups" object: nil];
-    
-    //update when speed limits are changed
-    [nc addObserver: self selector: @selector(updateSpeedFieldsToolTips)
-                    name: @"SpeedLimitUpdate" object: nil];
 
     //timer to update the interface every second
     [self updateUI];
@@ -597,13 +500,9 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     [[NSRunLoop currentRunLoop] addTimer: fTimer forMode: NSModalPanelRunLoopMode];
     [[NSRunLoop currentRunLoop] addTimer: fTimer forMode: NSEventTrackingRunLoopMode];
     
-    [self applyFilter: nil];
+    [self applyFilter];
     
     [fWindow makeKeyAndOrderFront: nil];
-    
-    //can't be done earlier
-    if (![fFilterBar isHidden])
-        [self resizeFilterBar];
     
     if ([fDefaults boolForKey: @"InfoVisible"])
         [self showInfo: nil];
@@ -776,6 +675,9 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     [fInfoController release];
     [fMessageController release];
     [fPrefsController release];
+    
+    [fStatusBar release];
+    [fFilterBar release];
     
     [fTorrents release];
     [fDisplayedTorrents release];
@@ -1230,49 +1132,15 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 
 - (void) openURLShowSheet: (id) sender
 {
-    [NSApp beginSheet: fURLSheetWindow modalForWindow: fWindow modalDelegate: self
-            didEndSelector: @selector(urlSheetDidEnd:returnCode:contextInfo:) contextInfo: nil];
+    [[[URLSheetWindowController alloc] initWithController: self] beginSheetForWindow: fWindow];
 }
 
-- (void) openURLEndSheet: (id) sender
+- (void) urlSheetDidEnd: (URLSheetWindowController *) controller url: (NSString *) urlString returnCode: (NSInteger) returnCode
 {
-    [fURLSheetWindow orderOut: sender];
-    [NSApp endSheet: fURLSheetWindow returnCode: 1];
-}
-
-- (void) openURLCancelEndSheet: (id) sender
-{
-    [fURLSheetWindow orderOut: sender];
-    [NSApp endSheet: fURLSheetWindow returnCode: 0];
-}
-
-- (void) controlTextDidChange: (NSNotification *) notification
-{
-    if ([notification object] != fURLSheetTextField)
-        return;
+    if (returnCode == 1)
+        [self performSelectorOnMainThread: @selector(openURL:) withObject: urlString waitUntilDone: NO];
     
-    NSString * string = [fURLSheetTextField stringValue];
-    BOOL enable = YES;
-    if ([string isEqualToString: @""])
-        enable = NO;
-    else
-    {
-        NSRange prefixRange = [string rangeOfString: @"://"];
-        if (prefixRange.location != NSNotFound && [string length] == NSMaxRange(prefixRange))
-            enable = NO;
-    }
-    
-    [fURLSheetOpenButton setEnabled: enable];
-}
-
-- (void) urlSheetDidEnd: (NSWindow *) sheet returnCode: (NSInteger) returnCode contextInfo: (void *) contextInfo
-{
-    [fURLSheetTextField selectText: self];
-    if (returnCode != 1)
-        return;
-    
-    NSString * urlString = [fURLSheetTextField stringValue];
-    [self performSelectorOnMainThread: @selector(openURL:) withObject: urlString waitUntilDone: NO];
+    [controller release];
 }
 
 - (void) createFile: (id) sender
@@ -1330,7 +1198,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     }
     
     [self updateUI];
-    [self applyFilter: nil];
+    [self applyFilter];
     [[fWindow toolbar] validateVisibleItems];
     [self updateTorrentHistory];
 }
@@ -1354,7 +1222,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     [torrents makeObjectsPerformSelector: @selector(stopTransfer)];
     
     [self updateUI];
-    [self applyFilter: nil];
+    [self applyFilter];
     [[fWindow toolbar] validateVisibleItems];
     [self updateTorrentHistory];
 }
@@ -1362,10 +1230,10 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 - (void) removeTorrents: (NSArray *) torrents deleteData: (BOOL) deleteData
 {
     [torrents retain];
-    NSInteger active = 0, downloading = 0;
 
     if ([fDefaults boolForKey: @"CheckRemove"])
     {
+        NSInteger active = 0, downloading = 0;
         for (Torrent * torrent in torrents)
             if ([torrent isActive])
             {
@@ -1445,6 +1313,9 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 
 - (void) confirmRemoveTorrents: (NSArray *) torrents deleteData: (BOOL) deleteData
 {
+    NSMutableArray * selectedValues = [NSMutableArray arrayWithArray: [fTableView selectedValues]];
+    [selectedValues removeObjectsInArray: torrents];
+    
     //don't want any of these starting then stopping
     for (Torrent * torrent in torrents)
         [torrent setWaitToStart: NO];
@@ -1471,9 +1342,10 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         [torrent closeRemoveTorrent: deleteData];
     }
     
+    #warning why do we need them retained?
     [torrents release];
     
-    [fTableView deselectAll: nil];
+    [fTableView selectValues: selectedValues];
     
     [self updateTorrentsInQueue];
 }
@@ -1486,6 +1358,17 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 - (void) removeDeleteData: (id) sender
 {
     [self removeTorrents: [fTableView selectedTorrents] deleteData: YES];
+}
+
+- (void) clearCompleted: (id) sender
+{
+    NSMutableArray * torrents = [[NSMutableArray alloc] init];
+    
+    for (Torrent * torrent in fTorrents)
+        if ([torrent isFinishedSeeding])
+            [torrents addObject: torrent];
+    
+    [self confirmRemoveTorrents: torrents deleteData: NO];
 }
 
 - (void) moveDataFilesSelected: (id) sender
@@ -1654,7 +1537,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     for (Torrent * torrent in torrents)
         [torrent resetCache];
     
-    [self applyFilter: nil];
+    [self applyFilter];
 }
 
 - (void) showPreferenceWindow: (id) sender
@@ -1736,45 +1619,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         {
             [self sortTorrents];
             
-            //update status bar
-            if (![fStatusBar isHidden])
-            {
-                //set rates
-                [fTotalDLField setStringValue: [NSString stringForSpeed: dlRate]];
-                [fTotalULField setStringValue: [NSString stringForSpeed: ulRate]];
-                
-                //set status button text
-                NSString * statusLabel = [fDefaults stringForKey: @"StatusLabel"], * statusString;
-                BOOL total;
-                if ((total = [statusLabel isEqualToString: STATUS_RATIO_TOTAL]) || [statusLabel isEqualToString: STATUS_RATIO_SESSION])
-                {
-                    tr_session_stats stats;
-                    if (total)
-                        tr_sessionGetCumulativeStats(fLib, &stats);
-                    else
-                        tr_sessionGetStats(fLib, &stats);
-                    
-                    statusString = [NSLocalizedString(@"Ratio", "status bar -> status label") stringByAppendingFormat: @": %@",
-                                    [NSString stringForRatio: stats.ratio]];
-                }
-                else //STATUS_TRANSFER_TOTAL or STATUS_TRANSFER_SESSION
-                {
-                    total = [statusLabel isEqualToString: STATUS_TRANSFER_TOTAL];
-                    
-                    tr_session_stats stats;
-                    if (total)
-                        tr_sessionGetCumulativeStats(fLib, &stats);
-                    else
-                        tr_sessionGetStats(fLib, &stats);
-                    
-                    statusString = [NSString stringWithFormat: @"%@: %@  %@: %@",
-                            NSLocalizedString(@"DL", "status bar -> status label"), [NSString stringForFileSize: stats.downloadedBytes],
-                            NSLocalizedString(@"UL", "status bar -> status label"), [NSString stringForFileSize: stats.uploadedBytes]];
-                }
-                
-                [fStatusButton setTitle: statusString];
-                [self resizeStatusButton];
-            }
+            [fStatusBar updateWithDownload: dlRate upload: ulRate];
         }
 
         //update non-constant parts of info window
@@ -1784,21 +1629,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     
     //badge dock
     [fBadger updateBadgeWithDownload: dlRate upload: ulRate];
-}
-
-- (void) resizeStatusButton
-{
-    [fStatusButton sizeToFit];
-    
-    //width ends up being too long
-    NSRect statusFrame = [fStatusButton frame];
-    statusFrame.size.width -= 25.0;
-    
-    CGFloat difference = NSMaxX(statusFrame) + 5.0 - [fTotalDLImageView frame].origin.x;
-    if (difference > 0)
-        statusFrame.size.width -= difference;
-    
-    [fStatusButton setFrame: statusFrame];
 }
 
 - (void) setBottomCountText: (BOOL) filtering
@@ -1822,42 +1652,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     }
     
     [fTotalTorrentsField setStringValue: totalTorrentsString];
-}
-
-- (void) updateSpeedFieldsToolTips
-{
-    NSString * uploadText, * downloadText;
-    
-    if ([fDefaults boolForKey: @"SpeedLimit"])
-    {
-        NSString * speedString = [NSString stringWithFormat: @"%@ (%@)", NSLocalizedString(@"%d KB/s", "Status Bar -> speed tooltip"),
-                                    NSLocalizedString(@"Speed Limit", "Status Bar -> speed tooltip")];
-        
-        uploadText = [NSString stringWithFormat: speedString, [fDefaults integerForKey: @"SpeedLimitUploadLimit"]];
-        downloadText = [NSString stringWithFormat: speedString, [fDefaults integerForKey: @"SpeedLimitDownloadLimit"]];
-    }
-    else
-    {
-        if ([fDefaults boolForKey: @"CheckUpload"])
-            uploadText = [NSString stringWithFormat: NSLocalizedString(@"%d KB/s", "Status Bar -> speed tooltip"),
-                            [fDefaults integerForKey: @"UploadLimit"]];
-        else
-            uploadText = NSLocalizedString(@"unlimited", "Status Bar -> speed tooltip");
-        
-        if ([fDefaults boolForKey: @"CheckDownload"])
-            downloadText = [NSString stringWithFormat: NSLocalizedString(@"%d KB/s", "Status Bar -> speed tooltip"),
-                            [fDefaults integerForKey: @"DownloadLimit"]];
-        else
-            downloadText = NSLocalizedString(@"unlimited", "Status Bar -> speed tooltip");
-    }
-    
-    uploadText = [NSLocalizedString(@"Global upload limit", "Status Bar -> speed tooltip")
-                    stringByAppendingFormat: @": %@", uploadText];
-    downloadText = [NSLocalizedString(@"Global download limit", "Status Bar -> speed tooltip")
-                    stringByAppendingFormat: @": %@", downloadText];
-    
-    [fTotalULField setToolTip: uploadText];
-    [fTotalDLField setToolTip: downloadText];
 }
 
 - (void) updateTorrentsInQueue
@@ -1898,7 +1692,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     }
     
     [self updateUI];
-    [self applyFilter: nil];
+    [self applyFilter];
     [[fWindow toolbar] validateVisibleItems];
     [self updateTorrentHistory];
 }
@@ -2061,7 +1855,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     }
     
     [fDefaults setObject: sortType forKey: @"Sort"];
-    [self applyFilter: nil]; //better than calling sortTorrents because it will even apply to queue order
+    [self applyFilter]; //better than calling sortTorrents because it will even apply to queue order
 }
 
 - (void) setSortByGroup: (id) sender
@@ -2073,7 +1867,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     if (sortByGroup)
         [fTableView removeAllCollapsedGroups];
     
-    [self applyFilter: nil];
+    [self applyFilter];
 }
 
 - (void) setSortReverse: (id) sender
@@ -2165,7 +1959,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     [fTableView reloadData];
 }
 
-- (void) applyFilter: (id) sender
+- (void) applyFilter
 {
     //get all the torrents in the table
     NSMutableArray * previousTorrents;
@@ -2198,9 +1992,10 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     const NSInteger groupFilterValue = [fDefaults integerForKey: @"FilterGroup"];
     const BOOL filterGroup = groupFilterValue != GROUP_FILTER_ALL_TAG;
     
-    NSString * searchString = [fSearchFilterField stringValue];
-    const BOOL filterText = [searchString length] > 0,
-            filterTracker = filterText && [[fDefaults stringForKey: @"FilterSearchType"] isEqualToString: FILTER_TYPE_TRACKER];
+    NSString * searchString = [fFilterBar searchString];
+    if (searchString && [searchString isEqualToString: @""])
+        searchString = nil;
+    const BOOL filterTracker = searchString && [[fDefaults stringForKey: @"FilterSearchType"] isEqualToString: FILTER_TYPE_TRACKER];
     
     NSMutableArray * allTorrents = [NSMutableArray arrayWithCapacity: [fTorrents count]];
     
@@ -2212,24 +2007,24 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         {
             const BOOL isActive = ![torrent isStalled];
             if (isActive)
-                active++;
+                ++active;
             
             if ([torrent isSeeding])
             {
-                seeding++;
+                ++seeding;
                 if (filterStatus && !((filterActive && isActive) || filterSeed))
                     continue;
             }
             else
             {
-                downloading++;
+                ++downloading;
                 if (filterStatus && !((filterActive && isActive) || filterDownload))
                     continue;
             }
         }
         else
         {
-            paused++;
+            ++paused;
             if (filterStatus && !filterPause)
                 continue;
         }
@@ -2240,7 +2035,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
                 continue;
         
         //check text field
-        if (filterText)
+        if (searchString)
         {
             if (filterTracker)
             {
@@ -2270,11 +2065,8 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     }
     
     //set button tooltips
-    [fNoFilterButton setCount: [fTorrents count]];
-    [fActiveFilterButton setCount: active];
-    [fDownloadFilterButton setCount: downloading];
-    [fSeedFilterButton setCount: seeding];
-    [fPauseFilterButton setCount: paused];
+    if (fFilterBar)
+        [fFilterBar setCountAll: [fTorrents count] active: active downloading: downloading seeding: seeding paused: paused];
     
     //clear display cache for not-shown torrents
     [previousTorrents removeObjectsInArray: allTorrents];
@@ -2306,7 +2098,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
                 group = nil;
                 
                 //try to see if the group already exists
-                for (; currentOldGroupIndex < [oldTorrentGroups count]; currentOldGroupIndex++)
+                for (; currentOldGroupIndex < [oldTorrentGroups count]; ++currentOldGroupIndex)
                 {
                     TorrentGroup * currentGroup = [oldTorrentGroups objectAtIndex: currentOldGroupIndex];
                     const NSInteger currentGroupValue = [currentGroup groupIndex];
@@ -2315,7 +2107,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
                         group = currentGroup;
                         [[currentGroup torrents] removeAllObjects];
                         
-                        currentOldGroupIndex++;
+                        ++currentOldGroupIndex;
                     }
                     
                     if (currentGroupValue >= groupValue)
@@ -2352,141 +2144,24 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     [fTableView selectValues: selectedValues];
     [self resetInfo]; //if group is already selected, but the torrents in it change
     
-    [self setBottomCountText: groupRows || filterStatus || filterGroup || filterText];
+    [self setBottomCountText: groupRows || filterStatus || filterGroup || searchString];
     
     [self setWindowSizeToFit];
 }
 
-//resets filter and sorts torrents
-- (void) setFilter: (id) sender
-{
-    NSString * oldFilterType = [fDefaults stringForKey: @"Filter"];
-    
-    NSButton * prevFilterButton;
-    if ([oldFilterType isEqualToString: FILTER_PAUSE])
-        prevFilterButton = fPauseFilterButton;
-    else if ([oldFilterType isEqualToString: FILTER_ACTIVE])
-        prevFilterButton = fActiveFilterButton;
-    else if ([oldFilterType isEqualToString: FILTER_SEED])
-        prevFilterButton = fSeedFilterButton;
-    else if ([oldFilterType isEqualToString: FILTER_DOWNLOAD])
-        prevFilterButton = fDownloadFilterButton;
-    else
-        prevFilterButton = fNoFilterButton;
-    
-    if (sender != prevFilterButton)
-    {
-        [prevFilterButton setState: NSOffState];
-        [sender setState: NSOnState];
-
-        NSString * filterType;
-        if (sender == fActiveFilterButton)
-            filterType = FILTER_ACTIVE;
-        else if (sender == fDownloadFilterButton)
-            filterType = FILTER_DOWNLOAD;
-        else if (sender == fPauseFilterButton)
-            filterType = FILTER_PAUSE;
-        else if (sender == fSeedFilterButton)
-            filterType = FILTER_SEED;
-        else
-            filterType = FILTER_NONE;
-
-        [fDefaults setObject: filterType forKey: @"Filter"];
-    }
-    else
-        [sender setState: NSOnState];
-
-    [self applyFilter: nil];
-}
-
-- (void) setFilterSearchType: (id) sender
-{
-    NSString * oldFilterType = [fDefaults stringForKey: @"FilterSearchType"];
-    
-    NSInteger prevTag, currentTag = [sender tag];
-    if ([oldFilterType isEqualToString: FILTER_TYPE_TRACKER])
-        prevTag = FILTER_TYPE_TAG_TRACKER;
-    else
-        prevTag = FILTER_TYPE_TAG_NAME;
-    
-    if (currentTag != prevTag)
-    {
-        NSString * filterType;
-        if (currentTag == FILTER_TYPE_TAG_TRACKER)
-            filterType = FILTER_TYPE_TRACKER;
-        else
-            filterType = FILTER_TYPE_NAME;
-        
-        [fDefaults setObject: filterType forKey: @"FilterSearchType"];
-        
-        [[fSearchFilterField cell] setPlaceholderString: [sender title]];
-    }
-    
-    [self applyFilter: nil];
-}
-
 - (void) switchFilter: (id) sender
 {
-    NSString * filterType = [fDefaults stringForKey: @"Filter"];
-    
-    NSButton * button;
-    if ([filterType isEqualToString: FILTER_NONE])
-        button = sender == fNextFilterItem ? fActiveFilterButton : fPauseFilterButton;
-    else if ([filterType isEqualToString: FILTER_ACTIVE])
-        button = sender == fNextFilterItem ? fDownloadFilterButton : fNoFilterButton;
-    else if ([filterType isEqualToString: FILTER_DOWNLOAD])
-        button = sender == fNextFilterItem ? fSeedFilterButton : fActiveFilterButton;
-    else if ([filterType isEqualToString: FILTER_SEED])
-        button = sender == fNextFilterItem ? fPauseFilterButton : fDownloadFilterButton;
-    else if ([filterType isEqualToString: FILTER_PAUSE])
-        button = sender == fNextFilterItem ? fNoFilterButton : fSeedFilterButton;
-    else
-        button = fNoFilterButton;
-    
-    [self setFilter: button];
-}
-
-- (void) setStatusLabel: (id) sender
-{
-    NSString * statusLabel;
-    switch ([sender tag])
-    {
-        case STATUS_RATIO_TOTAL_TAG:
-            statusLabel = STATUS_RATIO_TOTAL;
-            break;
-        case STATUS_RATIO_SESSION_TAG:
-            statusLabel = STATUS_RATIO_SESSION;
-            break;
-        case STATUS_TRANSFER_TOTAL_TAG:
-            statusLabel = STATUS_TRANSFER_TOTAL;
-            break;
-        case STATUS_TRANSFER_SESSION_TAG:
-            statusLabel = STATUS_TRANSFER_SESSION;
-            break;
-        default:
-            NSAssert1(NO, @"Unknown status label tag received: %d", [sender tag]);
-            return;
-    }
-    
-    [fDefaults setObject: statusLabel forKey: @"StatusLabel"];
-    [self updateUI];
+    [fFilterBar switchFilter: sender == fNextFilterItem];
 }
 
 - (void) menuNeedsUpdate: (NSMenu *) menu
 {
-    if (menu == fGroupsSetMenu || menu == fGroupsSetContextMenu || menu == fGroupFilterMenu)
+    if (menu == fGroupsSetMenu || menu == fGroupsSetContextMenu)
     {
-        const BOOL filter = menu == fGroupFilterMenu;
-        
-        const NSInteger remaining = filter ? 3 : 0;
-        for (NSInteger i = [menu numberOfItems]-1; i >= remaining; i--)
+        for (NSInteger i = [menu numberOfItems]-1; i >= 0; i--)
             [menu removeItemAtIndex: i];
         
-        NSMenu * groupMenu;
-        if (!filter)
-            groupMenu = [[GroupsController groups] groupMenuWithTarget: self action: @selector(setGroup:) isSmall: NO];
-        else
-            groupMenu = [[GroupsController groups] groupMenuWithTarget: self action: @selector(setGroupFilter:) isSmall: YES];
+        NSMenu * groupMenu = [[GroupsController groups] groupMenuWithTarget: self action: @selector(setGroup:) isSmall: NO];
         
         const NSInteger groupMenuCount = [groupMenu numberOfItems];
         for (NSInteger i = 0; i < groupMenuCount; i++)
@@ -2546,45 +2221,9 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         [torrent setGroupValue: [sender tag]];
     }
     
-    [self applyFilter: nil];
+    [self applyFilter];
     [self updateUI];
     [self updateTorrentHistory];
-}
-
-- (void) setGroupFilter: (id) sender
-{
-    [fDefaults setInteger: [sender tag] forKey: @"FilterGroup"];
-    [self updateGroupsFilterButton];
-    [self applyFilter: nil];
-}
-
-- (void) updateGroupsFilterButton
-{
-    NSInteger groupIndex = [fDefaults integerForKey: @"FilterGroup"];
-    
-    NSImage * icon;
-    NSString * toolTip;
-    if (groupIndex == GROUP_FILTER_ALL_TAG)
-    {
-        icon = [NSImage imageNamed: @"PinTemplate.png"];
-        toolTip = NSLocalizedString(@"All Groups", "Groups -> Button");
-    }
-    else
-    {
-        icon = [[GroupsController groups] imageForIndex: groupIndex];
-        NSString * groupName = groupIndex != -1 ? [[GroupsController groups] nameForIndex: groupIndex]
-                                                : NSLocalizedString(@"None", "Groups -> Button");
-        toolTip = [NSLocalizedString(@"Group", "Groups -> Button") stringByAppendingFormat: @": %@", groupName];
-    }
-    
-    [[fGroupFilterMenu itemAtIndex: 0] setImage: icon];
-    [fGroupsButton setToolTip: toolTip];
-}
-
-- (void) updateGroupsFilters: (NSNotification *) notification
-{
-    [self updateGroupsFilterButton];
-    [self applyFilter: nil];
 }
 
 - (void) toggleSpeedLimit: (id) sender
@@ -2596,7 +2235,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 - (void) speedLimitChanged: (id) sender
 {
     tr_sessionUseAltSpeed(fLib, [fDefaults boolForKey: @"SpeedLimit"]);
-    [self updateSpeedFieldsToolTips];
+    [fStatusBar updateSpeedFieldsToolTips];
 }
 
 //dict has been retained
@@ -2605,7 +2244,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     const BOOL isLimited = [[dict objectForKey: @"Active"] boolValue];
 
     [fDefaults setBool: isLimited forKey: @"SpeedLimit"];
-    [self updateSpeedFieldsToolTips];
+    [fStatusBar updateSpeedFieldsToolTips];
     
     if (![[dict objectForKey: @"ByUser"] boolValue])
         [GrowlApplicationBridge notifyWithTitle: isLimited
@@ -2744,6 +2383,10 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
             
             case TR_PARSE_ERR:
                 [fAutoImportedNames removeObject: file];
+                break;
+            
+            case TR_PARSE_DUPLICATE: //let's ignore this (but silence a warning)
+                break;
         }
         
         tr_ctorFree(ctor);
@@ -2946,7 +2589,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
             [fTorrents insertObjects: movingTorrents atIndexes: insertIndexes];
         }
         
-        [self applyFilter: nil];
+        [self applyFilter];
         [fTableView selectValues: selectedValues];
     }
     
@@ -3142,10 +2785,10 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         else
         {
             NSSize maxSize = [scrollView convertSize: [[fWindow screen] visibleFrame].size fromView: nil];
-            if ([fStatusBar isHidden])
-                maxSize.height -= [fStatusBar frame].size.height;
-            if ([fFilterBar isHidden]) 
-                maxSize.height -= [fFilterBar frame].size.height;
+            if (!fStatusBar)
+                maxSize.height -= [[fStatusBar view] frame].size.height;
+            if (!fFilterBar) 
+                maxSize.height -= [[fFilterBar view] frame].size.height;
             if (windowSize.height > maxSize.height)
                 windowSize.height = maxSize.height;
         }
@@ -3161,21 +2804,35 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 
 - (void) toggleStatusBar: (id) sender
 {
-    [self showStatusBar: [fStatusBar isHidden] animate: YES];
-    [fDefaults setBool: ![fStatusBar isHidden] forKey: @"StatusBar"];
+    const BOOL show = fStatusBar == nil;
+    [self showStatusBar: show animate: YES];
+    [fDefaults setBool: show forKey: @"StatusBar"];
 }
 
 //doesn't save shown state
 - (void) showStatusBar: (BOOL) show animate: (BOOL) animate
 {
-    if (show != [fStatusBar isHidden])
+    const BOOL prevShown = fStatusBar != nil;
+    if (show == prevShown)
         return;
-
+    
     if (show)
-        [fStatusBar setHidden: NO];
-
+    {
+        fStatusBar = [[StatusBarController alloc] initWithLib: fLib];
+        
+        NSView * contentView = [fWindow contentView];
+        const NSSize windowSize = [contentView convertSize: [fWindow frame].size fromView: nil];
+        
+        NSRect statusBarFrame = [[fStatusBar view] frame];
+        statusBarFrame.size.width = windowSize.width;
+        [[fStatusBar view] setFrame: statusBarFrame];
+        
+        [contentView addSubview: [fStatusBar view]];
+        [[fStatusBar view] setFrameOrigin: NSMakePoint(0.0, NSMaxY([contentView frame]))];
+    }
+    
     NSRect frame;
-    CGFloat heightChange = [fStatusBar frame].size.height;
+    CGFloat heightChange = [[fStatusBar view] frame].size.height;
     if (!show)
         heightChange *= -1;
     
@@ -3198,19 +2855,24 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     NSScrollView * scrollView = [fTableView enclosingScrollView];
     
     //set views to not autoresize
-    NSUInteger statsMask = [fStatusBar autoresizingMask];
-    NSUInteger filterMask = [fFilterBar autoresizingMask];
-    NSUInteger scrollMask = [scrollView autoresizingMask];
-    [fStatusBar setAutoresizingMask: NSViewNotSizable];
-    [fFilterBar setAutoresizingMask: NSViewNotSizable];
+    const NSUInteger statsMask = [[fStatusBar view] autoresizingMask];
+    [[fStatusBar view] setAutoresizingMask: NSViewNotSizable];
+    NSUInteger filterMask;
+    if (fFilterBar)
+    {
+        filterMask = [[fFilterBar view] autoresizingMask];
+        [[fFilterBar view] setAutoresizingMask: NSViewNotSizable];
+    }
+    const NSUInteger scrollMask = [scrollView autoresizingMask];
     [scrollView setAutoresizingMask: NSViewNotSizable];
     
     frame = [self windowFrameByAddingHeight: heightChange checkLimits: NO];
     [fWindow setFrame: frame display: YES animate: animate]; 
     
     //re-enable autoresize
-    [fStatusBar setAutoresizingMask: statsMask];
-    [fFilterBar setAutoresizingMask: filterMask];
+    [[fStatusBar view] setAutoresizingMask: statsMask];
+    if (fFilterBar)
+        [[fFilterBar view] setAutoresizingMask: filterMask];
     [scrollView setAutoresizingMask: scrollMask];
     
     //change min size
@@ -3219,43 +2881,66 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     [fWindow setContentMinSize: minSize];
     
     if (!show)
-        [fStatusBar setHidden: YES];
+    {
+        [[fStatusBar view] removeFromSuperview];
+        [fStatusBar release];
+        fStatusBar = nil;
+    }
 }
 
 - (void) toggleFilterBar: (id) sender
 {
-    //disable filtering when hiding
-    if (![fFilterBar isHidden])
-    {
-        [fSearchFilterField setStringValue: @""];
-        [self setFilter: fNoFilterButton];
-        [self setGroupFilter: [fGroupFilterMenu itemWithTag: GROUP_FILTER_ALL_TAG]];
-    }
-
-    [self showFilterBar: [fFilterBar isHidden] animate: YES];
-    [fDefaults setBool: ![fFilterBar isHidden] forKey: @"FilterBar"];
+    const BOOL show = fFilterBar == nil;
+    
+    [self showFilterBar: show animate: YES];
+    [fDefaults setBool: show forKey: @"FilterBar"];
     [[fWindow toolbar] validateVisibleItems];
+    
+    //disable filtering when hiding
+    if (!show)
+    {
+        [[NSUserDefaults standardUserDefaults] setObject: FILTER_NONE forKey: @"Filter"];
+        [[NSUserDefaults standardUserDefaults] setInteger: GROUP_FILTER_ALL_TAG forKey: @"FilterGroup"];
+    }
+    
+    [self applyFilter]; //do even if showing to ensure tooltips are updated
 }
 
 //doesn't save shown state
 - (void) showFilterBar: (BOOL) show animate: (BOOL) animate
 {
-    if (show != [fFilterBar isHidden])
+    const BOOL prevShown = fFilterBar != nil;
+    if (show == prevShown)
         return;
-
+    
     if (show)
-        [fFilterBar setHidden: NO];
-
-    NSRect frame;
-    CGFloat heightChange = [fFilterBar frame].size.height;
+    {
+        fFilterBar = [[FilterBarController alloc] init];
+        
+        NSView * contentView = [fWindow contentView];
+        const NSSize windowSize = [contentView convertSize: [fWindow frame].size fromView: nil];
+        
+        NSRect filterBarFrame = [[fFilterBar view] frame];
+        filterBarFrame.size.width = windowSize.width;
+        [[fFilterBar view] setFrame: filterBarFrame];
+        
+        if (fStatusBar)
+            [contentView addSubview: [fFilterBar view] positioned: NSWindowBelow relativeTo: [fStatusBar view]];
+        else
+            [contentView addSubview: [fFilterBar view]];
+        const CGFloat originY = fStatusBar ? NSMinY([[fStatusBar view] frame]) : NSMaxY([contentView frame]);
+        [[fFilterBar view] setFrameOrigin: NSMakePoint(0.0, originY)];
+    }
+    
+    CGFloat heightChange = NSHeight([[fFilterBar view] frame]);
     if (!show)
         heightChange *= -1;
     
     //allow bar to show even if not enough room
     if (show && ![fDefaults boolForKey: @"AutoSize"])
     {
-        frame = [self windowFrameByAddingHeight: heightChange checkLimits: NO];
-        CGFloat change = [[fWindow screen] visibleFrame].size.height - frame.size.height;
+        NSRect frame = [self windowFrameByAddingHeight: heightChange checkLimits: NO];
+        const CGFloat change = NSHeight([[fWindow screen] visibleFrame]) - NSHeight(frame);
         if (change < 0.0)
         {
             frame = [fWindow frame];
@@ -3268,16 +2953,16 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     NSScrollView * scrollView = [fTableView enclosingScrollView];
 
     //set views to not autoresize
-    NSUInteger filterMask = [fFilterBar autoresizingMask];
-    NSUInteger scrollMask = [scrollView autoresizingMask];
-    [fFilterBar setAutoresizingMask: NSViewNotSizable];
+    const NSUInteger filterMask = [[fFilterBar view] autoresizingMask];
+    const NSUInteger scrollMask = [scrollView autoresizingMask];
+    [[fFilterBar view] setAutoresizingMask: NSViewNotSizable];
     [scrollView setAutoresizingMask: NSViewNotSizable];
     
-    frame = [self windowFrameByAddingHeight: heightChange checkLimits: NO];
+    const NSRect frame = [self windowFrameByAddingHeight: heightChange checkLimits: NO];
     [fWindow setFrame: frame display: YES animate: animate];
     
     //re-enable autoresize
-    [fFilterBar setAutoresizingMask: filterMask];
+    [[fFilterBar view] setAutoresizingMask: filterMask];
     [scrollView setAutoresizingMask: scrollMask];
     
     //change min size
@@ -3287,16 +2972,18 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     
     if (!show)
     {
-        [fFilterBar setHidden: YES];
+        [[fFilterBar view] removeFromSuperview];
+        [fFilterBar release];
+        fFilterBar = nil;
         [fWindow makeFirstResponder: fTableView];
     }
 }
 
 - (void) focusFilterField
 {
-    [fWindow makeFirstResponder: fSearchFilterField];
-    if ([fFilterBar isHidden])
+    if (!fFilterBar)
         [self toggleFilterBar: self];
+    [fFilterBar focusSearchField];
 }
 
 #warning change from id to QLPreviewPanel
@@ -3454,6 +3141,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         [item setImage: [NSImage imageNamed: @"ToolbarRemoveTemplate.png"]];
         [item setTarget: self];
         [item setAction: @selector(removeNoDelete:)];
+        [item setVisibilityPriority: NSToolbarItemVisibilityPriorityHigh];
         
         return item;
     }
@@ -3508,6 +3196,9 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
                                         NSLocalizedString(@"Resume All", "All toolbar item -> label"), nil]];
         
         [segmentedControl release];
+        
+        [groupItem setVisibilityPriority: NSToolbarItemVisibilityPriorityHigh];
+        
         return [groupItem autorelease];
     }
     else if ([ident isEqualToString: TOOLBAR_PAUSE_RESUME_SELECTED])
@@ -3547,6 +3238,9 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
                                         NSLocalizedString(@"Resume Selected", "Selected toolbar item -> label"), nil]];
         
         [segmentedControl release];
+        
+        [groupItem setVisibilityPriority: NSToolbarItemVisibilityPriorityHigh];
+        
         return [groupItem autorelease];
     }
     else if ([ident isEqualToString: TOOLBAR_FILTER])
@@ -3574,6 +3268,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         [item setImage: [NSImage imageNamed: NSImageNameQuickLookTemplate]];
         [item setTarget: self];
         [item setAction: @selector(toggleQuickLook:)];
+        [item setVisibilityPriority: NSToolbarItemVisibilityPriorityLow];
         
         return item;
     }
@@ -3685,7 +3380,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     //set filter image
     if ([ident isEqualToString: TOOLBAR_FILTER])
     {
-        [(NSButton *)[toolbarItem view] setState: ![fFilterBar isHidden]];
+        [(NSButton *)[toolbarItem view] setState: fFilterBar != nil];
         return YES;
     }
     
@@ -3752,32 +3447,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         return [fWindow isVisible];
     }
     
-    //enable sort options
-    if (action == @selector(setStatusLabel:))
-    {
-        NSString * statusLabel;
-        switch ([menuItem tag])
-        {
-            case STATUS_RATIO_TOTAL_TAG:
-                statusLabel = STATUS_RATIO_TOTAL;
-                break;
-            case STATUS_RATIO_SESSION_TAG:
-                statusLabel = STATUS_RATIO_SESSION;
-                break;
-            case STATUS_TRANSFER_TOTAL_TAG:
-                statusLabel = STATUS_TRANSFER_TOTAL;
-                break;
-            case STATUS_TRANSFER_SESSION_TAG:
-                statusLabel = STATUS_TRANSFER_SESSION;
-                break;
-            default:
-                NSAssert1(NO, @"Unknown status label tag received: %d", [menuItem tag]);
-        }
-        
-        [menuItem setState: [statusLabel isEqualToString: [fDefaults stringForKey: @"StatusLabel"]] ? NSOnState : NSOffState];
-        return YES;
-    }
-    
     if (action == @selector(setGroup:))
     {
         BOOL checked = NO;
@@ -3792,12 +3461,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         
         [menuItem setState: checked ? NSOnState : NSOffState];
         return canUseTable && [fTableView numberOfSelectedRows] > 0;
-    }
-    
-    if (action == @selector(setGroupFilter:))
-    {
-        [menuItem setState: [menuItem tag] == [fDefaults integerForKey: @"FilterGroup"] ? NSOnState : NSOffState];
-        return YES;
     }
     
     if (action == @selector(toggleSmallView:))
@@ -3875,7 +3538,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     //enable toggle status bar
     if (action == @selector(toggleStatusBar:))
     {
-        NSString * title = [fStatusBar isHidden] ? NSLocalizedString(@"Show Status Bar", "View menu -> Status Bar")
+        NSString * title = !fStatusBar ? NSLocalizedString(@"Show Status Bar", "View menu -> Status Bar")
                             : NSLocalizedString(@"Hide Status Bar", "View menu -> Status Bar");
         [menuItem setTitle: title];
 
@@ -3885,7 +3548,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     //enable toggle filter bar
     if (action == @selector(toggleFilterBar:))
     {
-        NSString * title = [fFilterBar isHidden] ? NSLocalizedString(@"Show Filter Bar", "View menu -> Filter Bar")
+        NSString * title = !fFilterBar ? NSLocalizedString(@"Show Filter Bar", "View menu -> Filter Bar")
                             : NSLocalizedString(@"Hide Filter Bar", "View menu -> Filter Bar");
         [menuItem setTitle: title];
 
@@ -3894,7 +3557,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     
     //enable prev/next filter button
     if (action == @selector(switchFilter:))
-        return [fWindow isVisible] && ![fFilterBar isHidden];
+        return [fWindow isVisible] && fFilterBar;
     
     //enable reveal in finder
     if (action == @selector(revealFile:))
@@ -3931,6 +3594,15 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         }
         
         return canUseTable && [fTableView numberOfSelectedRows] > 0;
+    }
+    
+    //cleanup completed transfers item
+    if (action == @selector(clearCompleted:))
+    {
+        for (Torrent * torrent in fTorrents)
+            if ([torrent isFinishedSeeding])
+                return YES;
+        return NO;
     }
 
     //enable pause all item
@@ -4055,21 +3727,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     if (action == @selector(setSortByGroup:))
     {
         [menuItem setState: [fDefaults boolForKey: @"SortByGroup"] ? NSOnState : NSOffState];
-        return YES;
-    }
-    
-    //check proper filter search item
-    if (action == @selector(setFilterSearchType:))
-    {
-        NSString * filterType = [fDefaults stringForKey: @"FilterSearchType"];
-        
-        BOOL state;
-        if ([menuItem tag] == FILTER_TYPE_TAG_TRACKER)
-            state = [filterType isEqualToString: FILTER_TYPE_TRACKER];
-        else
-            state = [filterType isEqualToString: FILTER_TYPE_NAME];
-        
-        [menuItem setState: state ? NSOnState : NSOffState];
         return YES;
     }
     
@@ -4237,66 +3894,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     return [self windowFrameByAddingHeight: heightChange checkLimits: YES];
 }
 
-- (void) resizeFilterBar
-{
-    //replace all buttons
-    [fNoFilterButton sizeToFit];
-    [fActiveFilterButton sizeToFit];
-    [fDownloadFilterButton sizeToFit];
-    [fSeedFilterButton sizeToFit];
-    [fPauseFilterButton sizeToFit];
-    
-    NSRect allRect = [fNoFilterButton frame];
-    NSRect activeRect = [fActiveFilterButton frame];
-    NSRect downloadRect = [fDownloadFilterButton frame];
-    NSRect seedRect = [fSeedFilterButton frame];
-    NSRect pauseRect = [fPauseFilterButton frame];
-    
-    //size search filter to not overlap buttons
-    NSRect searchFrame = [fSearchFilterField frame];
-    searchFrame.origin.x = NSMaxX(pauseRect) + 5.0;
-    searchFrame.size.width = [fStatusBar frame].size.width - searchFrame.origin.x - 5.0;
-    
-    //make sure it is not too long
-    if (searchFrame.size.width > SEARCH_FILTER_MAX_WIDTH)
-    {
-        searchFrame.origin.x += searchFrame.size.width - SEARCH_FILTER_MAX_WIDTH;
-        searchFrame.size.width = SEARCH_FILTER_MAX_WIDTH;
-    }
-    else if (searchFrame.size.width < SEARCH_FILTER_MIN_WIDTH)
-    {
-        searchFrame.origin.x += searchFrame.size.width - SEARCH_FILTER_MIN_WIDTH;
-        searchFrame.size.width = SEARCH_FILTER_MIN_WIDTH;
-        
-        //calculate width the buttons can take up
-        const CGFloat allowedWidth = (searchFrame.origin.x - 5.0) - allRect.origin.x;
-        const CGFloat currentWidth = NSWidth(allRect) + NSWidth(activeRect) + NSWidth(downloadRect) + NSWidth(seedRect)
-                                        + NSWidth(pauseRect) + 4.0; //add 4 for space between buttons
-        const CGFloat ratio = allowedWidth / currentWidth;
-        
-        //decrease button widths proportionally
-        allRect.size.width  = NSWidth(allRect) * ratio;
-        activeRect.size.width = NSWidth(activeRect) * ratio;
-        downloadRect.size.width = NSWidth(downloadRect) * ratio;
-        seedRect.size.width = NSWidth(seedRect) * ratio;
-        pauseRect.size.width = NSWidth(pauseRect) * ratio;
-    }
-    else;
-    
-    activeRect.origin.x = NSMaxX(allRect) + 1.0;
-    downloadRect.origin.x = NSMaxX(activeRect) + 1.0;
-    seedRect.origin.x = NSMaxX(downloadRect) + 1.0;
-    pauseRect.origin.x = NSMaxX(seedRect) + 1.0;
-    
-    [fNoFilterButton setFrame: allRect];
-    [fActiveFilterButton setFrame: activeRect];
-    [fDownloadFilterButton setFrame: downloadRect];
-    [fSeedFilterButton setFrame: seedRect];
-    [fPauseFilterButton setFrame: pauseRect];
-    
-    [fSearchFilterField setFrame: searchFrame];
-}
-
 - (void) updateForExpandCollape
 {
     [self setWindowSizeToFit];
@@ -4320,17 +3917,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     if ([fDefaults boolForKey: @"AutoSize"])
         proposedFrameSize.height = [fWindow frame].size.height;
     return proposedFrameSize;
-}
-
-- (void) windowDidResize: (NSNotification *) notification
-{
-    if (![fStatusBar isHidden])
-        [self resizeStatusButton];
-    
-    if ([fFilterBar isHidden])
-        return;
-
-    [self resizeFilterBar];
 }
 
 - (void) applicationWillUnhide: (NSNotification *) notification
@@ -4441,6 +4027,10 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
             [self performSelectorOnMainThread: @selector(rpcRemoveTorrent:) withObject: torrent waitUntilDone: NO];
             break;
         
+        case TR_RPC_TORRENT_TRASHING:
+            [self performSelectorOnMainThread: @selector(rpcRemoveTorrentDeleteData:) withObject: torrent waitUntilDone: NO];
+            break;
+        
         case TR_RPC_TORRENT_CHANGED:
             [self performSelectorOnMainThread: @selector(rpcChangedTorrent:) withObject: torrent waitUntilDone: NO];
             break;
@@ -4490,13 +4080,19 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     [torrent release];
 }
 
+- (void) rpcRemoveTorrentDeleteData: (Torrent *) torrent
+{
+    [self confirmRemoveTorrents: [[NSArray arrayWithObject: torrent] retain] deleteData: YES];
+    [torrent release];
+}
+
 - (void) rpcStartedStoppedTorrent: (Torrent *) torrent
 {
     [torrent update];
     [torrent release];
     
     [self updateUI];
-    [self applyFilter: nil];
+    [self applyFilter];
     [self updateTorrentHistory];
 }
 
