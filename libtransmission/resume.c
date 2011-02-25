@@ -436,6 +436,8 @@ loadProgress( tr_benc * dict, tr_torrent * tor )
         const char * str;
         const uint8_t * raw;
         size_t rawlen;
+        tr_benc * b;
+        struct tr_bitset bitset = TR_BITSET_INIT;
 
         err = NULL;
 
