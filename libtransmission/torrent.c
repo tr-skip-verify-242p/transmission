@@ -2308,12 +2308,12 @@ tr_torGetFileBlockRange( const tr_torrent        * tor,
 {
     const tr_file * f = &tor->info.files[file];
     uint64_t offset = f->offset;
-    *first = offset / tor->blockSize;
+    *first = tr_torByteBlock( tor, offset );
     if( !f->length )
         *last = *first;
     else {
         offset += f->length - 1;
-        *last = offset / tor->blockSize;
+        *last = tr_torByteBlock( tor, offset );
     }
 }
 
@@ -2323,11 +2323,10 @@ tr_torGetPieceBlockRange( const tr_torrent        * tor,
                           tr_block_index_t        * first,
                           tr_block_index_t        * last )
 {
-    uint64_t offset = tor->info.pieceSize;
-    offset *= piece;
-    *first = offset / tor->blockSize;
+    uint64_t offset = tr_torPieceByte( tor, piece );
+    *first = tr_torByteBlock( tor, offset );
     offset += ( tr_torPieceCountBytes( tor, piece ) - 1 );
-    *last = offset / tor->blockSize;
+    *last = tr_torByteBlock( tor, offset );
 }
 
 
