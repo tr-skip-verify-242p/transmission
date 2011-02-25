@@ -33,9 +33,15 @@
 
 typedef enum { TR_NET_OK, TR_NET_ERROR, TR_NET_WAIT } tr_tristate_t;
 
-uint8_t*       tr_peerIdNew( void );
+enum
+{
+    PEER_ID_LEN        = 20,
+    PEER_ID_PREFIX_LEN = 8,
+};
 
-const uint8_t* tr_getPeerId( void );
+uint8_t*       tr_peerIdNew( const tr_session * session );
+
+const uint8_t* tr_getPeerId( const tr_session * session );
 
 struct event_base;
 struct tr_address;
@@ -108,6 +114,10 @@ struct tr_session
     tr_benc                      removedTorrents;
 
     int                          umask;
+
+    char                         peer_id_prefix[PEER_ID_PREFIX_LEN + 1];
+    uint8_t                      peer_id[PEER_ID_LEN + 1];
+    char                       * user_agent;
 
     int                          speedLimit_Bps[2];
     tr_bool                      speedLimitEnabled[2];

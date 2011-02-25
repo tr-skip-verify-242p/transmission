@@ -844,7 +844,7 @@ sendLtepHandshake( tr_peermsgs * msgs )
     tr_bencDictAddInt( &val, "p", tr_sessionGetPublicPeerPort( getSession(msgs) ) );
     tr_bencDictAddInt( &val, "reqq", REQQ );
     tr_bencDictAddInt( &val, "upload_only", tr_torrentIsSeed( msgs->torrent ) );
-    tr_bencDictAddStr( &val, "v", TR_NAME " " USERAGENT_PREFIX );
+    tr_bencDictAddStr( &val, "v", tr_sessionGetCurrentUserAgent( getSession( msgs ) ) );
     m  = tr_bencDictAddDict( &val, "m", 2 );
     if( allow_metadata_xfer )
         tr_bencDictAddInt( m, "ut_metadata", UT_METADATA_ID );
