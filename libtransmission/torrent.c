@@ -723,7 +723,9 @@ torrentInitFromInfo( tr_torrent * tor )
 
 OUT:
     tr_cpConstruct( &tor->completion, tor );
+
     tr_torrentInitFilePieces( tor );
+
     tor->completeness = tr_cpGetStatus( &tor->completion );
 }
 
@@ -733,6 +735,8 @@ void
 tr_torrentGotNewInfoDict( tr_torrent * tor )
 {
     torrentInitFromInfo( tor );
+
+    tr_peerMgrOnTorrentGotMetainfo( tor );
 
     tr_torrentFireMetadataCompleted( tor );
 }
@@ -2917,6 +2921,19 @@ tr_torrentGetPeerLimit( const tr_torrent * tor )
 ****
 ***/
 
+void
+tr_torrentGetBlockLocation( const tr_torrent * tor, 
+                            tr_block_index_t   block,
+                            tr_piece_index_t * piece,
+                            uint32_t         * offset,
+                            uint32_t         * length )
+{
+    *piece = tr_torBlockPiece( tor, block );
+    *offset = tr_torBlockPieceByte( tor, block, *piece );
+    *length = tr_torBlockCountBytes( tor, block );
+}
+
+
 tr_block_index_t
 _tr_block( const tr_torrent * tor,
            tr_piece_index_t   index,
@@ -2978,6 +2995,36 @@ tr_pieceOffset( const tr_torrent * tor,
     ret += length;
     return ret;
 }
+
+void
+tr_torGetFileBlockRange( const tr_torrent        * tor,
+                         const tr_file_index_t     file,
+                         tr_block_index_t        * first,
+                         tr_block_index_t        * last )
+{
+    const tr_file * f = &tor->info.files[file];
+    uint64_t offset = f->offset;
+    *first = tr_torByteBlock( tor, offset );
+    if( !f->length )
+        *last = *first;
+    else {
+        offset += f->length - 1;
+        *last = tr_torByteBlock( tor, offset );
+    }
+}
+
+void
+tr_torGetPieceBlockRange( const tr_torrent        * tor,
+                          const tr_piece_index_t    piece,
+                          tr_block_index_t        * first,
+                          tr_block_index_t        * last )
+{
+    uint64_t offset = tr_torPieceByte( tor, piece );
+    *first = tr_torByteBlock( tor, offset );
+    offset += ( tr_torPieceCountBytes( tor, piece ) - 1 );
+    *last = tr_torByteBlock( tor, offset );
+}
+
 
 /***
 ****

@@ -402,7 +402,6 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddBool( d, TR_PREFS_KEY_IDLE_LIMIT_ENABLED,       FALSE );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_INCOMPLETE_DIR,           tr_getDefaultDownloadDir( ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED,   FALSE );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_LAZY_BITFIELD,            TRUE );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_MSGLEVEL,                 TR_MSG_INF );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_OPEN_FILE_LIMIT,          atoi( TR_DEFAULT_OPEN_FILE_LIMIT_STR ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_MAX_CONNECTIONS_PER_SEC,  atoi( TR_DEFAULT_MAX_CONNECTIONS_PER_SEC_STR ) );
@@ -488,7 +487,6 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddBool( d, TR_PREFS_KEY_IDLE_LIMIT_ENABLED,       tr_sessionIsIdleLimited( s ) );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_INCOMPLETE_DIR,           tr_sessionGetIncompleteDir( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED,   tr_sessionIsIncompleteDirEnabled( s ) );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_LAZY_BITFIELD,            s->useLazyBitfield );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_MSGLEVEL,                 tr_getMessageLevel( ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_OPEN_FILE_LIMIT,          tr_fdGetFileLimit( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_MAX_CONNECTIONS_PER_SEC,  tr_sessionGetMaxConnectionsPerSec( s ) );
@@ -877,8 +875,6 @@ sessionSetImpl( void * vdata )
     /* misc features */
     if( tr_bencDictFindInt( settings, TR_PREFS_KEY_MAX_CACHE_SIZE_MB, &i ) )
         tr_sessionSetCacheLimit_MB( session, i );
-    if( tr_bencDictFindBool( settings, TR_PREFS_KEY_LAZY_BITFIELD, &boolVal ) )
-        tr_sessionSetLazyBitfieldEnabled( session, boolVal );
     if( tr_bencDictFindStr( settings, TR_PREFS_KEY_PEER_ID_PREFIX, &str ) )
         tr_sessionSetPeerIdPrefix( session, str );
     if( tr_bencDictFindStr( settings, TR_PREFS_KEY_USER_AGENT, &str ) )

@@ -135,11 +135,11 @@ typedef struct tr_peer
 
     time_t                   chokeChangedAt;
 
-    tr_recentHistory       * blocksSentToClient;
-    tr_recentHistory       * blocksSentToPeer;
+    tr_recentHistory         blocksSentToClient;
+    tr_recentHistory         blocksSentToPeer;
 
-    tr_recentHistory       * cancelsSentToClient;
-    tr_recentHistory       * cancelsSentToPeer;
+    tr_recentHistory         cancelsSentToClient;
+    tr_recentHistory         cancelsSentToPeer;
 
     struct tr_peermsgs     * msgs;
 }
@@ -243,6 +243,8 @@ void tr_peerMgrTorrentAvailability( const tr_torrent * tor,
                                     unsigned int       tabCount );
 
 struct tr_bitfield* tr_peerMgrGetAvailable( const tr_torrent * tor );
+
+void tr_peerMgrOnTorrentGotMetainfo( tr_torrent * tor );
 
 void tr_peerMgrOnBlocklistChanged( tr_peerMgr * manager );
 
