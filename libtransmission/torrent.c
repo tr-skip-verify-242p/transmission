@@ -2239,6 +2239,54 @@ usePieceTemp( tr_torrent * tor, tr_file_index_t i )
 }
 
 /**
+ * Calculate the offset and amount of overlap that the file
+ * given by index @a fi has with its first and last pieces. The
+ * offsets are relative to the start of pieces, and the the
+ * overlap sizes are less than or equal to the piece size.
+ *
+ * @note All of the @a setme_* arguments are assumed non-NULL.
+ *
+ * @note For small files, be sure to check whether the file
+ *       is completely contained in a single piece, i.e.
+ *       whether @code file->firstPiece == file->lastPiece @endcode.
+ */
+static void
+getFileOverlap( tr_torrent * tor,
+                tr_file_index_t fi,
+                size_t * setme_fpoffset,
+                size_t * setme_fpoverlap,
+                size_t * setme_lpoffset,
+                size_t * setme_lpoverlap )
+{
+    const tr_file * file = &tor->info.files[fi];
+    tr_piece_index_t fpindex = file->firstPiece;
+    tr_piece_index_t lpindex = file->lastPiece;
+    size_t fpoffset, fpoverlap, lpoffset, lpoverlap;
+
+    fpoffset = file->offset - tr_pieceOffset( tor, fpindex, 0, 0 );
+    fpoverlap = tr_torPieceCountBytes( tor, fpindex ) - fpoffset;
+    if( fpoverlap > file->length )
+        fpoverlap = file->length;
+
+    if( fpindex != lpindex )
+    {
+        lpoffset = 0;
+        lpoverlap = ( file->offset + file->length
+                      - tr_pieceOffset( tor, lpindex, 0, 0 ) );
+    }
+    else
+    {
+        lpoffset = fpoffset;
+        lpoverlap = fpoverlap;
+    }
+
+    *setme_fpoffset = fpoffset;
+    *setme_fpoverlap = fpoverlap;
+    *setme_lpoffset = lpoffset;
+    *setme_lpoverlap = lpoverlap;
+}
+
+/**
  * @note This function assumes @a tor is valid and already locked, and
  *       @a file_index is a valid file index for the torrent.
  * @note When @a file->dnd is TRUE and @a dnd is FALSE, this function has
@@ -2254,8 +2302,7 @@ setFileDND( tr_torrent * tor, tr_file_index_t file_index, int8_t dnd )
     const tr_piece_index_t fpindex = file->firstPiece;
     const tr_piece_index_t lpindex = file->lastPiece;
     tr_bool fpmovept, lpmovept, fpdnd, lpdnd, fpnopt, lpnopt;
-    size_t fpoverlap, lpoverlap;
-    uint32_t fpoffset, lpoffset;
+    size_t fpoverlap, lpoverlap, fpoffset, lpoffset;
     uint8_t * fpbuf, * lpbuf;
 
     if( file->dnd == dnd )
@@ -2278,14 +2325,13 @@ setFileDND( tr_torrent * tor, tr_file_index_t file_index, int8_t dnd )
         lpmovept = tr_torrentFindPieceTemp2( tor, lpindex, NULL, NULL );
     }
 
+    getFileOverlap( tor, file_index,
+                    &fpoffset, &fpoverlap,
+                    &lpoffset, &lpoverlap );
+
     if( fpmovept )
     {
-        fpoffset = file->offset - tr_pieceOffset( tor, fpindex, 0, 0 );
-        fpoverlap = tr_torPieceCountBytes( tor, fpindex ) - fpoffset;
-        if( fpoverlap > file->length )
-            fpoverlap = file->length;
         fpbuf = tr_malloc0( fpoverlap );
-
         if( tr_ioRead( tor, fpindex, fpoffset, fpoverlap, fpbuf ) != 0 )
         {
             tr_free( fpbuf );
@@ -2295,10 +2341,7 @@ setFileDND( tr_torrent * tor, tr_file_index_t file_index, int8_t dnd )
 
     if( lpmovept )
     {
-        lpoffset = 0;
-        lpoverlap = file->offset + file->length - tr_pieceOffset( tor, lpindex, 0, 0 );
         lpbuf = tr_malloc0( lpoverlap );
-
         if( tr_ioRead( tor, lpindex, lpoffset, lpoverlap, lpbuf ) != 0 )
         {
             tr_free( lpbuf );
@@ -2400,20 +2443,228 @@ tr_torrentInitFileDLs( tr_torrent             * tor,
     tr_torrentUnlock( tor );
 }
 
+/**
+ * Delete a file set to DND, if all pieces making up the file are also
+ * set to DND. Otherwise, delete the file and write back the overlapping
+ * non-DND piece parts.
+ *
+ * @note This function assumes it is only called from
+ *       tr_torrentDeleteDNDFiles().
+ *
+ * @return TRUE if the file was deleted.
+ *
+ * @see setFileDND()
+ */
+static tr_bool
+deleteDNDFile( tr_torrent      * tor,
+               tr_file_index_t   file_index,
+               tr_fileFunc       removeFunc )
+{
+    tr_file * file;
+    tr_file_index_t fi;
+    tr_piece_index_t fpindex, lpindex, pi;
+    size_t fpoffset, lpoffset, fpoverlap, lpoverlap;
+    int fpblocks, lpblocks;
+    tr_bool fpsave, lpsave, fpallpt, lpallpt;
+    uint8_t * fpbuf = NULL, * lpbuf = NULL;
+    char * path = NULL;
+
+    if( file_index >= tor->info.fileCount )
+        return FALSE;
+
+    file = &tor->info.files[file_index];
+
+    if( !file->dnd || file->usept )
+        return FALSE;
+
+    fpindex = file->firstPiece;
+    lpindex = file->lastPiece;
+    fpblocks = tr_cpCompleteBlocksInPiece( &tor->completion, fpindex );
+    lpblocks = tr_cpCompleteBlocksInPiece( &tor->completion, lpindex );
+
+    getFileOverlap( tor, file_index,
+                    &fpoffset, &fpoverlap,
+                    &lpoffset, &lpoverlap );
+
+    /* We need to preserve the overlapping piece parts if they are
+     * used by wanted files and have some complete blocks in them. */
+    fpsave = ( !tor->info.pieces[fpindex].dnd && fpblocks > 0 );
+    lpsave = ( !tor->info.pieces[lpindex].dnd && lpblocks > 0
+               && fpindex != lpindex );
+
+    /* Ensure that the data we are about to delete does not
+     * remain in the cache. */
+    tr_cacheFlushFile( tor->session->cache, tor, file_index );
+
+    path = tr_torrentFindFile( tor, file_index );
+    if( !path )
+    {
+        /* The file is already gone for some reason. */
+        return TRUE;
+    }
+
+    /* Read the existing overlapping piece parts. */
+    if( fpsave )
+    {
+        fpbuf = tr_malloc( fpoverlap );
+        if( tr_ioRead( tor, fpindex, fpoffset, fpoverlap, fpbuf ) != 0 )
+        {
+            tr_free( fpbuf );
+            fpsave = FALSE;
+        }
+    }
+    if( lpsave )
+    {
+        lpbuf = tr_malloc( lpoverlap );
+        if( tr_ioRead( tor, lpindex, lpoffset, lpoverlap, lpbuf ) != 0 )
+        {
+            tr_free( lpbuf );
+            lpsave = FALSE;
+        }
+    }
+
+    /* Close and delete the file from the file system. */
+    tr_fdFileClose( tor->session, tor, file_index, TR_FD_INDEX_FILE );
+    deleteLocalFile( path, removeFunc );
+    tr_free( path );
+
+    /* Make subsequent writes to temporary piece files, if needed. */
+    file->usept = TRUE;
+
+    /* Write the overlapping piece parts back from the buffers. */
+    if( fpsave )
+    {
+        tr_ioWrite( tor, fpindex, fpoffset, fpoverlap, fpbuf );
+        tr_free( fpbuf );
+    }
+    if( lpsave )
+    {
+        tr_ioWrite( tor, lpindex, lpoffset, lpoverlap, lpbuf );
+        tr_free( lpbuf );
+    }
+
+    /* Update the piece status of the deleted pieces. */
+    for( pi = fpindex; pi <= lpindex; ++pi )
+        if( tor->info.pieces[pi].dnd )
+            tr_torrentSetHasPiece( tor, pi, FALSE );
+
+    /* Scan for temporary piece files we can remove. */
+    fpallpt = file->usept;
+    if( file_index > 0 )
+    {
+        for( fi = file_index - 1; fpallpt; --fi )
+        {
+            if( tor->info.files[fi].lastPiece != fpindex )
+                break;
+            fpallpt = tor->info.files[fi].usept;
+            if( !fi )
+                break;
+        }
+    }
+
+    lpallpt = file->usept;
+    for( fi = file_index + 1; lpallpt && fi < tor->info.fileCount; ++fi )
+    {
+        if( tor->info.files[fi].firstPiece != lpindex )
+            break;
+        lpallpt = tor->info.files[fi].usept;
+    }
+
+    if( fpindex == lpindex )
+    {
+        if( fpallpt && lpallpt )
+        {
+            tor->info.pieces[fpindex].dnd = TRUE;
+            tr_torrentSetHasPiece( tor, fpindex, FALSE );
+            removePieceTemp( tor, fpindex );
+        }
+    }
+    else
+    {
+        if( fpallpt )
+        {
+            tor->info.pieces[fpindex].dnd = TRUE;
+            tr_torrentSetHasPiece( tor, fpindex, FALSE );
+            removePieceTemp( tor, fpindex );
+        }
+        if( lpallpt )
+        {
+            tor->info.pieces[lpindex].dnd = TRUE;
+            tr_torrentSetHasPiece( tor, lpindex, FALSE );
+            removePieceTemp( tor, lpindex );
+        }
+    }
+
+    return TRUE;
+}
+
+/**
+ * @note This function assumes it is only called
+ *       from tr_torrentSetFileDLsImpl().
+ *
+ * @return the number of files deleted.
+ */
+static tr_file_index_t
+tr_torrentDeleteDNDFiles( tr_torrent            * tor,
+                          const tr_file_index_t * files,
+                          tr_file_index_t         fileCount,
+                          tr_fileFunc             removeFunc )
+{
+    tr_file_index_t count = 0, i;
+
+    for( i = 0; i < fileCount; ++i )
+        if( deleteDNDFile( tor, files[i], removeFunc ) )
+            ++count;
+
+    return count;
+}
+
+static void
+tr_torrentSetFileDLsImpl( tr_torrent             * tor,
+                          const tr_file_index_t  * files,
+                          tr_file_index_t          fileCount,
+                          tr_bool                  doDownload,
+                          tr_bool                  deleteData,
+                          tr_file_index_t        * setmeDeleteCount,
+                          tr_fileFunc              removeFunc )
+{
+    assert( tr_isTorrent( tor ) );
+    tr_torrentLock( tor );
+
+    tr_torrentInitFileDLs( tor, files, fileCount, doDownload );
+    if( !doDownload && deleteData )
+    {
+        tr_file_index_t count;
+        count = tr_torrentDeleteDNDFiles( tor, files, fileCount, removeFunc );
+        if( setmeDeleteCount )
+            *setmeDeleteCount = count;
+    }
+    tr_torrentSetDirty( tor );
+    tr_peerMgrRebuildRequests( tor );
+
+    tr_torrentUnlock( tor );
+}
+
 void
 tr_torrentSetFileDLs( tr_torrent             * tor,
                       const tr_file_index_t  * files,
                       tr_file_index_t          fileCount,
                       tr_bool                  doDownload )
 {
-    assert( tr_isTorrent( tor ) );
-    tr_torrentLock( tor );
+    tr_torrentSetFileDLsImpl( tor, files, fileCount, doDownload,
+                              FALSE, NULL, NULL );
+}
 
-    tr_torrentInitFileDLs( tor, files, fileCount, doDownload );
-    tr_torrentSetDirty( tor );
-    tr_peerMgrRebuildRequests( tor );
-
-    tr_torrentUnlock( tor );
+tr_file_index_t
+tr_torrentDeleteFiles( tr_torrent            * torrent,
+                       const tr_file_index_t * files,
+                       tr_file_index_t         fileCount,
+                       tr_fileFunc             removeFunc )
+{
+    tr_file_index_t count = 0;
+    tr_torrentSetFileDLsImpl( torrent, files, fileCount, FALSE,
+                              TRUE, &count, removeFunc );
+    return count;
 }
 
 /***

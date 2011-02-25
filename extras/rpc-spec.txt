@@ -91,6 +91,7 @@
    "downloadLimited"     | boolean    true if "downloadLimit" is honored
    "files-wanted"        | array      indices of file(s) to download
    "files-unwanted"      | array      indices of file(s) to not download
+   "delete-files"        | array      indices of file(s) to delete
    "honorsSessionLimits" | boolean    true if session upload limits are honored
    "ids"                 | array      torrent list, as described in 3.1
    "location"            | string     new location of the torrent's content
