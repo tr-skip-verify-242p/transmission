@@ -2232,10 +2232,8 @@ tr_torrentGetBlockLocation( const tr_torrent * tor,
                             uint32_t         * offset,
                             uint32_t         * length )
 {
-    uint64_t pos = block;
-    pos *= tor->blockSize;
-    *piece = pos / tor->info.pieceSize;
-    *offset = pos - ( *piece * tor->info.pieceSize );
+    *piece = tr_torBlockPiece( tor, block );
+    *offset = tr_torBlockPieceByte( tor, block, *piece );
     *length = tr_torBlockCountBytes( tor, block );
 }
 
