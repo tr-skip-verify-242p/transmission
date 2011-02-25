@@ -81,6 +81,22 @@ uint64_t         tr_pieceOffset( const tr_torrent * tor,
                                  uint32_t           offset,
                                  uint32_t           length );
 
+void             tr_torrentGetBlockLocation( const tr_torrent * tor, 
+                                             tr_block_index_t   block,
+                                             tr_piece_index_t * piece, 
+                                             uint32_t         * offset,
+                                             uint32_t         * length );
+
+void             tr_torGetFileBlockRange( const tr_torrent        * tor,
+                                          const tr_file_index_t     file,
+                                          tr_block_index_t        * first,
+                                          tr_block_index_t        * last );
+
+void             tr_torGetPieceBlockRange( const tr_torrent        * tor,
+                                           const tr_piece_index_t    piece,
+                                           tr_block_index_t        * first,
+                                           tr_block_index_t        * last );
+
 void             tr_torrentInitFilePriority( tr_torrent       * tor,
                                              tr_file_index_t    fileIndex,
                                              tr_priority_t      priority );
