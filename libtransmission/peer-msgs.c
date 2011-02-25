@@ -1872,6 +1872,12 @@ tr_peerMsgsIsReadingBlock( const tr_peermsgs * msgs, tr_block_index_t block )
     if( msgs->state != AWAITING_BT_PIECE )
         return FALSE;
 
+    if( msgs->incoming.blockReq.index >= msgs->torrent->info.pieceCount
+        || ( msgs->incoming.blockReq.offset
+             >= tr_torPieceCountBytes( msgs->torrent,
+                                       msgs->incoming.blockReq.index ) ) )
+        return FALSE;
+
     return block == _tr_block( msgs->torrent,
                                msgs->incoming.blockReq.index,
                                msgs->incoming.blockReq.offset );
