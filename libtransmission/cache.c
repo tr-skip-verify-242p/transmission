@@ -442,22 +442,21 @@ tr_cacheFlushFile( tr_cache * cache, tr_torrent * torrent, tr_file_index_t i )
 int
 tr_cacheFlushPiece( tr_cache * cache, tr_torrent * torrent, tr_piece_index_t i )
 {
+    int pos;
     int err = 0;
-    const tr_block_index_t begin = tr_torPieceFirstBlock( torrent, i );
-    const tr_block_index_t end  = ( tr_torPieceFirstBlock( torrent, i )
-                                    + tr_torPieceCountBlocks( torrent, i ) );
-    const int pos = findPiece( cache, torrent, i );
+    tr_block_index_t first;
+    tr_block_index_t last;
+    tr_torGetPieceBlockRange( torrent, i, &first, &last );
+    pos = findBlockPos( cache, torrent, first );
     dbgmsg( "flushing piece %d from cache to disk: blocks [%zu...%zu)",
-            (int)i, (size_t)begin, (size_t)end );
+            (int) i, (size_t) first, (size_t) last );
 
     /* flush out all the blocks in that piece */
     while( !err && pos < tr_ptrArraySize( &cache->blocks ) )
     {
         const struct cache_block * b = tr_ptrArrayNth( &cache->blocks, pos );
-        if( b->tor != torrent )
-            break;
-        if( b->block < begin || b->block >= end )
-            break;
+        if( b->tor != torrent ) break;
+        if( ( b->block < first ) || ( b->block > last ) ) break;
         err = flushContiguous( cache, pos, getBlockRun( cache, pos, NULL ) );
     }
 

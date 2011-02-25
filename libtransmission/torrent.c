@@ -1750,13 +1750,8 @@ tr_torrentStop( tr_torrent * tor )
     }
 }
 
-static void
-deleteLocalFile( const char * filename, tr_fileFunc fileFunc )
-{
-    struct stat sb;
-    if( !stat( filename, &sb ) ) /* if file exists... */
-        fileFunc( filename );
-}
+static void deleteLocalFile( const char  * filename,
+                             tr_fileFunc   fileFunc );
 
 /**
  * @brief Delete all temporary piece files for the torrent.
@@ -1770,9 +1765,9 @@ tr_torrentRemovePieceTemp( tr_torrent * tor )
     tr_list * files = NULL;
     const char * path = tor->pieceTempDir;
 
-    if(( dir = opendir( path )))
+    if( ( dir = opendir( path ) ) )
     {
-        while(( d = readdir( dir )))
+        while( ( d = readdir( dir ) ) )
         {
             const char * name = d->d_name;
 
@@ -1784,7 +1779,7 @@ tr_torrentRemovePieceTemp( tr_torrent * tor )
         tr_list_append( &files, tr_strdup( path ) );
     }
 
-    for( l=files; l!=NULL; l=l->next )
+    for( l = files; l != NULL; l = l->next )
         deleteLocalFile( l->data, remove );
 
     tr_list_free( &files, tr_free );
@@ -2155,13 +2150,7 @@ tr_torrentGetFilePriorities( const tr_torrent * tor )
 ***
 **/
 
-static tr_bool
-fileExists( const char * filename )
-{
-    struct stat sb;
-    const tr_bool ok = !stat( filename, &sb );
-    return ok;
-}
+static tr_bool fileExists( const char * filename );
 
 tr_bool
 tr_torrentFindPieceTemp2( const tr_torrent  * tor,
@@ -2170,9 +2159,8 @@ tr_torrentFindPieceTemp2( const tr_torrent  * tor,
                           char             ** subpath )
 {
     const char * b = tor->pieceTempDir;
-    char       * s;
-    char       * filename;
-    tr_bool      exists = FALSE;
+    char * s, * filename;
+    tr_bool exists = FALSE;
 
     s = tr_strdup_printf( "%010u.dat", pieceIndex );
 
@@ -2195,8 +2183,7 @@ tr_torrentFindPieceTemp( const tr_torrent * tor,
                          tr_piece_index_t   pieceIndex )
 {
     const char * base;
-    char       * subpath;
-    char       * filename = NULL;
+    char * subpath, * filename = NULL;
 
     if( tr_torrentFindPieceTemp2( tor, pieceIndex, &base, &subpath ) )
     {
@@ -2288,7 +2275,7 @@ getFileOverlap( tr_torrent * tor,
 
 /**
  * @note This function assumes @a tor is valid and already locked, and
- *       @a fileIndex is a valid file index for the torrent.
+ *       @a file_index is a valid file index for the torrent.
  * @note When @a file->dnd is TRUE and @a dnd is FALSE, this function has
  *       the side effect of copying over data from temporary piece files
  *       to the destination file.
@@ -2371,7 +2358,7 @@ setFileDND( tr_torrent * tor, tr_file_index_t file_index, int8_t dnd )
      * - We can set the piece to DND if all files using
      *   that piece are DND.
      * - We can remove the temporary piece file if all
-     *   files using it have @a usept set to FALSE. */
+     *   files using it have 'usept' set to FALSE. */
 
     fpdnd = file->dnd;
     fpnopt = !file->usept;
@@ -3183,6 +3170,14 @@ walkLocalData( const tr_torrent * tor,
 }
 
 static void
+deleteLocalFile( const char * filename, tr_fileFunc fileFunc )
+{
+    struct stat sb;
+    if( !stat( filename, &sb ) ) /* if file exists... */
+        fileFunc( filename );
+}
+
+static void
 deleteLocalData( tr_torrent * tor, tr_fileFunc fileFunc )
 {
     int i, n;
@@ -3456,6 +3451,14 @@ tr_torrentFileCompleted( tr_torrent * tor, tr_file_index_t fileNum )
 /***
 ****
 ***/
+
+static tr_bool
+fileExists( const char * filename )
+{
+    struct stat sb;
+    const tr_bool ok = !stat( filename, &sb );
+    return ok;
+}
 
 tr_bool
 tr_torrentFindFile2( const tr_torrent * tor, tr_file_index_t fileNum,
