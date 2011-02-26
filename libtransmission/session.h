@@ -29,6 +29,7 @@
 
 #include "bencode.h"
 #include "bitfield.h"
+#include "net-interfaces.h"
 #include "utils.h"
 
 typedef enum { TR_NET_OK, TR_NET_ERROR, TR_NET_WAIT } tr_tristate_t;
@@ -196,6 +197,9 @@ struct tr_session
 
     struct event               * nowTimer;
     struct event               * saveTimer;
+    struct event               * networkInterfacesTimer;
+
+    tr_interface              ** networkInterfaces;
 
     /* monitors the "global pool" speeds */
     struct tr_bandwidth        * bandwidth;
@@ -204,8 +208,10 @@ struct tr_session
 
     uint16_t                     idleLimitMinutes;
 
+	/* these attribute store the public bind address details */
     struct tr_bindinfo         * public_ipv4;
     struct tr_bindinfo         * public_ipv6;
+    char *                       publicInterface;
 
     /* a page-aligned buffer for use by the libtransmission thread.
      * @see SESSION_BUFFER_SIZE */

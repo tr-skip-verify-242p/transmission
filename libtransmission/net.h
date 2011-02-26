@@ -25,6 +25,7 @@
 #ifndef __TRANSMISSION__
 #error only libtransmission should #include this header.
 #endif
+#include "transmission.h"
 
 #ifndef _TR_NET_H_
 #define _TR_NET_H_
@@ -90,6 +91,9 @@ int tr_compareAddresses( const tr_address * a,
 
 tr_bool tr_isValidPeerAddress( const tr_address * addr, tr_port port );
 
+tr_bool isAvailableBindAddress(tr_address * address, enum tr_address_type addrType);
+tr_address * unavailableBindAddress(enum tr_address_type addrType);
+
 static inline tr_bool tr_isAddress( const tr_address * a ) { return ( a != NULL ) && ( a->type==TR_AF_INET || a->type==TR_AF_INET6 ); }
 
 tr_bool tr_net_hasIPv6( tr_port );
@@ -127,6 +131,8 @@ void tr_netClose( tr_session * session, int s );
 void tr_netCloseSocket( int fd );
 
 void tr_netInit( void );
+
+void tr_netBindSocketInterface(tr_session *session, int socket);
 
 /**
  * @brief get a human-representable string representing the network error.

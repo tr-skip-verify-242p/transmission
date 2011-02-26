@@ -165,6 +165,7 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_ALT_SPEED_TIME_DAY            "alt-speed-time-day"
 #define TR_PREFS_KEY_BIND_ADDRESS_IPV4             "bind-address-ipv4"
 #define TR_PREFS_KEY_BIND_ADDRESS_IPV6             "bind-address-ipv6"
+#define TR_PREFS_KEY_BIND_INTERFACE                "bind-interface"
 #define TR_PREFS_KEY_BLOCKLIST_ENABLED             "blocklist-enabled"
 #define TR_PREFS_KEY_BLOCKLIST_URL                 "blocklist-url"
 #define TR_PREFS_KEY_MAX_CACHE_SIZE_MB             "cache-size-mb"
@@ -593,6 +594,9 @@ void          tr_sessionSetProxyPassword( tr_session * session,
 /**
 ***
 **/
+
+void tr_sessionSetPublicInterface( tr_session * session,
+	     						    const char * publicInterface );
 
 /** @brief Used by tr_sessionGetStats() and tr_sessionGetCumulativeStats() to give bandwidth statistics */
 typedef struct tr_session_stats

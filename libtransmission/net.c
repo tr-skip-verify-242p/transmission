@@ -41,6 +41,8 @@
  #include <arpa/inet.h> /* inet_addr */
  #include <netdb.h>
  #include <fcntl.h>
+ #include <sys/ioctl.h>
+ #include <net/if.h>
 #endif
 #include <unistd.h>
 
@@ -249,6 +251,46 @@ tr_netSetCongestionControl( int s UNUSED, const char *algorithm UNUSED )
 #endif
 }
 
+void
+tr_netBindSocketInterface(tr_session *session, int socket)
+{
+#ifdef USE_SO_BINDTODEVICE
+    if ( socket >= 0 && session->publicInterface != NULL )
+    {
+        /*
+         * Using the ifreq struct with setsockopt seems reasonably common
+         * among the POSIX and POSIX like platforms.
+         * The linux manpage here: http://linux.die.net/man/7/socket says:
+         *   ""The passed option is a variable-length null terminated
+         *     interface name string with the maximum size of IFNAMSIZ.""
+         *
+         * The ifreq structure contains, as it's first element, ifr_name
+         * of size IFNAMSIZ.
+         *
+         * If you find that you do not have net/if.h or the ifreq structure
+         * but you do have SO_BINDTODEVICE then you may just pass null
+         * terminated string. IFNAMSIZ is 16, quite long as net devices
+         * tend to be named eth0, eth0:1, ppp0, etc.
+         *
+         * For size you can pass either IFNAMSIZ, sizeof(struct ifreq), or the
+         * number of bytes in session->publicInterface plus the '\0'.
+         */
+        struct ifreq request;
+
+        memset(&request, 0, sizeof(request));
+        tr_strlcpy(request.ifr_name, session->publicInterface, IFNAMSIZ);
+        if ( setsockopt(socket, SOL_SOCKET, SO_BINDTODEVICE,
+                        &request, IFNAMSIZ) < 0 )
+        {
+            int eno = sockerrno;
+            tr_err( _( "Bind socket to device \'%s\' error: \'%s\' (%d)" ),
+                   session->publicInterface, tr_strerror(eno), eno );
+        }
+    }
+#endif
+}
+
+
 static socklen_t
 setup_sockaddr( const tr_address        * addr,
                 tr_port                   port,
@@ -301,6 +343,8 @@ tr_netOpenPeerSocket( tr_session        * session,
     s = tr_fdSocketCreate( session, domains[addr->type], SOCK_STREAM );
     if( s < 0 )
         return -1;
+
+    tr_netBindSocketInterface(session, s);
 
     /* seeds don't need much of a read buffer... */
     if( clientIsSeed ) {
@@ -706,3 +750,62 @@ tr_isValidPeerAddress( const tr_address * addr, tr_port port )
         && ( !isIPv4MappedAddress( addr ) )
         && ( !isMartianAddr( addr ) );
 }
+
+
+tr_bool isAvailableBindAddress(tr_address * address, enum tr_address_type addrType)
+{
+    int s;
+    int bindResult = 0;
+    int bindErr;
+    static socklen_t sourcelen;
+    struct sockaddr_storage source_sock;
+    sourcelen = setup_sockaddr( address, 0, &source_sock );
+
+    s = socket( (int)addrType, SOCK_DGRAM, 0 );
+    bindResult = bind( s, (struct sockaddr*)&source_sock, sourcelen );
+
+    bindErr = errno;
+    close(s);
+
+    if(bindResult == 0)
+        return TRUE;
+    else switch(bindErr)
+	{
+        case EADDRNOTAVAIL:
+            return FALSE; break;
+        default:
+            tr_nerr("isAvailableBindAddress", "bind() probe gave an unhandled error code %i", bindErr);
+            tr_nerr("isAvailableBindAddress", "assuming that the address (may otherwise at other times) be bind()'able");
+            return TRUE;
+	}
+}
+
+/*
+ * Attempt to create a dummy private address that will disable traffic.
+ */
+tr_address * unavailableBindAddress(enum tr_address_type addrType)
+{
+    int i;
+    tr_address * testAddr = tr_new0( tr_address, 1 );
+
+    switch (addrType)
+    {
+        case TR_AF_INET:  tr_pton( "1.2.3.4", testAddr ); break;
+        case TR_AF_INET6: tr_pton( "fd7f:54eb:9f51:be9a:1:2:3:4", testAddr ); break;
+        default: return testAddr;
+    }
+
+    i = 100;
+    while( isAvailableBindAddress(testAddr, addrType) && i < 100 )
+    {
+        switch (addrType)
+        {
+            case TR_AF_INET:  testAddr->addr.addr4.s_addr     += 1; break;
+            case TR_AF_INET6: testAddr->addr.addr6.s6_addr[0] -= 1; break;
+            default: return testAddr;
+        }
+        i++;
+    }
+    return testAddr;
+}
+

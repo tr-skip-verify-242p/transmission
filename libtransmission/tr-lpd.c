@@ -288,6 +288,7 @@ int tr_lpdInit( tr_session* ss, tr_address* tr_addr UNUSED )
                 &opt_on, sizeof opt_on ) < 0 )
             goto fail;
 
+        tr_netBindSocketInterface(ss, lpd_socket);
         memset( &lpd_mcastAddr, 0, sizeof lpd_mcastAddr );
         lpd_mcastAddr.sin_family = AF_INET;
         lpd_mcastAddr.sin_port = htons( lpd_mcastPort );
@@ -322,6 +323,8 @@ int tr_lpdInit( tr_session* ss, tr_address* tr_addr UNUSED )
 
         if( evutil_make_socket_nonblocking( lpd_socket2 ) < 0 )
             goto fail;
+
+        tr_netBindSocketInterface(ss, lpd_socket2);
 
         /* configure outbound multicast TTL */
         if( setsockopt( lpd_socket2, IPPROTO_IP, IP_MULTICAST_TTL,

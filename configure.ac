@@ -182,6 +182,88 @@ AC_CHECK_LIB([rt],
 
 dnl ----------------------------------------------------------------------------
 dnl
+dnl  SO_BINDTODEVICE support
+
+AC_CACHE_CHECK([whether setsockopt accepts SO_BINDTODEVICE],
+    [ac_cv_c_so_bindtodevice],
+    [CXXFLAGS="${save_CXXFLAGS} -Wall -Werror"
+     AC_TRY_COMPILE([#include <sys/types.h>
+                     #include <sys/socket.h>],
+        [return SO_BINDTODEVICE;],
+        ac_cv_c_so_bindtodevice=yes, ac_cv_c_so_bindtodevice=no)])
+if test x"$ac_cv_c_so_bindtodevice" != x"no"; then
+    AC_DEFINE(HAVE_SO_BINDTODEVICE, 1, Define if setsockopt accepts SO_BINDTODEVICE.)
+fi
+
+dnl ----------------------------------------------------------------------------
+dnl
+dnl  SO_BINDTODEVICE enable/disable.
+
+AC_ARG_ENABLE([bindtodevice],
+              AS_HELP_STRING([--enable-bindtodevice],[Enable bind to device support]),
+              [want_bindtodevice=${enableval}],
+              [want_bindtodevice=${ac_cv_c_so_bindtodevice}])
+
+if test x"$want_bindtodevice" = x"yes" ; then
+    if test x"$ac_cv_c_so_bindtodevice" != x"no"; then
+      AC_DEFINE(USE_SO_BINDTODEVICE, 1, Define as 1 if bind to device feature is enabled.)
+    else
+      AC_DEFINE(USE_SO_BINDTODEVICE, 0, Define as 0 if bind to device feature is disabled.)
+    fi
+fi
+
+dnl ----------------------------------------------------------------------------
+dnl
+dnl  getifaddrs
+
+AC_CACHE_CHECK([whether getifaddrs() exists],
+    [ac_cv_c_getifaddrs],
+    [CXXFLAGS="${save_CXXFLAGS} -Wall -Werror"
+     AC_TRY_COMPILE([#include <sys/types.h>
+                     #include <sys/socket.h>
+                     #include <ifaddrs.h>],
+        [{struct ifaddrs * pIfa;
+          return getifaddrs(&pIfa);}],
+        ac_cv_c_getifaddrs=yes, ac_cv_c_getifaddrs=no)])
+if test x"$ac_cv_c_getifaddrs" != x"no"; then
+    AC_DEFINE(HAVE_GETIFADDRS, 1, Define if getifaddrs is available..)
+fi
+
+dnl ----------------------------------------------------------------------------
+dnl
+dnl  libnetlink
+
+AC_CACHE_CHECK([whether libnetlink is available (iproute-dev)],
+    [ac_cv_c_libnetlink],
+    [CXXFLAGS="${save_CXXFLAGS} -Wall -Werror"
+     AC_TRY_COMPILE([#include <sys/types.h>
+                     #include <sys/socket.h>
+                     #include <libnetlink.h>],
+        [{struct rtnl_handle rth;
+          return rtnl_open(&rth, RTNLGRP_IPV4_ROUTE);}],
+        ac_cv_c_libnetlink=yes, ac_cv_c_libnetlink=no)])
+if test x"$ac_cv_c_libnetlink" != x"no"; then
+    AC_DEFINE(HAVE_LIBNETLINK, 1, Define if libnetlink is available..)
+fi
+
+dnl ----------------------------------------------------------------------------
+dnl
+dnl  SystemConfiguration
+
+AC_CACHE_CHECK([whether SystemConfiguration.Framework is available (configd)],
+    [ac_cv_f_system_configuration],
+    [CXXFLAGS="${save_CXXFLAGS} -Wall -Werror"
+    AC_TRY_COMPILE([#include <SystemConfiguration/SystemConfiguration.h>],
+       [SCDynamicStoreGetTypeID();],
+        ac_cv_f_system_configuration=yes, ac_cv_f_system_configuration=no)])
+if test x"$ac_cv_f_system_configuration" != x"no"; then
+    AC_DEFINE(HAVE_FRAMEWORK_SYSTEM_CONFIGURATION, 1, Define if SystemConfiguration.Framework is available..)
+    FRAMEWORK_SYSTEM_CONFIGURATION_LDFLAGS="-framework SystemConfiguration"
+    AC_SUBST(FRAMEWORK_SYSTEM_CONFIGURATION_LDFLAGS)
+fi
+
+dnl ----------------------------------------------------------------------------
+dnl
 dnl  dht
 
 DHT_CFLAGS="-I\$(top_srcdir)/third-party/dht"

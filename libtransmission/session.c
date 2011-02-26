@@ -35,6 +35,7 @@
 #include "list.h"
 #include "metainfo.h" /* tr_metainfoFree */
 #include "net.h"
+#include "net-interfaces.h"
 #include "peer-io.h"
 #include "peer-mgr.h"
 #include "platform.h" /* tr_lock */
@@ -43,6 +44,7 @@
 #include "session.h"
 #include "stats.h"
 #include "torrent.h"
+#include "tr-dht.h"
 #include "tr-udp.h"
 #include "tr-utp.h"
 #include "tr-lpd.h"
@@ -51,6 +53,17 @@
 #include "verify.h"
 #include "version.h"
 #include "web.h"
+
+#ifdef HAVE_LIBNETLINK
+#include <libnetlink.h>
+
+#define RTNLGRP_MSGS \
+    (RTNLGRP_IPV4_IFADDR|RTNLGRP_IPV4_ROUTE|RTNLGRP_IPV6_IFADDR|RTNLGRP_IPV6_ROUTE)
+
+#elif defined HAVE_FRAMEWORK_SYSTEM_CONFIGURATION
+#include <SystemConfiguration/SystemConfiguration.h>
+
+#endif /* HAVE_LIBNETLINK */
 
 enum
 {
@@ -61,7 +74,14 @@ enum
     DEFAULT_CACHE_SIZE_MB = 4,
     DEFAULT_PREFETCH_ENABLED = TRUE,
 #endif
-    SAVE_INTERVAL_SECS = 360
+    SAVE_INTERVAL_SECS = 360,
+#ifdef HAVE_LIBNETLINK
+    NET_IF_POLL_INTERVAL_SECS = 30,
+#elif defined HAVE_FRAMEWORK_SYSTEM_CONFIGURATION
+    NET_IF_POLL_INTERVAL_SECS = 30,
+#else
+    NET_IF_POLL_INTERVAL_SECS = 3,
+#endif /* HAVE_LIBNETLINK */
 };
 
 
@@ -209,6 +229,7 @@ open_incoming_peer_port( tr_session * session )
     b = session->public_ipv4;
     b->socket = tr_netBindTCP( &b->addr, session->private_peer_port, FALSE );
     if( b->socket >= 0 ) {
+        tr_netBindSocketInterface(session, b->socket);
         b->ev = event_new( session->event_base, b->socket, EV_READ | EV_PERSIST, accept_incoming_peer, session );
         event_add( b->ev, NULL );
     }
@@ -218,6 +239,7 @@ open_incoming_peer_port( tr_session * session )
         b = session->public_ipv6;
         b->socket = tr_netBindTCP( &b->addr, session->private_peer_port, FALSE );
         if( b->socket >= 0 ) {
+            tr_netBindSocketInterface(session, b->socket);
             b->ev = event_new( session->event_base, b->socket, EV_READ | EV_PERSIST, accept_incoming_peer, session );
             event_add( b->ev, NULL );
         }
@@ -227,8 +249,9 @@ open_incoming_peer_port( tr_session * session )
 const tr_address*
 tr_sessionGetPublicAddress( const tr_session * session, int tr_af_type, tr_bool * is_default_value )
 {
-    const char * default_value;
-    const struct tr_bindinfo * bindinfo;
+    /* this method is called to get the bind address */
+    const char * default_value = "";
+    const struct tr_bindinfo * bindinfo = NULL;
 
     switch( tr_af_type )
     {
@@ -372,6 +395,7 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_UPLOAD_SLOTS_PER_TORRENT, 14 );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_BIND_ADDRESS_IPV4,        TR_DEFAULT_BIND_ADDRESS_IPV4 );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_BIND_ADDRESS_IPV6,        TR_DEFAULT_BIND_ADDRESS_IPV6 );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_BIND_INTERFACE,           "" );
     tr_bencDictAddBool( d, TR_PREFS_KEY_START,                    TRUE );
     tr_bencDictAddBool( d, TR_PREFS_KEY_TRASH_ORIGINAL,           FALSE );
 }
@@ -444,6 +468,7 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_UPLOAD_SLOTS_PER_TORRENT, s->uploadSlotsPerTorrent );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_BIND_ADDRESS_IPV4,        tr_ntop_non_ts( &s->public_ipv4->addr ) );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_BIND_ADDRESS_IPV6,        tr_ntop_non_ts( &s->public_ipv6->addr ) );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_BIND_INTERFACE,           s->publicInterface );
     tr_bencDictAddBool( d, TR_PREFS_KEY_START,                    !tr_sessionGetPaused( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_TRASH_ORIGINAL,           tr_sessionGetDeleteSource( s ) );
 }
@@ -560,6 +585,7 @@ onSaveTimer( int foo UNUSED, short bar UNUSED, void * vsession )
 ***/
 
 static void tr_sessionInitImpl( void * );
+static void peerPortChanged( void * session );
 
 struct init_data
 {
@@ -664,6 +690,263 @@ onNowTimer( int foo UNUSED, short bar UNUSED, void * vsession )
     /* fprintf( stderr, "time %zu sec, %zu microsec\n", (size_t)tr_time(), (size_t)tv.tv_usec ); */
 }
 
+static void tr_getNetworkInterfaces( tr_session * session )
+{
+    dbgmsg( "tr_getNetworkInterfaces: Refreshing the list of network interfaces...");
+    tr_interfacesFree( session->networkInterfaces );
+    session->networkInterfaces = tr_net_interfaces();
+    dbgmsg( "tr_getNetworkInterfaces: Refreshed.");
+}
+
+static tr_interface * tr_sessionGetInterfaceNamed(char * device, tr_session * session )
+{
+    return tr_FindInterfaceByName(session->networkInterfaces, device);
+}
+
+/**
+ * If public interface name is set, refresh the bind ip addresses
+ * ie the session attributes public_ipv4 and public_ipv6
+ * NOTE: here we don't remember a previous state of the
+ * public_interface string. So clearing this setting may not register
+ * until client restarts. We would have to add a hook funcion for GUI.
+ * At the moment this is hidden setting only, so we dont bother.
+ */
+static void tr_refreshPublicIp( tr_session * session )
+{
+    tr_address old_public_ipv4_addr = session->public_ipv4->addr;
+    tr_address old_public_ipv6_addr = session->public_ipv6->addr;
+
+    /* If user wants to bind to a specific device
+     * (ppp0, my PPTP VPN for instance).
+     */
+    if( session->publicInterface && strlen(session->publicInterface) > 0 )
+    {
+        tr_address * addr_ipv4 = NULL;
+        tr_address * addr_ipv6 = NULL;
+
+        tr_interface * foundInterface =
+            tr_sessionGetInterfaceNamed(session->publicInterface, session);
+
+        if (foundInterface)
+        {
+            if (foundInterface->af4) /* != AF_UNSPEC */
+            {
+                tr_address ipv4null;
+                tr_pton(TR_DEFAULT_BIND_ADDRESS_IPV4, &ipv4null);
+
+                /* Check that we don't accidentally bind to all
+                 * interfaces (0.0.0.0).
+                 */
+                if (0 != tr_compareAddresses(&ipv4null, &(foundInterface->ipv4)))
+                {
+                    addr_ipv4 = &(foundInterface->ipv4);
+                }
+            }
+            if (foundInterface->af6)  /* != AF_UNSPEC */
+            {
+                tr_address ipv6null;
+                tr_pton(TR_DEFAULT_BIND_ADDRESS_IPV6, &ipv6null);
+
+                /* Check that we don't accidentally bind to all
+                 * interfaces (::).
+                 */
+                if (0 != tr_compareAddresses(&ipv6null, &(foundInterface->ipv6)))
+                {
+                    addr_ipv6 = &(foundInterface->ipv6);
+                }
+            }
+        }
+
+        if (!addr_ipv4)
+        {
+            addr_ipv4 = unavailableBindAddress(TR_AF_INET);
+        }
+
+        if (!addr_ipv6)
+        {
+            addr_ipv6 = unavailableBindAddress(TR_AF_INET6);
+        }
+
+        /* if either v4 or v6 bind address has changed */
+        if(tr_compareAddresses( addr_ipv4, &old_public_ipv4_addr ) ||
+           tr_compareAddresses( addr_ipv6, &old_public_ipv6_addr ))
+        {
+            session->public_ipv4->addr = * addr_ipv4;
+            session->public_ipv6->addr = * addr_ipv6;
+
+            /* restart future connections to bind on the new ip address */
+            if( session->isLPDEnabled )
+                tr_lpdUninit( session );
+
+            if( session->isDHTEnabled )
+            {
+                tr_dhtUninit( session );
+                tr_dhtInit( session );
+            }
+            if( session->isLPDEnabled )
+                tr_lpdInit( session, &session->public_ipv4->addr );
+
+            peerPortChanged( session );
+        }
+    }
+}
+
+
+static void networkIFRefresh(tr_session * session)
+{
+    assert( tr_isSession( session ) );
+
+    tr_getNetworkInterfaces( session );
+    tr_refreshPublicIp( session );
+}
+
+
+/**
+ * Periodically reload the list of network interfaces
+ */
+static void onNetworkIFTimer( int foo UNUSED, short bar UNUSED, void * vsession )
+{
+    tr_session * session = vsession;
+
+    assert( tr_isSession( session ) );
+    assert( session->networkInterfacesTimer != NULL );
+
+    dbgmsg(
+        "onNetworkIFTimer: the timer has timed out. Next timeout in %d secs.",
+        NET_IF_POLL_INTERVAL_SECS );
+
+    networkIFRefresh(session);
+    tr_timerAdd( session->networkInterfacesTimer, NET_IF_POLL_INTERVAL_SECS, 0 );
+}
+
+/**
+ * libnetlink support
+ */
+
+#ifdef HAVE_LIBNETLINK
+
+/*
+ * libnetlink will listen for kernel events and notify of the
+ *  types we have registered for.
+ */
+static int
+netlinkMessageCallback(const struct sockaddr_nl *who, struct nlmsghdr *n, void *vsession)
+{
+    switch(n->nlmsg_type)
+    {
+        case RTM_NEWLINK:
+        case RTM_DELLINK:
+        case RTM_GETLINK:
+        case RTM_SETLINK:
+        case RTM_NEWADDR:
+        case RTM_DELADDR:
+        case RTM_GETADDR:
+        case RTM_NEWROUTE:
+        case RTM_DELROUTE:
+        case RTM_GETROUTE:
+        case RTM_NEWRULE:
+        case RTM_DELRULE:
+        case RTM_GETRULE:
+            networkIFRefresh((tr_session *)vsession);
+            break;
+
+        default:
+            break;
+    }
+}
+
+/*
+ * libnetlink rtnl_listen() blocks forever.
+ * Run it on a separate thread.
+ */
+static void
+netlinkListenThreadFunc( void * vsession )
+{
+    struct rtnl_handle rth;
+    unsigned int groups = RTNLGRP_MSGS;
+
+    if (rtnl_open(&rth,groups) >= 0)
+    {
+        if (rtnl_listen(&rth, netlinkMessageCallback, vsession)<0)
+        {
+	        tr_err( "rtnl_listen existed." );
+        }
+    }
+    else
+    {
+        tr_err( "rtnl_open failed." );
+    }
+}
+
+#endif /* HAVE_LIBNETLINK */
+
+/**
+ * SystemConfiguration.framework support
+ */
+
+#ifdef HAVE_FRAMEWORK_SYSTEM_CONFIGURATION
+
+/*
+ * SystemConfiguration.framework will listen for events on our behalf and
+ * notifies us of the types we have registered for.
+ */
+static void
+scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *vsession)
+{
+	networkIFRefresh((tr_session *)vsession);
+}
+
+/*
+ * Tell SystemConfiguration.framework which events we want subscribed to
+ * Then wait in a RunLoop for any notifications. We do this all in a seperate
+ * thread here as CFRunLoopRun() blocks forever.
+ */
+static void
+systemConfigurationThread( void * vsession )
+{
+	SCDynamicStoreContext context = {0, vsession, NULL, NULL, NULL};
+
+	SCDynamicStoreRef dynStore = SCDynamicStoreCreate(kCFAllocatorDefault,
+									CFSTR("Transmission"),
+									scCallback,
+									&context);
+	if (!dynStore) {
+        tr_err( "SCDynamicStoreCreate() failed: %s", SCErrorString(SCError()) );
+		return;
+	}
+
+	/* The Interface/ * regex(3) patterns below vv matches all the host network interfaces */
+	const CFStringRef patterns[5] = {
+		CFSTR("com.apple.network.identification"),/* default route, IPv4/6 networks        */
+		CFSTR("State:/Network/Interface"),        /* Interfaces created, destroyed         */
+		CFSTR("State:/Network/Interface/*/Link"), /* Monitor Link up, down                 */
+		CFSTR("State:/Network/Interface/*/IPv4"), /* Monitor IPv4 address, Subnet Mask etc */
+		CFSTR("State:/Network/Interface/*/IPv6"), /* Monitor IPv6 address, Subnet Mask etc */
+	};
+	CFArrayRef watchedPatterns = CFArrayCreate(kCFAllocatorDefault,
+										   (const void **)patterns,
+										   5, /* array size ^^ above */
+										   &kCFTypeArrayCallBacks);
+	if (!SCDynamicStoreSetNotificationKeys(dynStore, NULL, watchedPatterns)) {
+		CFRelease(watchedPatterns);
+	        tr_err( "SCDynamicStoreSetNotificationKeys() failed: %s", SCErrorString(SCError()) );
+		CFRelease(dynStore);
+		dynStore = NULL;
+		return;
+	}
+	CFRelease(watchedPatterns);
+
+	/* Start a run loop to listen for ^^ above said network notifications */
+	CFRunLoopSourceRef rlSrc = SCDynamicStoreCreateRunLoopSource(kCFAllocatorDefault, dynStore, 0);
+	CFRunLoopAddSource(CFRunLoopGetCurrent(), rlSrc, kCFRunLoopDefaultMode);
+	CFRunLoopRun(); /* bye bye, we dont return until program exit */
+	CFRunLoopRemoveSource(CFRunLoopGetCurrent(), rlSrc, kCFRunLoopDefaultMode);
+	CFRelease(rlSrc);
+	return;
+}
+
+#endif /* HAVE_FRAMEWORK_SYSTEM_CONFIGURATION */
+
 static void loadBlocklists( tr_session * session );
 
 static void
@@ -714,6 +997,29 @@ tr_sessionInitImpl( void * vdata )
 
     assert( tr_isSession( session ) );
 
+    tr_sessionSet( session, &settings );
+
+    /* ^^ here we set the public_ipv4 bindinfo and other settings
+     *  so we are safe to go after here
+     */
+    session->networkInterfacesTimer = evtimer_new( session->event_base, onNetworkIFTimer, session );
+    onNetworkIFTimer( 0, 0, session );
+
+#ifdef HAVE_LIBNETLINK
+    /* If we have LIBNETLINK support we can listen for the kernel events associated with
+     * Links and Routes coming and going. We just simply refresh our network interface
+     * knowledge when interesting events fire.
+     */
+    tr_threadNew( netlinkListenThreadFunc, session );
+
+#elif defined HAVE_FRAMEWORK_SYSTEM_CONFIGURATION
+    /* If we have SystemConfiguration.framework (Mac OS X) we can subscribe for a
+     * notification (as a C callback / function pointer) to listen for events associated
+     * with Network Configuration changed (as handled by configd server).
+     */
+    tr_threadNew( systemConfigurationThread, session );
+#endif /* HAVE_LIBNETLINK */
+
     session->saveTimer = evtimer_new( session->event_base, onSaveTimer, session );
     tr_timerAdd( session->saveTimer, SAVE_INTERVAL_SECS, 0 );
 
@@ -726,8 +1032,6 @@ tr_sessionInitImpl( void * vdata )
     tr_statsInit( session );
 
     tr_webInit( session );
-
-    tr_sessionSet( session, &settings );
 
     tr_udpInit( session );
 
@@ -849,6 +1153,9 @@ sessionSetImpl( void * vdata )
         b.addr = tr_in6addr_any;
     b.socket = -1;
     session->public_ipv6 = tr_memdup( &b, sizeof( struct tr_bindinfo ) );
+
+    if( tr_bencDictFindStr( settings, TR_PREFS_KEY_BIND_INTERFACE, &str ) )
+        tr_sessionSetPublicInterface( session, str );
 
     /* incoming peer port */
     if( tr_bencDictFindInt ( settings, TR_PREFS_KEY_PEER_PORT_RANDOM_LOW, &i ) )
@@ -1103,7 +1410,14 @@ peerPortChanged( void * session )
     tr_sharedPortChanged( session );
 
     while(( tor = tr_torrentNext( session, tor )))
-        tr_torrentChangeMyPort( tor );
+    {
+        if (tor->isRunning)
+        {
+            tr_torrentStop( tor );
+            tr_torrentStart( tor );
+            tr_torrentChangeMyPort( tor );
+        }
+    }
 }
 
 static void
@@ -1773,6 +2087,12 @@ sessionCloseImpl( void * vsession )
 
     event_free( session->nowTimer );
     session->nowTimer = NULL;
+
+    evtimer_del( session->networkInterfacesTimer );
+    tr_free( session->networkInterfacesTimer );
+    session->networkInterfacesTimer = NULL;
+
+    tr_interfacesFree( session->networkInterfaces );
 
     tr_verifyClose( session );
     tr_sharedClose( session );
@@ -2727,6 +3047,23 @@ tr_sessionSetProxyPassword( tr_session * session,
     {
         tr_free( session->proxyPassword );
         session->proxyPassword = tr_strdup( password );
+    }
+}
+
+/****
+*****
+****/
+
+void
+tr_sessionSetPublicInterface( tr_session * session,
+                              const char * publicInterface )
+{
+    assert( tr_isSession( session ) );
+
+    if( publicInterface != session->publicInterface )
+    {
+        tr_free( session->publicInterface );
+        session->publicInterface = tr_strdup( publicInterface );
     }
 }
 
