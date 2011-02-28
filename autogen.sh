@@ -35,8 +35,14 @@ if test "$GETTEXTIZE"; then
   intltoolize --copy --force --automake
 fi
 
-autoreconf --force --install --verbose || exit 1;
-
+echo "Running aclocal..."
+aclocal --force -I m4 || exit 1
+echo "Running libtoolize..."
+libtoolize --install --copy --force || exit 1
+echo "Running autoconf..."
+autoconf --force || exit 1
+echo "Running automake..."
+automake --add-missing --copy --force-missing || exit 1
 
 cd "$ORIGDIR" || exit $?
 
