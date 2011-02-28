@@ -2524,6 +2524,7 @@ gtr_torrent_details_dialog_new( GtkWindow * parent, TrCore * core )
     d = gtk_dialog_new_with_buttons( NULL, parent, 0,
                                      GTK_STOCK_CLOSE, GTK_RESPONSE_CLOSE,
                                      NULL );
+    gtk_widget_set_size_request( d, 0.8 * gtr_window_get_max_width( GTK_WINDOW( d ) ), -1 );
     di->dialog = d;
     gtk_window_set_role( GTK_WINDOW( d ), "tr-info" );
     g_signal_connect_swapped( d, "response",
