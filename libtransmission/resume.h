@@ -39,9 +39,9 @@ enum
     TR_FR_IDLELIMIT           = ( 1 << 17 ),
     TR_FR_TIME_SEEDING        = ( 1 << 18 ),
     TR_FR_TIME_DOWNLOADING    = ( 1 << 19 ),
-
     TR_FR_QUEUERANK           = ( 1 << 25 ),
-    TR_FR_QUEUED              = ( 1 << 26 )
+    TR_FR_QUEUED              = ( 1 << 26 ),
+    TR_FR___LAST__            = ( 1LL << 63 )
 };
 
 /**
