@@ -140,7 +140,7 @@ rebind_ipv6(tr_session *ss, tr_bool force)
         setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &one, sizeof(one));
 #endif
 
-    tr_netBindSocketInterface(ss, s);
+    tr_netBindSocketInterface( ss, s );
 
     memset(&sin6, 0, sizeof(sin6));
     sin6.sin6_family = AF_INET6;
@@ -243,7 +243,7 @@ tr_udpInit(tr_session *ss)
         goto ipv6;
     }
 
-    tr_netBindSocketInterface(ss, ss->udp_socket);
+    tr_netBindSocketInterface( ss, ss->udp_socket );
 
     memset(&sin, 0, sizeof(sin));
     sin.sin_family = AF_INET;

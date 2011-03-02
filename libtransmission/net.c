@@ -327,7 +327,7 @@ tr_netOpenPeerSocket( tr_session        * session,
     if( s < 0 )
         return -1;
 
-    tr_netBindSocketInterface(session, s);
+    tr_netBindSocketInterface( session, s );
 
     /* seeds don't need much of a read buffer... */
     if( clientIsSeed ) {
