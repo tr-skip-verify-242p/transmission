@@ -2048,6 +2048,27 @@ tr_torrentSetMetadataCallback( tr_torrent                * tor,
 
 
 /**
+***  File Names
+**/
+
+void
+tr_torrentInitFileName( tr_torrent *    tor,
+                        tr_file_index_t fileIndex,
+                        const char *    name )
+{
+    tr_file * file;
+
+    assert( tr_isTorrent( tor ) );
+    assert( fileIndex < tor->info.fileCount );
+    assert( name != NULL );
+    assert( name[0] != '\0' );
+
+    file = &tor->info.files[fileIndex];
+    tr_free( file->name );
+    file->name = tr_strdup( name );
+}
+
+/**
 ***  File priorities
 **/
 
@@ -2103,27 +2124,6 @@ tr_torrentGetFilePriorities( const tr_torrent * tor )
     tr_torrentUnlock( tor );
 
     return p;
-}
-
-/**
-***  File Names
-**/
-
-void
-tr_torrentInitFileName( tr_torrent *    tor,
-                        tr_file_index_t fileIndex,
-                        const char *    name )
-{
-    tr_file * file;
-
-    assert( tr_isTorrent( tor ) );
-    assert( fileIndex < tor->info.fileCount );
-    assert( name != NULL );
-    assert( name[0] != '\0' );
-
-    file = &tor->info.files[fileIndex];
-    tr_free( file->name );
-    file->name = tr_strdup( name );
 }
 
 /**
