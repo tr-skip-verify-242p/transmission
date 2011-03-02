@@ -3052,11 +3052,10 @@ tr_sessionSetPublicInterface( tr_session * session,
 {
     assert( tr_isSession( session ) );
 
-    if( publicInterface != session->publicInterface )
-    {
-        tr_free( session->publicInterface );
-        session->publicInterface = tr_strdup( publicInterface );
-    }
+    tr_sessionLock( session );
+    tr_free( session->publicInterface );
+    session->publicInterface = tr_strdup( publicInterface );
+    tr_sessionUnlock( session );
 }
 
 /****
