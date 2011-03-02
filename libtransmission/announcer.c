@@ -1715,6 +1715,7 @@ tierCopyAttributes( tr_tier * t, const tr_tier * o )
     bak = *t;
     *t = *o;
     t->tor = bak.tor;
+    t->key = bak.key;
     t->trackers = bak.trackers;
     t->announceEvents = bak.announceEvents;
     t->currentTracker = bak.currentTracker;
@@ -1786,6 +1787,7 @@ tr_announcerResetTorrent( tr_announcer * announcer UNUSED, tr_torrent * tor )
             tr_tier * tier = tiers[i];
             if( !tier->wasCopied )
                 tierAddAnnounce( tier, STARTED, now );
+            tier->wasCopied = FALSE;
         }
     }
 
