@@ -45,6 +45,9 @@
  */
 void tr_setConfigDir( tr_session * session, const char * configDir );
 
+/** @brief return the default name of the directory where temporary piece files are stored */
+const char * tr_getDefaultPieceSubDir( void );
+
 /** @brief return the directory where .resume files are stored */
 const char * tr_getResumeDir( const tr_session * );
 
@@ -53,9 +56,6 @@ const char * tr_getTorrentDir( const tr_session * );
 
 /** @brief return the directory where the Web Client's web ui files are kept */
 const char * tr_getWebClientDir( const tr_session * );
-
-/** @brief return the default name of the directory where temporary piece files are stored */
-const char * tr_getDefaultPieceSubDir( void );
 
 /** @brief return the number of bytes available for use in the specified path, or -1 on error */
 int64_t tr_getFreeSpace( const char * path );
