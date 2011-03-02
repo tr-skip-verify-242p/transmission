@@ -735,32 +735,36 @@ tr_isValidPeerAddress( const tr_address * addr, tr_port port )
 }
 
 static tr_bool
-isAvailableBindAddress(tr_address * address, enum tr_address_type addrType)
+isAvailableBindAddress( const tr_address * address )
 {
-    int s;
-    int bindResult = 0;
-    int bindErr;
-    static socklen_t sourcelen;
+    static const int domains[NUM_TR_AF_INET_TYPES] = { AF_INET, AF_INET6 };
     struct sockaddr_storage source_sock;
+    int s, bindResult, bindErr;
+    socklen_t sourcelen;
+    char astr[64];
+
+    assert( tr_isAddress( address ) );
+
     sourcelen = setup_sockaddr( address, 0, &source_sock );
 
-    s = socket( (int)addrType, SOCK_DGRAM, 0 );
-    bindResult = bind( s, (struct sockaddr*)&source_sock, sourcelen );
-
+    s = socket( domains[address->type], SOCK_DGRAM, 0 );
+    bindResult = bind( s, (struct sockaddr *) &source_sock, sourcelen );
     bindErr = errno;
-    close(s);
+    tr_netCloseSocket( s );
 
-    if(bindResult == 0)
+    if( bindResult == 0 )
         return TRUE;
-    else switch(bindErr)
-	{
-        case EADDRNOTAVAIL:
-            return FALSE; break;
-        default:
-            tr_nerr("isAvailableBindAddress", "bind() probe gave an unhandled error code %i", bindErr);
-            tr_nerr("isAvailableBindAddress", "assuming that the address (may otherwise at other times) be bind()'able");
-            return TRUE;
-	}
+
+    if( bindErr == EADDRNOTAVAIL )
+        return FALSE;
+
+    if( !tr_ntop( address, astr, sizeof( astr ) ) )
+        tr_strlcpy( astr, "<invalid>", sizeof( astr ) );
+    tr_nerr( "isAvailableBindAddress", _( "Error %d probing %s: %s" ),
+             bindErr, astr, tr_strerror( bindErr ) );
+    tr_nerr( "isAvailableBindAddress", _( "Assuming address %s can be bound"),
+             astr );
+    return TRUE;
 }
 
 /*
@@ -781,7 +785,7 @@ tr_getUnavailableBindAddress( tr_address * addr )
     }
 
     i = 100;
-    while( isAvailableBindAddress( addr, addr->type ) && i < 100 )
+    while( isAvailableBindAddress( addr ) && i < 100 )
     {
         switch( addr->type )
         {
