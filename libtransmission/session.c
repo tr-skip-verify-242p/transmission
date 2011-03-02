@@ -817,9 +817,12 @@ static void onNetworkIFTimer( int foo UNUSED, short bar UNUSED, void * vsession 
  *  types we have registered for.
  */
 static int
-netlinkMessageCallback(const struct sockaddr_nl *who, struct nlmsghdr *n, void *vsession)
+netlinkMessageCallback( const struct sockaddr_nl * who,
+                        struct nlmsghdr * n, void * vsession )
 {
-    switch(n->nlmsg_type)
+    tr_session * session = vsession;
+    tr_assert( tr_isSession( session ) );
+    switch( n->nlmsg_type )
     {
         case RTM_NEWLINK:
         case RTM_DELLINK:
@@ -834,9 +837,8 @@ netlinkMessageCallback(const struct sockaddr_nl *who, struct nlmsghdr *n, void *
         case RTM_NEWRULE:
         case RTM_DELRULE:
         case RTM_GETRULE:
-            networkIFRefresh((tr_session *)vsession);
+            networkIFRefresh( session );
             break;
-
         default:
             break;
     }
