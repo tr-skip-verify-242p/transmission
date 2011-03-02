@@ -89,8 +89,8 @@ tr_interfacesNew( void )
 
 #if defined( HAVE_GETIFADDRS )
 static void
-mergeOrAppendToInterfaces( tr_interface   ** interfaces,
-                           struct ifaddrs  * ifa )
+mergeOrAppendToInterfaces( tr_interface         ** interfaces,
+                           const struct ifaddrs  * ifa )
 {
     if( interfaces )
     {
