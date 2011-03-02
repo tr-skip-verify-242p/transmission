@@ -132,7 +132,7 @@ void tr_netCloseSocket( int fd );
 
 void tr_netInit( void );
 
-void tr_netBindSocketInterface(tr_session *session, int socket);
+void tr_netBindSocketInterface( tr_session * session, int socket );
 
 /**
  * @brief get a human-representable string representing the network error.

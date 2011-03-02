@@ -252,21 +252,21 @@ tr_netSetCongestionControl( int s UNUSED, const char *algorithm UNUSED )
 }
 
 void
-tr_netBindSocketInterface(tr_session *session, int socket)
+tr_netBindSocketInterface( tr_session * session, int socket )
 {
 #ifdef USE_SO_BINDTODEVICE
     if ( socket >= 0 && session->publicInterface != NULL )
     {
         struct ifreq request;
 
-        memset(&request, 0, sizeof(request));
-        tr_strlcpy(request.ifr_name, session->publicInterface, IFNAMSIZ);
-        if ( setsockopt(socket, SOL_SOCKET, SO_BINDTODEVICE,
-                        &request, IFNAMSIZ) < 0 )
+        memset( &request, 0, sizeof( request ) );
+        tr_strlcpy( request.ifr_name, session->publicInterface, IFNAMSIZ );
+        if ( setsockopt( socket, SOL_SOCKET, SO_BINDTODEVICE,
+                         &request, IFNAMSIZ ) < 0 )
         {
             int eno = sockerrno;
             tr_err( _( "Bind socket to device \'%s\' error: \'%s\' (%d)" ),
-                   session->publicInterface, tr_strerror(eno), eno );
+                    session->publicInterface, tr_strerror( eno ), eno );
         }
     }
 #endif
