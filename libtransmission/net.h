@@ -91,7 +91,6 @@ int tr_compareAddresses( const tr_address * a,
 
 tr_bool tr_isValidPeerAddress( const tr_address * addr, tr_port port );
 
-tr_bool isAvailableBindAddress(tr_address * address, enum tr_address_type addrType);
 tr_address * unavailableBindAddress(enum tr_address_type addrType);
 
 static inline tr_bool tr_isAddress( const tr_address * a ) { return ( a != NULL ) && ( a->type==TR_AF_INET || a->type==TR_AF_INET6 ); }

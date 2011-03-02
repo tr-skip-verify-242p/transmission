@@ -734,8 +734,8 @@ tr_isValidPeerAddress( const tr_address * addr, tr_port port )
         && ( !isMartianAddr( addr ) );
 }
 
-
-tr_bool isAvailableBindAddress(tr_address * address, enum tr_address_type addrType)
+static tr_bool
+isAvailableBindAddress(tr_address * address, enum tr_address_type addrType)
 {
     int s;
     int bindResult = 0;
