@@ -90,7 +90,7 @@ tr_interfacesNew( void )
 #if defined( HAVE_GETIFADDRS )
 static void
 mergeOrAppendToInterfaces( tr_interface   ** interfaces,
-                              struct ifaddrs  * ifa )
+                           struct ifaddrs  * ifa )
 {
     if( interfaces )
     {
