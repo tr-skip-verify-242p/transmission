@@ -691,21 +691,6 @@ onNowTimer( int foo UNUSED, short bar UNUSED, void * vsession )
     /* fprintf( stderr, "time %zu sec, %zu microsec\n", (size_t)tr_time(), (size_t)tv.tv_usec ); */
 }
 
-static void
-refreshNetworkInterfaces( tr_session * session )
-{
-    dbgmsg( "refreshNetworkInterfaces: Refreshing the list of network interfaces..." );
-    tr_interfacesFree( session->networkInterfaces );
-    session->networkInterfaces = tr_interfacesNew( );
-    dbgmsg( "refreshNetworkInterfaces: Refreshed.");
-}
-
-static tr_interface *
-getInterfaceByName( const char * device, tr_session * session )
-{
-    return tr_interfacesFindByName( session->networkInterfaces, device );
-}
-
 /**
  * If public interface name is set, refresh the bind ip addresses
  * ie the session attributes public_ipv4 and public_ipv6
@@ -725,7 +710,8 @@ refreshPublicIp( tr_session * session )
     if( !session->publicInterface || !*session->publicInterface )
         return;
 
-    inf = getInterfaceByName( session->publicInterface, session );
+    inf = tr_interfacesFindByName( session->networkInterfaces,
+                                   session->publicInterface );
 
     /* Check that we don't accidentally bind to all interfaces. */
     if( inf )
@@ -784,7 +770,10 @@ static void networkIFRefresh( tr_session * session )
 {
     assert( tr_isSession( session ) );
 
-    refreshNetworkInterfaces( session );
+    dbgmsg( "refreshNetworkInterfaces: Getting a list of network interfaces..." );
+    tr_interfacesFree( session->networkInterfaces );
+    session->networkInterfaces = tr_interfacesNew( );
+    dbgmsg( "refreshNetworkInterfaces: Done.");
     refreshPublicIp( session );
 }
 
