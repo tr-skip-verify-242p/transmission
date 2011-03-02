@@ -39,9 +39,6 @@
 #endif
 #include <errno.h>
 
-#if defined( HAVE_GETIFADDRS )
-static tr_interface ** getInterfaces( void );
-#endif
 
 tr_interface *
 tr_interfacesFindByName( tr_interface ** interfaces,
@@ -75,16 +72,6 @@ tr_interfacesFree( tr_interface ** interfaces )
             tr_free( interfaces[entry] );
     }
     tr_free( interfaces );
-}
-
-tr_interface **
-tr_interfacesNew( void )
-{
-#if defined( HAVE_GETIFADDRS )
-    return getInterfaces( );
-#else
-    return NULL; /* PORTME */
-#endif
 }
 
 #if defined( HAVE_GETIFADDRS )
@@ -129,9 +116,10 @@ mergeOrAppendToInterfaces( tr_interface         ** interfaces,
     }
 }
 
-static tr_interface **
-getInterfaces( void )
+tr_interface **
+tr_interfacesNew( void )
 {
+#if defined( HAVE_GETIFADDRS )
     tr_interface ** interfaces = NULL;
     struct ifaddrs * myaddrs = NULL, * ifa;
     int status, ifcount = 0;
@@ -160,6 +148,9 @@ getInterfaces( void )
 OUT:
     freeifaddrs( myaddrs );
     return interfaces;
+#else
+    return NULL;
+#endif
 }
 
 #endif /* HAVE_GETIFADDRS */
