@@ -44,8 +44,8 @@ static tr_interface ** getInterfaces( void );
 #endif
 
 tr_interface *
-tr_FindInterfaceByName( tr_interface ** interfaces,
-                        const char    * device )
+tr_interfacesFindByName( tr_interface ** interfaces,
+                         const char    * device )
 {
     tr_interface * found = NULL;
 
@@ -94,8 +94,8 @@ mergeOrAppendToInterfaces( tr_interface   ** interfaces,
 {
     if( interfaces )
     {
-        tr_interface * merge = tr_FindInterfaceByName( interfaces,
-                                                       ifa->ifa_name );
+        tr_interface * merge;
+        merge = tr_interfacesFindByName( interfaces, ifa->ifa_name );
 
         if( merge == NULL )
         {
