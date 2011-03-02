@@ -34,25 +34,25 @@
 #include <arpa/inet.h>
 #include <net/if.h>
 
-#if defined(HAVE_GETIFADDRS)
-    #include <ifaddrs.h>
+#if defined( HAVE_GETIFADDRS )
+#include <ifaddrs.h>
 #endif
-
 #include <errno.h>
 
-#if defined(HAVE_GETIFADDRS)
-    static tr_interface ** tr_net_getinterfaces(void);
-#else
-    static tr_interface ** tr_net_dummy_interfaces(void);
+#if defined( HAVE_GETIFADDRS )
+static tr_interface ** getInterfaces( void );
 #endif
 
-tr_interface * tr_FindInterfaceByName(tr_interface **interfaces, char * device)
+tr_interface *
+tr_FindInterfaceByName( tr_interface ** interfaces,
+                        char          * device )
 {
     tr_interface * found = NULL;
-    if (interfaces)
+
+    if( interfaces )
     {
         int entry;
-        for(entry = 0; interfaces[entry]; entry++)
+        for( entry = 0; interfaces[entry]; ++entry )
         {
             tr_interface * test = interfaces[entry];
             if( 0 == strcasecmp( test->name, device ) )
@@ -65,62 +65,61 @@ tr_interface * tr_FindInterfaceByName(tr_interface **interfaces, char * device)
     return found;
 }
 
-void tr_interfacesFree( tr_interface ** interfaces )
+void
+tr_interfacesFree( tr_interface ** interfaces )
 {
-    if (interfaces)
+    if( interfaces )
     {
         int entry;
-        for(entry = 0; interfaces[entry]; entry++)
-        {
-            tr_free(interfaces[entry]);
-        }
+        for( entry = 0; interfaces[entry]; ++entry )
+            tr_free( interfaces[entry] );
     }
-    tr_free(interfaces);
+    tr_free( interfaces );
 }
 
-tr_interface ** tr_net_interfaces()
+tr_interface **
+tr_net_interfaces( void )
 {
-#if defined(HAVE_GETIFADDRS)
-    return tr_net_getinterfaces();
+#if defined( HAVE_GETIFADDRS )
+    return getInterfaces( );
 #else
-    return tr_net_dummy_interfaces();
+    return NULL; /* PORTME */
 #endif
 }
 
-#if defined(HAVE_GETIFADDRS)
-static void tr_MergeOrAppendToInterfaces(tr_interface **interfaces, struct ifaddrs * ifa);
-
-static void tr_MergeOrAppendToInterfaces(tr_interface **interfaces, struct ifaddrs * ifa)
+#if defined( HAVE_GETIFADDRS )
+static void
+tr_MergeOrAppendToInterfaces( tr_interface   ** interfaces,
+                              struct ifaddrs  * ifa )
 {
-    if (interfaces)
+    if( interfaces )
     {
-        tr_interface * merge = tr_FindInterfaceByName(interfaces, ifa->ifa_name);
+        tr_interface * merge = tr_FindInterfaceByName( interfaces,
+                                                       ifa->ifa_name );
 
-        if (merge == NULL)
+        if( merge == NULL )
         {
             int entry;
-            for(entry = 0; interfaces[entry]; entry++)
-            {
-            }
-            interfaces[entry] = tr_new0(tr_interface, 1);
+            for( entry = 0; interfaces[entry]; entry++ )
+                ;
+            interfaces[entry] = tr_new0( tr_interface, 1 );
             merge = interfaces[entry];
-            // Name.
-            tr_strlcpy(merge->name, ifa->ifa_name, sizeof(merge->name));
+            tr_strlcpy( merge->name, ifa->ifa_name, sizeof( merge->name ) );
         }
 
-        if (merge)
+        if( merge )
         {
-            if (ifa->ifa_addr->sa_family == AF_INET)
+            if( ifa->ifa_addr->sa_family == AF_INET )
             {
-                struct sockaddr_in * s4 = (struct sockaddr_in *)(ifa->ifa_addr);
+                struct sockaddr_in * s4 = (struct sockaddr_in *) ifa->ifa_addr;
 
                 merge->af4 = ifa->ifa_addr->sa_family;
                 merge->ipv4.type = TR_AF_INET;
                 merge->ipv4.addr.addr4 = s4->sin_addr;
             }
-            else if (ifa->ifa_addr->sa_family == AF_INET6)
+            else if( ifa->ifa_addr->sa_family == AF_INET6 )
             {
-                struct sockaddr_in6 * s6 = (struct sockaddr_in6 *)(ifa->ifa_addr);
+                struct sockaddr_in6 * s6 = (struct sockaddr_in6 *) ifa->ifa_addr;
 
                 merge->af6 = ifa->ifa_addr->sa_family;
                 merge->ipv6.type = TR_AF_INET6;
@@ -130,53 +129,46 @@ static void tr_MergeOrAppendToInterfaces(tr_interface **interfaces, struct ifadd
     }
 }
 
-static tr_interface ** tr_net_getinterfaces(void)
+static tr_interface **
+getInterfaces( void )
 {
-	tr_interface ** interfaces = NULL;
-	int ifcount = 0;
+    tr_interface ** interfaces = NULL;
+    struct ifaddrs * myaddrs, * ifa;
+    int status, ifcount = 0;
 
-    struct ifaddrs *myaddrs, *ifa;
-    int status;
-
-    status = getifaddrs(&myaddrs);
-    if (status != 0)
+    status = getifaddrs( &myaddrs );
+    if( status != 0 )
     {
-        tr_err( _( "getifaddrs error: \'%s\' (%d)" ), tr_strerror(errno), errno );
+        int err = errno;
+        tr_err( _( "getifaddrs error: \'%s\' (%d)" ),
+                tr_strerror( err ), err );
     }
 
-    for (ifa = myaddrs; ifa != NULL; ifa = ifa->ifa_next)
+    for( ifa = myaddrs; ifa != NULL; ifa = ifa->ifa_next )
     {
-        if (  (ifa->ifa_addr != NULL)    // has address
-           && (ifa->ifa_flags & IFF_UP)) // iface is up.
+        if( ( ifa->ifa_addr != NULL )
+            && ( ifa->ifa_flags & IFF_UP ) )
         {
             ifcount++;
         }
     }
 
-	if (ifcount > 0)
-	{
-	    // treat as a null terminated array of interfaces
+    if( ifcount > 0 )
+    {
+        /* treat as a null terminated array of interfaces */
         interfaces = tr_new0( tr_interface *, ifcount + 1 );
-        for (ifa = myaddrs; ifa != NULL; ifa = ifa->ifa_next)
+        for( ifa = myaddrs; ifa != NULL; ifa = ifa->ifa_next )
         {
-            if (  (ifa->ifa_addr != NULL)    // has address
-               && (ifa->ifa_flags & IFF_UP)) // iface is up.
+            if( ( ifa->ifa_addr != NULL )
+                && ( ifa->ifa_flags & IFF_UP ) )
             {
-                tr_MergeOrAppendToInterfaces(interfaces, ifa);
+                tr_MergeOrAppendToInterfaces( interfaces, ifa );
             }
         }
-	}
-    freeifaddrs(myaddrs);
+    }
+    freeifaddrs( myaddrs );
 
     return interfaces;
 }
 
-#else // HAVE_GETIFADDRS
-
-tr_interface ** tr_net_dummy_interfaces(void)
-{
-    // Is there a port of getifaddrs for win32?
-    return NULL;
-}
-
-#endif
+#endif /* HAVE_GETIFADDRS */
