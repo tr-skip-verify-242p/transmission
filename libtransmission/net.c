@@ -254,9 +254,9 @@ tr_netSetCongestionControl( int s UNUSED, const char *algorithm UNUSED )
 void
 tr_netBindSocketInterface( tr_session * session, int socket )
 {
-#ifdef USE_SO_BINDTODEVICE
     if( socket >= 0 && session->publicInterface != NULL )
     {
+#ifdef USE_SO_BINDTODEVICE
         struct ifreq request;
 
         memset( &request, 0, sizeof( request ) );
@@ -269,8 +269,8 @@ tr_netBindSocketInterface( tr_session * session, int socket )
             tr_err( _( "Bind socket to device \'%s\' error: \'%s\' (%d)" ),
                     session->publicInterface, tr_strerror( eno ), eno );
         }
-    }
 #endif
+    }
 }
 
 
