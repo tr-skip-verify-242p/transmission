@@ -720,60 +720,52 @@ static void tr_refreshPublicIp( tr_session * session )
     /* If user wants to bind to a specific device
      * (ppp0, my PPTP VPN for instance).
      */
-    if( session->publicInterface && strlen(session->publicInterface) > 0 )
+    if( session->publicInterface && *session->publicInterface )
     {
         tr_address * addr_ipv4 = NULL;
         tr_address * addr_ipv6 = NULL;
 
-        tr_interface * foundInterface =
-            tr_sessionGetInterfaceNamed(session->publicInterface, session);
+        tr_interface * foundInterface
+            = tr_sessionGetInterfaceNamed( session->publicInterface, session );
 
-        if (foundInterface)
+        if( foundInterface )
         {
-            if (foundInterface->af4) /* != AF_UNSPEC */
+            if( foundInterface->af4 )
             {
                 tr_address ipv4null;
-                tr_pton(TR_DEFAULT_BIND_ADDRESS_IPV4, &ipv4null);
+                tr_pton( TR_DEFAULT_BIND_ADDRESS_IPV4, &ipv4null );
 
                 /* Check that we don't accidentally bind to all
                  * interfaces (0.0.0.0).
                  */
-                if (0 != tr_compareAddresses(&ipv4null, &(foundInterface->ipv4)))
-                {
-                    addr_ipv4 = &(foundInterface->ipv4);
-                }
+                if( 0 != tr_compareAddresses( &ipv4null, &foundInterface->ipv4 ) )
+                    addr_ipv4 = &foundInterface->ipv4;
             }
-            if (foundInterface->af6)  /* != AF_UNSPEC */
+            if( foundInterface->af6 )
             {
                 tr_address ipv6null;
-                tr_pton(TR_DEFAULT_BIND_ADDRESS_IPV6, &ipv6null);
+                tr_pton( TR_DEFAULT_BIND_ADDRESS_IPV6, &ipv6null );
 
                 /* Check that we don't accidentally bind to all
                  * interfaces (::).
                  */
-                if (0 != tr_compareAddresses(&ipv6null, &(foundInterface->ipv6)))
-                {
-                    addr_ipv6 = &(foundInterface->ipv6);
-                }
+                if( 0 != tr_compareAddresses( &ipv6null, &foundInterface->ipv6 ) )
+                    addr_ipv6 = &foundInterface->ipv6;
             }
         }
 
-        if (!addr_ipv4)
-        {
-            addr_ipv4 = unavailableBindAddress(TR_AF_INET);
-        }
+        if( !addr_ipv4 )
+            addr_ipv4 = unavailableBindAddress( TR_AF_INET );
 
-        if (!addr_ipv6)
-        {
-            addr_ipv6 = unavailableBindAddress(TR_AF_INET6);
-        }
+        if( !addr_ipv6 )
+            addr_ipv6 = unavailableBindAddress( TR_AF_INET6 );
 
         /* if either v4 or v6 bind address has changed */
-        if(tr_compareAddresses( addr_ipv4, &old_public_ipv4_addr ) ||
-           tr_compareAddresses( addr_ipv6, &old_public_ipv6_addr ))
+        if( tr_compareAddresses( addr_ipv4, &old_public_ipv4_addr )
+            || tr_compareAddresses( addr_ipv6, &old_public_ipv6_addr ) )
         {
-            session->public_ipv4->addr = * addr_ipv4;
-            session->public_ipv6->addr = * addr_ipv6;
+            session->public_ipv4->addr = *addr_ipv4;
+            session->public_ipv6->addr = *addr_ipv6;
 
             /* restart future connections to bind on the new ip address */
             if( session->isLPDEnabled )
@@ -792,15 +784,13 @@ static void tr_refreshPublicIp( tr_session * session )
     }
 }
 
-
-static void networkIFRefresh(tr_session * session)
+static void networkIFRefresh( tr_session * session )
 {
     assert( tr_isSession( session ) );
 
     tr_getNetworkInterfaces( session );
     tr_refreshPublicIp( session );
 }
-
 
 /**
  * Periodically reload the list of network interfaces
