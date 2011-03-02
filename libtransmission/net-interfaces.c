@@ -133,7 +133,7 @@ static tr_interface **
 getInterfaces( void )
 {
     tr_interface ** interfaces = NULL;
-    struct ifaddrs * myaddrs, * ifa;
+    struct ifaddrs * myaddrs = NULL, * ifa;
     int status, ifcount = 0;
 
     status = getifaddrs( &myaddrs );
@@ -142,6 +142,7 @@ getInterfaces( void )
         int err = errno;
         tr_err( _( "getifaddrs error: \'%s\' (%d)" ),
                 tr_strerror( err ), err );
+        goto OUT;
     }
 
     for( ifa = myaddrs; ifa != NULL; ifa = ifa->ifa_next )
@@ -166,8 +167,9 @@ getInterfaces( void )
             }
         }
     }
-    freeifaddrs( myaddrs );
 
+OUT:
+    freeifaddrs( myaddrs );
     return interfaces;
 }
 
