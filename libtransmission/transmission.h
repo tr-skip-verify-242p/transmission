@@ -595,9 +595,6 @@ void          tr_sessionSetProxyPassword( tr_session * session,
 ***
 **/
 
-void tr_sessionSetPublicInterface( tr_session * session,
-	     						    const char * publicInterface );
-
 /** @brief Used by tr_sessionGetStats() and tr_sessionGetCumulativeStats() to give bandwidth statistics */
 typedef struct tr_session_stats
 {
@@ -645,6 +642,9 @@ tr_bool  tr_sessionIsLazyBitfieldEnabled( const tr_session * session );
 tr_encryption_mode tr_sessionGetEncryption( tr_session * session );
 void               tr_sessionSetEncryption( tr_session * session,
                                             tr_encryption_mode    mode );
+
+void tr_sessionSetPublicInterface( tr_session * session,
+                                   const char * publicInterface );
 
 
 /***********************************************************************
