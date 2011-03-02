@@ -766,29 +766,30 @@ isAvailableBindAddress(tr_address * address, enum tr_address_type addrType)
 /*
  * Attempt to create a dummy private address that will disable traffic.
  */
-tr_address * tr_getUnavailableBindAddress(enum tr_address_type addrType)
+void
+tr_getUnavailableBindAddress( tr_address * addr )
 {
     int i;
-    tr_address * testAddr = tr_new0( tr_address, 1 );
 
-    switch (addrType)
+    assert( addr != NULL );
+
+    switch( addr->type )
     {
-        case TR_AF_INET:  tr_pton( "1.2.3.4", testAddr ); break;
-        case TR_AF_INET6: tr_pton( "fd7f:54eb:9f51:be9a:1:2:3:4", testAddr ); break;
-        default: return testAddr;
+        case TR_AF_INET:  tr_pton( "1.2.3.4", addr ); break;
+        case TR_AF_INET6: tr_pton( "fd7f:54eb:9f51:be9a:1:2:3:4", addr ); break;
+        default: return;
     }
 
     i = 100;
-    while( isAvailableBindAddress(testAddr, addrType) && i < 100 )
+    while( isAvailableBindAddress( addr, addr->type ) && i < 100 )
     {
-        switch (addrType)
+        switch( addr->type )
         {
-            case TR_AF_INET:  testAddr->addr.addr4.s_addr     += 1; break;
-            case TR_AF_INET6: testAddr->addr.addr6.s6_addr[0] -= 1; break;
-            default: return testAddr;
+            case TR_AF_INET:  addr->addr.addr4.s_addr     += 1; break;
+            case TR_AF_INET6: addr->addr.addr6.s6_addr[0] -= 1; break;
+            default: return;
         }
         i++;
     }
-    return testAddr;
 }
 
