@@ -1002,7 +1002,7 @@
 				A2E669790F5B8E5A00B4251A /* Security.framework in Frameworks */,
 				A22CFB820FB66EF30009BD3E /* Carbon.framework in Frameworks */,
 				A221DCC8104B3660008A642D /* Quartz.framework in Frameworks */,
- 				68E7ACFA1316B5FA0017CB1D /* SystemConfiguration.framework in Frameworks */,
+				68E7ACFA1316B5FA0017CB1D /* SystemConfiguration.framework in Frameworks */,
 				A2E38540130DFECD001F501B /* libminiupnp.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
