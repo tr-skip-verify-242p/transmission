@@ -798,11 +798,10 @@ static void onNetworkIFTimer( int foo UNUSED, short bar UNUSED, void * vsession 
     assert( tr_isSession( session ) );
     assert( session->networkInterfacesTimer != NULL );
 
-    dbgmsg(
-        "onNetworkIFTimer: the timer has timed out. Next timeout in %d secs.",
-        NET_IF_POLL_INTERVAL_SECS );
+    dbgmsg( "onNetworkIFTimer: the timer has timed out. Next timeout in %d secs.",
+            NET_IF_POLL_INTERVAL_SECS );
 
-    networkIFRefresh(session);
+    networkIFRefresh( session );
     tr_timerAdd( session->networkInterfacesTimer, NET_IF_POLL_INTERVAL_SECS, 0 );
 }
 
@@ -854,17 +853,13 @@ netlinkListenThreadFunc( void * vsession )
     struct rtnl_handle rth;
     unsigned int groups = RTNLGRP_MSGS;
 
-    if (rtnl_open(&rth,groups) >= 0)
+    if( rtnl_open( &rth, groups ) >= 0 )
     {
-        if (rtnl_listen(&rth, netlinkMessageCallback, vsession)<0)
-        {
-	        tr_err( "rtnl_listen existed." );
-        }
+        if( rtnl_listen( &rth, netlinkMessageCallback, vsession ) < 0 )
+            tr_err( "rtnl_listen existed." );
     }
     else
-    {
         tr_err( "rtnl_open failed." );
-    }
 }
 
 #endif /* HAVE_LIBNETLINK */
@@ -880,9 +875,9 @@ netlinkListenThreadFunc( void * vsession )
  * notifies us of the types we have registered for.
  */
 static void
-scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *vsession)
+scCallback( SCDynamicStoreRef store, CFArrayRef changedKeys, void * vsession )
 {
-	networkIFRefresh((tr_session *)vsession);
+	networkIFRefresh( (tr_session *) vsession );
 }
 
 /*
@@ -893,45 +888,47 @@ scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *vsession)
 static void
 systemConfigurationThread( void * vsession )
 {
-	SCDynamicStoreContext context = {0, vsession, NULL, NULL, NULL};
+    SCDynamicStoreContext context = {0, vsession, NULL, NULL, NULL};
 
-	SCDynamicStoreRef dynStore = SCDynamicStoreCreate(kCFAllocatorDefault,
-									CFSTR("Transmission"),
-									scCallback,
-									&context);
-	if (!dynStore) {
-        tr_err( "SCDynamicStoreCreate() failed: %s", SCErrorString(SCError()) );
-		return;
-	}
+    SCDynamicStoreRef dynStore = SCDynamicStoreCreate( kCFAllocatorDefault,
+                                                       CFSTR( "Transmission" ),
+                                                       scCallback,
+                                                       &context );
+    if( !dynStore )
+    {
+        tr_err( "SCDynamicStoreCreate() failed: %s", SCErrorString( SCError( ) ) );
+        return;
+    }
 
-	/* The Interface/ * regex(3) patterns below vv matches all the host network interfaces */
-	const CFStringRef patterns[5] = {
-		CFSTR("com.apple.network.identification"),/* default route, IPv4/6 networks        */
-		CFSTR("State:/Network/Interface"),        /* Interfaces created, destroyed         */
-		CFSTR("State:/Network/Interface/*/Link"), /* Monitor Link up, down                 */
-		CFSTR("State:/Network/Interface/*/IPv4"), /* Monitor IPv4 address, Subnet Mask etc */
-		CFSTR("State:/Network/Interface/*/IPv6"), /* Monitor IPv6 address, Subnet Mask etc */
-	};
-	CFArrayRef watchedPatterns = CFArrayCreate(kCFAllocatorDefault,
-										   (const void **)patterns,
-										   5, /* array size ^^ above */
-										   &kCFTypeArrayCallBacks);
-	if (!SCDynamicStoreSetNotificationKeys(dynStore, NULL, watchedPatterns)) {
-		CFRelease(watchedPatterns);
-	        tr_err( "SCDynamicStoreSetNotificationKeys() failed: %s", SCErrorString(SCError()) );
-		CFRelease(dynStore);
-		dynStore = NULL;
-		return;
-	}
-	CFRelease(watchedPatterns);
+    /* The Interface/ * regex(3) patterns below vv matches all the host network interfaces */
+    const CFStringRef patterns[5] = {
+        CFSTR( "com.apple.network.identification" ),/* default route, IPv4/6 networks        */
+        CFSTR( "State:/Network/Interface" ),        /* Interfaces created, destroyed         */
+        CFSTR( "State:/Network/Interface/*/Link" ), /* Monitor Link up, down                 */
+        CFSTR( "State:/Network/Interface/*/IPv4" ), /* Monitor IPv4 address, Subnet Mask etc */
+        CFSTR( "State:/Network/Interface/*/IPv6" ), /* Monitor IPv6 address, Subnet Mask etc */
+    };
+    CFArrayRef watchedPatterns = CFArrayCreate( kCFAllocatorDefault,
+                                                (const void **) patterns,
+                                                5, /* array size ^^ above */
+                                                &kCFTypeArrayCallBacks );
+    if( !SCDynamicStoreSetNotificationKeys( dynStore, NULL, watchedPatterns ) )
+    {
+        CFRelease( watchedPatterns );
+        tr_err( "SCDynamicStoreSetNotificationKeys() failed: %s", SCErrorString( SCError( ) ) );
+        CFRelease( dynStore );
+        dynStore = NULL;
+        return;
+    }
+    CFRelease( watchedPatterns );
 
-	/* Start a run loop to listen for ^^ above said network notifications */
-	CFRunLoopSourceRef rlSrc = SCDynamicStoreCreateRunLoopSource(kCFAllocatorDefault, dynStore, 0);
-	CFRunLoopAddSource(CFRunLoopGetCurrent(), rlSrc, kCFRunLoopDefaultMode);
-	CFRunLoopRun(); /* bye bye, we dont return until program exit */
-	CFRunLoopRemoveSource(CFRunLoopGetCurrent(), rlSrc, kCFRunLoopDefaultMode);
-	CFRelease(rlSrc);
-	return;
+    /* Start a run loop to listen for ^^ above said network notifications */
+    CFRunLoopSourceRef rlSrc = SCDynamicStoreCreateRunLoopSource( kCFAllocatorDefault, dynStore, 0 );
+    CFRunLoopAddSource( CFRunLoopGetCurrent( ), rlSrc, kCFRunLoopDefaultMode );
+    CFRunLoopRun( ); /* bye bye, we dont return until program exit */
+    CFRunLoopRemoveSource(CFRunLoopGetCurrent( ), rlSrc, kCFRunLoopDefaultMode );
+    CFRelease( rlSrc );
+    return;
 }
 
 #endif /* HAVE_FRAMEWORK_SYSTEM_CONFIGURATION */
