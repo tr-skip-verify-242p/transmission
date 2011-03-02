@@ -1850,6 +1850,7 @@ tr_announcerAddTex( tr_torrent            * tor,
             /* FIXME: What should the 'id' argument be? */
             tierAddTracker( tier, it->announce, scrape, 0, FALSE );
             tr_free( scrape );
+            tr_ninf( _( "Tracker Exchange" ), _( "Added tracker: %s" ), nurl );
         }
         tr_free( nurl );
     }
