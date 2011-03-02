@@ -877,7 +877,7 @@ netlinkListenThreadFunc( void * vsession )
 static void
 scCallback( SCDynamicStoreRef store, CFArrayRef changedKeys, void * vsession )
 {
-	networkIFRefresh( (tr_session *) vsession );
+    networkIFRefresh( (tr_session *) vsession );
 }
 
 /*
