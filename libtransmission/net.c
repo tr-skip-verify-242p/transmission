@@ -673,6 +673,65 @@ tr_globalIPv6( void )
 ***/
 
 static tr_bool
+isAvailableBindAddress( const tr_address * address )
+{
+    static const int domains[NUM_TR_AF_INET_TYPES] = { AF_INET, AF_INET6 };
+    struct sockaddr_storage source_sock;
+    int s, bindResult, bindErr;
+    socklen_t sourcelen;
+    char astr[64];
+
+    assert( tr_isAddress( address ) );
+
+    sourcelen = setup_sockaddr( address, 0, &source_sock );
+
+    s = socket( domains[address->type], SOCK_DGRAM, 0 );
+    bindResult = bind( s, (struct sockaddr *) &source_sock, sourcelen );
+    bindErr = errno;
+    tr_netCloseSocket( s );
+
+    if( bindResult == 0 )
+        return TRUE;
+
+    if( bindErr == EADDRNOTAVAIL )
+        return FALSE;
+
+    if( !tr_ntop( address, astr, sizeof( astr ) ) )
+        tr_strlcpy( astr, "<invalid>", sizeof( astr ) );
+    tr_nerr( "isAvailableBindAddress", _( "Error %d probing %s: %s" ),
+             bindErr, astr, tr_strerror( bindErr ) );
+    tr_nerr( "isAvailableBindAddress", _( "Assuming address %s can be bound"),
+             astr );
+    return TRUE;
+}
+
+void
+tr_netGetUnavailableBindAddress( tr_address * addr )
+{
+    int i;
+
+    assert( tr_isAddress( addr ) );
+
+    if( addr->type == TR_AF_INET )
+        tr_pton( "1.2.3.4", addr );
+    else
+        tr_pton( "fd7f:54eb:9f51:be9a:1:2:3:4", addr );
+
+    for( i = 0; i < 100 && isAvailableBindAddress( addr ); ++i )
+    {
+        if( addr->type == TR_AF_INET )
+            addr->addr.addr4.s_addr += 1;
+        else
+            addr->addr.addr6.s6_addr[0] += 1;
+    }
+}
+
+/***
+****
+****
+***/
+
+static tr_bool
 isIPv4MappedAddress( const tr_address * addr )
 {
     return ( addr->type == TR_AF_INET6 ) && IN6_IS_ADDR_V4MAPPED( &addr->addr.addr6 );
@@ -733,58 +792,3 @@ tr_isValidPeerAddress( const tr_address * addr, tr_port port )
         && ( !isIPv4MappedAddress( addr ) )
         && ( !isMartianAddr( addr ) );
 }
-
-static tr_bool
-isAvailableBindAddress( const tr_address * address )
-{
-    static const int domains[NUM_TR_AF_INET_TYPES] = { AF_INET, AF_INET6 };
-    struct sockaddr_storage source_sock;
-    int s, bindResult, bindErr;
-    socklen_t sourcelen;
-    char astr[64];
-
-    assert( tr_isAddress( address ) );
-
-    sourcelen = setup_sockaddr( address, 0, &source_sock );
-
-    s = socket( domains[address->type], SOCK_DGRAM, 0 );
-    bindResult = bind( s, (struct sockaddr *) &source_sock, sourcelen );
-    bindErr = errno;
-    tr_netCloseSocket( s );
-
-    if( bindResult == 0 )
-        return TRUE;
-
-    if( bindErr == EADDRNOTAVAIL )
-        return FALSE;
-
-    if( !tr_ntop( address, astr, sizeof( astr ) ) )
-        tr_strlcpy( astr, "<invalid>", sizeof( astr ) );
-    tr_nerr( "isAvailableBindAddress", _( "Error %d probing %s: %s" ),
-             bindErr, astr, tr_strerror( bindErr ) );
-    tr_nerr( "isAvailableBindAddress", _( "Assuming address %s can be bound"),
-             astr );
-    return TRUE;
-}
-
-void
-tr_netGetUnavailableBindAddress( tr_address * addr )
-{
-    int i;
-
-    assert( tr_isAddress( addr ) );
-
-    if( addr->type == TR_AF_INET )
-        tr_pton( "1.2.3.4", addr );
-    else
-        tr_pton( "fd7f:54eb:9f51:be9a:1:2:3:4", addr );
-
-    for( i = 0; i < 100 && isAvailableBindAddress( addr ); ++i )
-    {
-        if( addr->type == TR_AF_INET )
-            addr->addr.addr4.s_addr += 1;
-        else
-            addr->addr.addr6.s6_addr[0] += 1;
-    }
-}
-
