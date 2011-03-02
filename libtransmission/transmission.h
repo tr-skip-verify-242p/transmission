@@ -643,6 +643,7 @@ tr_encryption_mode tr_sessionGetEncryption( tr_session * session );
 void               tr_sessionSetEncryption( tr_session * session,
                                             tr_encryption_mode    mode );
 
+const char * tr_sessionGetPublicInterface( const tr_session * session );
 void tr_sessionSetPublicInterface( tr_session * session,
                                    const char * publicInterface );
 

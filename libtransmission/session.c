@@ -469,7 +469,7 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_UPLOAD_SLOTS_PER_TORRENT, s->uploadSlotsPerTorrent );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_BIND_ADDRESS_IPV4,        tr_ntop_non_ts( &s->public_ipv4->addr ) );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_BIND_ADDRESS_IPV6,        tr_ntop_non_ts( &s->public_ipv6->addr ) );
-    tr_bencDictAddStr ( d, TR_PREFS_KEY_BIND_INTERFACE,           s->publicInterface );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_BIND_INTERFACE,           tr_sessionGetPublicInterface( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_START,                    !tr_sessionGetPaused( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_TRASH_ORIGINAL,           tr_sessionGetDeleteSource( s ) );
 }
@@ -706,12 +706,13 @@ refreshPublicIp( tr_session * session )
     tr_address * paddr4 = NULL, * paddr6 = NULL;
     tr_bool chng4 = FALSE, chng6 = FALSE;
     const tr_interface * inf;
+    const char * ifname;
 
-    if( !session->publicInterface || !*session->publicInterface )
+    ifname = tr_sessionGetPublicInterface( session );
+    if( !ifname || !*ifname )
         return;
 
-    inf = tr_interfacesFindByName( session->networkInterfaces,
-                                   session->publicInterface );
+    inf = tr_interfacesFindByName( session->networkInterfaces, ifname );
 
     /* Check that we don't accidentally bind to all interfaces. */
     if( inf )
@@ -3027,6 +3028,13 @@ tr_sessionSetProxyPassword( tr_session * session,
 /****
 *****
 ****/
+
+const char *
+tr_sessionGetPublicInterface( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+    return session->publicInterface;
+}
 
 void
 tr_sessionSetPublicInterface( tr_session * session,
