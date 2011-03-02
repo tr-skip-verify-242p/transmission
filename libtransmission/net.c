@@ -255,15 +255,15 @@ void
 tr_netBindSocketInterface( tr_session * session, int socket )
 {
 #ifdef USE_SO_BINDTODEVICE
-    if ( socket >= 0 && session->publicInterface != NULL )
+    if( socket >= 0 && session->publicInterface != NULL )
     {
         struct ifreq request;
 
         memset( &request, 0, sizeof( request ) );
         tr_strlcpy( request.ifr_name, session->publicInterface,
                     sizeof( request.ifr_name ) );
-        if ( setsockopt( socket, SOL_SOCKET, SO_BINDTODEVICE,
-                         &request, sizeof( request ) ) < 0 )
+        if( setsockopt( socket, SOL_SOCKET, SO_BINDTODEVICE,
+                        &request, sizeof( request ) ) < 0 )
         {
             int eno = sockerrno;
             tr_err( _( "Bind socket to device \'%s\' error: \'%s\' (%d)" ),
