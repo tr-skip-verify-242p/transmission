@@ -757,10 +757,10 @@ static void tr_refreshPublicIp( tr_session * session )
         }
 
         if( !addr_ipv4 )
-            addr_ipv4 = unavailableBindAddress( TR_AF_INET );
+            addr_ipv4 = tr_getUnavailableBindAddress( TR_AF_INET );
 
         if( !addr_ipv6 )
-            addr_ipv6 = unavailableBindAddress( TR_AF_INET6 );
+            addr_ipv6 = tr_getUnavailableBindAddress( TR_AF_INET6 );
 
         /* if either v4 or v6 bind address has changed */
         if( tr_compareAddresses( addr_ipv4, &old_public_ipv4_addr )

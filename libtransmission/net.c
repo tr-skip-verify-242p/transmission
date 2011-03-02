@@ -766,7 +766,7 @@ isAvailableBindAddress(tr_address * address, enum tr_address_type addrType)
 /*
  * Attempt to create a dummy private address that will disable traffic.
  */
-tr_address * unavailableBindAddress(enum tr_address_type addrType)
+tr_address * tr_getUnavailableBindAddress(enum tr_address_type addrType)
 {
     int i;
     tr_address * testAddr = tr_new0( tr_address, 1 );
