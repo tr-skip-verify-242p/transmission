@@ -701,7 +701,7 @@ refreshNetworkInterfaces( tr_session * session )
 }
 
 static tr_interface *
-getInterfaceByName( char * device, tr_session * session )
+getInterfaceByName( const char * device, tr_session * session )
 {
     return tr_FindInterfaceByName( session->networkInterfaces, device );
 }

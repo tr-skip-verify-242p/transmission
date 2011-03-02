@@ -45,7 +45,7 @@ static tr_interface ** getInterfaces( void );
 
 tr_interface *
 tr_FindInterfaceByName( tr_interface ** interfaces,
-                        char          * device )
+                        const char    * device )
 {
     tr_interface * found = NULL;
 

@@ -46,7 +46,7 @@ tr_interface ** tr_interfacesNew( void );
 void            tr_interfacesFree( tr_interface ** interfaces );
 
 tr_interface *  tr_FindInterfaceByName( tr_interface ** interfaces,
-                                        char          * device );
+                                        const char    * device );
 
 
 #endif /* _TR_NET_INTERFACES_H_ */
