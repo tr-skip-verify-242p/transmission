@@ -362,6 +362,7 @@ typedef struct tr_torrent_tiers
 {
     tr_ptrArray tiers; /* tr_tier */
     tr_tracker_callback * callback;
+    tr_ptrArray tracker_table; /* announce urls; tr_normalizeURL'd */
     void * callbackData;
 }
 tr_torrent_tiers;
@@ -371,6 +372,7 @@ tiersNew( void )
 {
     tr_torrent_tiers * tiers = tr_new0( tr_torrent_tiers, 1 );
     tiers->tiers = TR_PTR_ARRAY_INIT;
+    tiers->tracker_table = TR_PTR_ARRAY_INIT;
     return tiers;
 }
 
@@ -378,7 +380,30 @@ static void
 tiersFree( tr_torrent_tiers * tiers )
 {
     tr_ptrArrayDestruct( &tiers->tiers, tierFree );
+    tr_ptrArrayDestruct( &tiers->tracker_table, tr_free );
     tr_free( tiers );
+}
+
+/**
+ * @param nurl The normalized tracker announce url.
+ * @return TRUE if the tracker was added.
+ */
+static tr_bool
+tiersAddTracker( tr_torrent_tiers * tiers, const char * nurl )
+{
+    tr_ptrArray * table;
+    tr_bool exists = FALSE;
+    int pos;
+
+    assert( tiers != NULL );
+    if( !nurl || !*nurl )
+        return FALSE;
+
+    table = &tiers->tracker_table;
+    pos = tr_ptrArrayLowerBound( table, nurl, vstrcmp, &exists );
+    if( !exists )
+        tr_ptrArrayInsert( table, tr_strdup( nurl ), pos );
+    return !exists;
 }
 
 static tr_tier*
@@ -621,6 +646,7 @@ addTorrentToTier( tr_torrent_tiers  * tiers,
     const tr_tracker_info ** infos;
     const int trackerCount = tor->info.trackerCount;
     const tr_tracker_info  * trackers = tor->info.trackers;
+    char * nurl;
 
     /* get the trackers that we support... */
     infos = tr_new0( const tr_tracker_info*, trackerCount );
@@ -649,6 +675,9 @@ addTorrentToTier( tr_torrent_tiers  * tiers,
                 tr_ptrArrayAppend( &tiers->tiers, tier );
             }
 
+            nurl = tr_normalizeURL( info->announce );
+            tiersAddTracker( tiers, nurl );
+            tr_free( nurl );
             tierAddTracker( tier, info->announce, info->scrape, info->id, TRUE );
         }
     }
@@ -1755,34 +1784,6 @@ tr_announcerGetVerifiedTrackers( const tr_torrent * tor,
     tr_torrentUnlock( tor );
 }
 
-tr_bool
-torrentHasTracker( const tr_torrent * tor, const char * announce_url )
-{
-    /* FIXME: Make these const. */
-    tr_ptrArray * tiers_array;
-    tr_tier * tier;
-
-    const tr_tracker_item * tracker;
-    int i, j;
-
-    assert( tor->tiers != NULL );
-    tiers_array = &tor->tiers->tiers;
-
-    /* FIXME: Make this more efficient, at least O(log n). */
-    for( i = 0; i < tr_ptrArraySize( tiers_array ); ++i )
-    {
-        tier = tr_ptrArrayNth( tiers_array, i );
-        for( j = 0; j < tr_ptrArraySize( &tier->trackers ); ++j )
-        {
-            tracker = tr_ptrArrayNth( &tier->trackers, j );
-            /* FIXME: Are the URLs always normalized? */
-            if( !strcmp( tracker->announce, announce_url ) )
-                return TRUE;
-        }
-    }
-    return FALSE;
-}
-
 void
 tr_announcerAddTex( tr_torrent            * tor,
                     const tr_tracker_info * trackers,
@@ -1804,22 +1805,24 @@ tr_announcerAddTex( tr_torrent            * tor,
 
     for( it = trackers, end = trackers + count; it < end; ++it )
     {
-        tr_tier * tier;
-        char * scrape;
+        char * nurl = tr_normalizeURL( it->announce );
+        if( tiersAddTracker( tor->tiers, nurl ) )
+        {
+            tr_tier * tier;
+            char * scrape;
+            scrape = tr_convertAnnounceToScrape( nurl );
 
-        if( torrentHasTracker( tor, it->announce ) )
-            continue;
+            /* FIXME: Should some trackers go into the same tier,
+             *        or tiers that already exist? */
+            tier = tierNew( tor );
+            tr_ptrArrayAppend( tiers_array, tier );
 
-        scrape = tr_convertAnnounceToScrape( it->announce );
-
-        /* FIXME: Should some trackers go into the same tier,
-         *        or tiers that already exist? */
-        tier = tierNew( tor );
-        tr_ptrArrayAppend( tiers_array, tier );
-
-        /* FIXME: What should the 'id' argument be? */
-        tierAddTracker( tier, it->announce, scrape, 0, FALSE );
-        tr_free( scrape );
+            /* FIXME: What should the 'id' argument be? */
+            tierAddTracker( tier, nurl, scrape, 0, FALSE );
+            tr_free( scrape );
+            tr_ninf( _( "Tracker Exchange" ), _( "Added tracker: %s" ), nurl );
+        }
+        tr_free( nurl );
     }
 
     if( tor->isRunning )
