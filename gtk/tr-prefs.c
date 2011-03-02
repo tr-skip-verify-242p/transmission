@@ -1328,6 +1328,7 @@ networkPage( GObject * core )
     GtkWidget *                h;
     GtkWidget *                l;
     struct network_page_data * data;
+    const char * tooltip;
 
     /* register to stop listening to core prefs changes when the page is destroyed */
     data = g_new0( struct network_page_data, 1 );
@@ -1359,6 +1360,13 @@ networkPage( GObject * core )
     s = _( "Use UPnP or NAT-PMP port _forwarding from my router" );
     w = new_check_button( s, TR_PREFS_KEY_PORT_FORWARDING, core );
     hig_workarea_add_wide_control( t, &row, w );
+
+    s = _( "Bind to network _interface" );
+    w = new_entry( TR_PREFS_KEY_BIND_INTERFACE, core );
+    tooltip = _( "Note that binding to a specific interface is only "
+                 "possible if the program is run with root privileges." );
+    gtr_widget_set_tooltip_text( w, tooltip );
+    hig_workarea_add_row( t, &row, s, w, NULL );
 
     hig_workarea_add_section_divider( t, &row );
     hig_workarea_add_section_title( t, &row, _( "Peer Limits" ) );
