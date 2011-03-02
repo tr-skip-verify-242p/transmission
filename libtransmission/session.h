@@ -208,7 +208,6 @@ struct tr_session
 
     uint16_t                     idleLimitMinutes;
 
-	/* these attribute store the public bind address details */
     struct tr_bindinfo         * public_ipv4;
     struct tr_bindinfo         * public_ipv6;
     char *                       publicInterface;
