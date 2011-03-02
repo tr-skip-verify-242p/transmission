@@ -260,9 +260,10 @@ tr_netBindSocketInterface( tr_session * session, int socket )
         struct ifreq request;
 
         memset( &request, 0, sizeof( request ) );
-        tr_strlcpy( request.ifr_name, session->publicInterface, IFNAMSIZ );
+        tr_strlcpy( request.ifr_name, session->publicInterface,
+                    sizeof( request.ifr_name ) );
         if ( setsockopt( socket, SOL_SOCKET, SO_BINDTODEVICE,
-                         &request, IFNAMSIZ ) < 0 )
+                         &request, sizeof( request ) ) < 0 )
         {
             int eno = sockerrno;
             tr_err( _( "Bind socket to device \'%s\' error: \'%s\' (%d)" ),
