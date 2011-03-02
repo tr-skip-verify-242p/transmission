@@ -77,6 +77,11 @@ char* tr_strltime( char * buf, int secs, size_t buflen );
 /* similar to asctime, but is utf8-clean */
 char* gtr_localtime( time_t time );
 
+/**
+ * Get the width of the screen containing @a window.
+ * If @a window is NULL the default screen is used.
+ */
+int gtr_window_get_max_width( GtkWindow * window );
 
 int gtr_compare_double( const double a, const double b, int decimal_places );
 

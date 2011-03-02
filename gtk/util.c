@@ -116,6 +116,17 @@ gtr_lockfile( const char * filename )
 ***/
 
 int
+gtr_window_get_max_width( GtkWindow * window )
+{
+    GdkScreen * screen;
+    if( window )
+        screen = gtk_window_get_screen( window );
+    else
+        screen = gdk_screen_get_default( );
+    return gdk_screen_get_width( screen );
+}
+
+int
 gtr_compare_double( const double a, const double b, int decimal_places )
 {
     const int64_t ia = (int64_t)(a * pow( 10, decimal_places ) );
