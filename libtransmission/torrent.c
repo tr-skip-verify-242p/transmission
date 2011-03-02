@@ -827,7 +827,7 @@ torrentInit( tr_torrent * tor, const tr_ctor * ctor )
         tor->incompleteDir = tr_strdup( dir );
 
     s = tr_metainfoGetBasename( &tor->info );
-    tor->pieceTempDir = tr_buildPath( tr_getPieceDir( tor->session ), s, NULL );
+    tor->pieceTempDir = tr_buildPath( tr_sessionGetPieceTempDir( tor->session ), s, NULL );
     tr_free( s );
 
     tor->bandwidth = tr_bandwidthNew( session, session->bandwidth );
@@ -855,6 +855,7 @@ torrentInit( tr_torrent * tor, const tr_ctor * ctor )
     tr_ctorInitTorrentWanted( ctor, tor );
 
     refreshCurrentDir( tor );
+    tr_mkdirp( tor->pieceTempDir, 0777 );
 
     doStart = tor->isRunning;
     tor->isRunning = 0;
