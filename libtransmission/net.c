@@ -290,20 +290,20 @@ tr_netSetCongestionControl( int s UNUSED, const char *algorithm UNUSED )
 void
 tr_netBindSocketInterface( tr_session * session, int socket )
 {
-    if( socket >= 0 && session->publicInterface != NULL )
+    const char * ifname = tr_sessionGetPublicInterface( session );
+    if( socket >= 0 && ifname && *ifname )
     {
 #ifdef USE_SO_BINDTODEVICE
         struct ifreq request;
 
         memset( &request, 0, sizeof( request ) );
-        tr_strlcpy( request.ifr_name, session->publicInterface,
-                    sizeof( request.ifr_name ) );
+        tr_strlcpy( request.ifr_name, ifname, sizeof( request.ifr_name ) );
         if( setsockopt( socket, SOL_SOCKET, SO_BINDTODEVICE,
                         &request, sizeof( request ) ) < 0 )
         {
             int eno = sockerrno;
             tr_err( _( "Bind socket to device \'%s\' error: \'%s\' (%d)" ),
-                    session->publicInterface, tr_strerror( eno ), eno );
+                    ifname, tr_strerror( eno ), eno );
         }
 #endif
     }

@@ -776,6 +776,23 @@ onNowTimer( int foo UNUSED, short bar UNUSED, void * vsession )
     /* fprintf( stderr, "time %zu sec, %zu microsec\n", (size_t)tr_time(), (size_t)tv.tv_usec ); */
 }
 
+static void
+rebindSockets( tr_session * session )
+{
+    if( session->isLPDEnabled )
+        tr_lpdUninit( session );
+
+    if( session->isDHTEnabled )
+    {
+        tr_dhtUninit( session );
+        tr_dhtInit( session );
+    }
+    if( session->isLPDEnabled )
+        tr_lpdInit( session, &session->public_ipv4->addr );
+
+    peerPortChanged( session );
+}
+
 /**
  * If public interface name is set, refresh the bind ip addresses
  * ie the session attributes public_ipv4 and public_ipv6
@@ -795,7 +812,7 @@ refreshPublicIp( tr_session * session )
 
     ifname = tr_sessionGetPublicInterface( session );
     if( !ifname || !*ifname )
-        return;
+        goto OUT;
 
     inf = tr_interfacesFindByName( session->networkInterfaces, ifname );
 
@@ -826,30 +843,16 @@ refreshPublicIp( tr_session * session )
         paddr6 = &addr6;
     }
 
-    chng4 = tr_compareAddresses( paddr4, &session->public_ipv4->addr );
-    chng6 = tr_compareAddresses( paddr6, &session->public_ipv6->addr );
+OUT:
+    chng4 = tr_compareAddresses( &addr4, &session->public_ipv4->addr );
+    chng6 = tr_compareAddresses( &addr6, &session->public_ipv6->addr );
 
+    if( chng4 )
+        session->public_ipv4->addr = addr4;
+    if( chng6 )
+        session->public_ipv6->addr = addr6;
     if( chng4 || chng6 )
-    {
-        if( chng4 )
-            session->public_ipv4->addr = addr4;
-        if( chng6 )
-            session->public_ipv6->addr = addr6;
-
-        /* Rebind sockets to the new address. */
-        if( session->isLPDEnabled )
-            tr_lpdUninit( session );
-
-        if( session->isDHTEnabled )
-        {
-            tr_dhtUninit( session );
-            tr_dhtInit( session );
-        }
-        if( session->isLPDEnabled )
-            tr_lpdInit( session, &session->public_ipv4->addr );
-
-        peerPortChanged( session );
-    }
+        rebindSockets( session );
 }
 
 static void networkIFRefresh( tr_session * session )
