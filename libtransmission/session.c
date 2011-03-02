@@ -691,15 +691,17 @@ onNowTimer( int foo UNUSED, short bar UNUSED, void * vsession )
     /* fprintf( stderr, "time %zu sec, %zu microsec\n", (size_t)tr_time(), (size_t)tv.tv_usec ); */
 }
 
-static void tr_getNetworkInterfaces( tr_session * session )
+static void
+refreshNetworkInterfaces( tr_session * session )
 {
-    dbgmsg( "tr_getNetworkInterfaces: Refreshing the list of network interfaces..." );
+    dbgmsg( "refreshNetworkInterfaces: Refreshing the list of network interfaces..." );
     tr_interfacesFree( session->networkInterfaces );
     session->networkInterfaces = tr_interfacesNew( );
-    dbgmsg( "tr_getNetworkInterfaces: Refreshed.");
+    dbgmsg( "refreshNetworkInterfaces: Refreshed.");
 }
 
-static tr_interface * tr_sessionGetInterfaceNamed(char * device, tr_session * session )
+static tr_interface *
+getInterfaceByName( char * device, tr_session * session )
 {
     return tr_FindInterfaceByName( session->networkInterfaces, device );
 }
@@ -724,9 +726,9 @@ static void tr_refreshPublicIp( tr_session * session )
     {
         tr_address * addr_ipv4 = NULL;
         tr_address * addr_ipv6 = NULL;
+        tr_interface * foundInterface;
 
-        tr_interface * foundInterface
-            = tr_sessionGetInterfaceNamed( session->publicInterface, session );
+        foundInterface = getInterfaceByName( session->publicInterface, session );
 
         if( foundInterface )
         {
@@ -788,7 +790,7 @@ static void networkIFRefresh( tr_session * session )
 {
     assert( tr_isSession( session ) );
 
-    tr_getNetworkInterfaces( session );
+    refreshNetworkInterfaces( session );
     tr_refreshPublicIp( session );
 }
 
