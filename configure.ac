@@ -186,8 +186,7 @@ dnl  SO_BINDTODEVICE support
 
 AC_CACHE_CHECK([whether setsockopt accepts SO_BINDTODEVICE],
     [ac_cv_c_so_bindtodevice],
-    [CXXFLAGS="${save_CXXFLAGS} -Wall -Werror"
-     AC_TRY_COMPILE([#include <sys/types.h>
+    [AC_TRY_COMPILE([#include <sys/types.h>
                      #include <sys/socket.h>],
         [return SO_BINDTODEVICE;],
         ac_cv_c_so_bindtodevice=yes, ac_cv_c_so_bindtodevice=no)])
@@ -218,8 +217,7 @@ dnl  getifaddrs
 
 AC_CACHE_CHECK([whether getifaddrs() exists],
     [ac_cv_c_getifaddrs],
-    [CXXFLAGS="${save_CXXFLAGS} -Wall -Werror"
-     AC_TRY_COMPILE([#include <sys/types.h>
+    [AC_TRY_COMPILE([#include <sys/types.h>
                      #include <sys/socket.h>
                      #include <ifaddrs.h>],
         [{struct ifaddrs * pIfa;
@@ -235,8 +233,7 @@ dnl  libnetlink
 
 AC_CACHE_CHECK([whether libnetlink is available (iproute-dev)],
     [ac_cv_c_libnetlink],
-    [CXXFLAGS="${save_CXXFLAGS} -Wall -Werror"
-     AC_TRY_COMPILE([#include <sys/types.h>
+    [AC_TRY_COMPILE([#include <sys/types.h>
                      #include <sys/socket.h>
                      #include <libnetlink.h>],
         [{struct rtnl_handle rth;
@@ -252,8 +249,7 @@ dnl  SystemConfiguration
 
 AC_CACHE_CHECK([whether SystemConfiguration.Framework is available (configd)],
     [ac_cv_f_system_configuration],
-    [CXXFLAGS="${save_CXXFLAGS} -Wall -Werror"
-    AC_TRY_COMPILE([#include <SystemConfiguration/SystemConfiguration.h>],
+    [AC_TRY_COMPILE([#include <SystemConfiguration/SystemConfiguration.h>],
        [SCDynamicStoreGetTypeID();],
         ac_cv_f_system_configuration=yes, ac_cv_f_system_configuration=no)])
 if test x"$ac_cv_f_system_configuration" != x"no"; then
