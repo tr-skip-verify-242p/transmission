@@ -5,10 +5,10 @@
 #include "utils.h"
 
 #define VERBOSE 1
-// #undef VERBOSE
+/* #undef VERBOSE */
 
 #ifdef VERBOSE
-  #define check( A ) \
+ #define check( A ) \
     { \
         ++test; \
         if( A ){ \
@@ -19,7 +19,7 @@
         } \
     }
 #else
-  #define check( A ) \
+ #define check( A ) \
     { \
         ++test; \
         if( !( A ) ){ \
@@ -36,54 +36,57 @@
 
 
 static void tr_list_interfaces( tr_interface ** interfaces );
+
 static void tr_list_interface( tr_interface * interface );
 
-static void tr_list_interface( tr_interface * interface )
+static void
+tr_list_interface( tr_interface * interface )
 {
     char buf[INET6_ADDRSTRLEN];
 
-	info("%s:",interface->name);
-	info("  name = %s",interface->name);
+    info( "%s:", interface->name );
+    info( "  name = %s", interface->name );
 
-	if (interface->af4)
-	{
-	    tr_ntop(&interface->ipv4, buf, sizeof(buf));
-        info("  ipv4 = %s", buf);
-	}
-	if (interface->af6)
-	{
-	    tr_ntop(&interface->ipv6, buf, sizeof(buf));
-        info("  ipv6 = %s", buf);
-	}
-	info(" ");
+    if( interface->af4 )
+    {
+        tr_ntop( &interface->ipv4, buf, sizeof( buf ) );
+        info( "  ipv4 = %s", buf );
+    }
+    if( interface->af6 )
+    {
+        tr_ntop( &interface->ipv6, buf, sizeof( buf ) );
+        info( "  ipv6 = %s", buf );
+    }
+    info( " " );
 }
 
-static void tr_list_interfaces( tr_interface ** interfaces )
+static void
+tr_list_interfaces( tr_interface ** interfaces )
 {
-    if (interfaces)
+    if( interfaces )
     {
-        int index;
-        for( index = 0; interfaces[index]; index++ )
+        int i;
+        for( i = 0; interfaces[i]; ++i++ )
         {
-            tr_interface * interface = interfaces[index];
+            tr_interface * interface = interfaces[i];
             tr_list_interface( interface );
         }
     }
-	return;
+    return;
 }
 
 static int
 test1( void )
 {
-	tr_interface ** interfaces;
+    tr_interface ** interfaces;
 
-	info("Network interfaces test...");
-	info(" ");
-	interfaces = tr_interfacesNew();
-	tr_list_interfaces(interfaces);
-	tr_interfacesFree(interfaces);
-	info("Done.");
-	return 0;
+    info( "Network interfaces test..." );
+    info( " " );
+    interfaces = tr_interfacesNew( );
+    tr_list_interfaces( interfaces );
+    tr_interfacesFree( interfaces );
+    info( "Done." );
+    return 0;
 }
 
 int
