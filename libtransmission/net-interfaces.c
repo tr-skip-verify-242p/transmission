@@ -145,27 +145,16 @@ getInterfaces( void )
         goto OUT;
     }
 
-    for( ifa = myaddrs; ifa != NULL; ifa = ifa->ifa_next )
-    {
-        if( ( ifa->ifa_addr != NULL )
-            && ( ifa->ifa_flags & IFF_UP ) )
-        {
+    for( ifa = myaddrs; ifa; ifa = ifa->ifa_next )
+        if( ifa->ifa_addr && ( ifa->ifa_flags & IFF_UP ) )
             ifcount++;
-        }
-    }
 
     if( ifcount > 0 )
     {
-        /* treat as a null terminated array of interfaces */
         interfaces = tr_new0( tr_interface *, ifcount + 1 );
-        for( ifa = myaddrs; ifa != NULL; ifa = ifa->ifa_next )
-        {
-            if( ( ifa->ifa_addr != NULL )
-                && ( ifa->ifa_flags & IFF_UP ) )
-            {
+        for( ifa = myaddrs; ifa; ifa = ifa->ifa_next )
+            if( ifa->ifa_addr && ( ifa->ifa_flags & IFF_UP ) )
                 tr_MergeOrAppendToInterfaces( interfaces, ifa );
-            }
-        }
     }
 
 OUT:
