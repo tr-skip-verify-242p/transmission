@@ -767,33 +767,24 @@ isAvailableBindAddress( const tr_address * address )
     return TRUE;
 }
 
-/*
- * Attempt to create a dummy private address that will disable traffic.
- */
 void
-tr_getUnavailableBindAddress( tr_address * addr )
+tr_netGetUnavailableBindAddress( tr_address * addr )
 {
     int i;
 
-    assert( addr != NULL );
+    assert( tr_isAddress( addr ) );
 
-    switch( addr->type )
-    {
-        case TR_AF_INET:  tr_pton( "1.2.3.4", addr ); break;
-        case TR_AF_INET6: tr_pton( "fd7f:54eb:9f51:be9a:1:2:3:4", addr ); break;
-        default: return;
-    }
+    if( addr->type == TR_AF_INET )
+        tr_pton( "1.2.3.4", addr );
+    else
+        tr_pton( "fd7f:54eb:9f51:be9a:1:2:3:4", addr );
 
-    i = 100;
-    while( isAvailableBindAddress( addr ) && i < 100 )
+    for( i = 0; i < 100 && isAvailableBindAddress( addr ); ++i )
     {
-        switch( addr->type )
-        {
-            case TR_AF_INET:  addr->addr.addr4.s_addr     += 1; break;
-            case TR_AF_INET6: addr->addr.addr6.s6_addr[0] -= 1; break;
-            default: return;
-        }
-        i++;
+        if( addr->type == TR_AF_INET )
+            addr->addr.addr4.s_addr += 1;
+        else
+            addr->addr.addr6.s6_addr[0] += 1;
     }
 }
 

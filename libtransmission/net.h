@@ -91,8 +91,6 @@ int tr_compareAddresses( const tr_address * a,
 
 tr_bool tr_isValidPeerAddress( const tr_address * addr, tr_port port );
 
-void tr_getUnavailableBindAddress( tr_address * setmeAddr );
-
 static inline tr_bool tr_isAddress( const tr_address * a ) { return ( a != NULL ) && ( a->type==TR_AF_INET || a->type==TR_AF_INET6 ); }
 
 tr_bool tr_net_hasIPv6( tr_port );
@@ -132,6 +130,9 @@ void tr_netCloseSocket( int fd );
 void tr_netInit( void );
 
 void tr_netBindSocketInterface( tr_session * session, int socket );
+
+/** Attempt to create a dummy private address that will disable traffic. */
+void tr_netGetUnavailableBindAddress( tr_address * setmeAddr );
 
 /**
  * @brief get a human-representable string representing the network error.

@@ -717,7 +717,8 @@ getInterfaceByName( const char * device, tr_session * session )
 static void
 refreshPublicIp( tr_session * session )
 {
-    tr_address addr4, addr6, * paddr4 = NULL, * paddr6 = NULL;
+    tr_address addr4 = tr_inaddr_any, addr6 = tr_in6addr_any;
+    tr_address * paddr4 = NULL, * paddr6 = NULL;
     tr_bool chng4 = FALSE, chng6 = FALSE;
     const tr_interface * inf;
 
@@ -741,13 +742,20 @@ refreshPublicIp( tr_session * session )
         }
     }
 
-    if( paddr4 )
-        tr_getUnavailableBindAddress( paddr4 );
-    if( paddr6 )
-        tr_getUnavailableBindAddress( paddr6 );
+    if( !paddr4 )
+    {
+        tr_netGetUnavailableBindAddress( &addr4 );
+        paddr4 = &addr4;
+    }
 
-    chng4 = paddr4 && tr_compareAddresses( paddr4, &session->public_ipv4->addr );
-    chng6 = paddr6 && tr_compareAddresses( paddr6, &session->public_ipv6->addr );
+    if( !paddr6 )
+    {
+        tr_netGetUnavailableBindAddress( &addr6 );
+        paddr6 = &addr6;
+    }
+
+    chng4 = tr_compareAddresses( paddr4, &session->public_ipv4->addr );
+    chng6 = tr_compareAddresses( paddr6, &session->public_ipv6->addr );
 
     if( chng4 || chng6 )
     {
