@@ -41,7 +41,7 @@ typedef struct tr_interface
     tr_address            ipv6;
 } tr_interface;
 
-tr_interface ** tr_net_interfaces( void );
+tr_interface ** tr_interfacesNew( void );
 
 void            tr_interfacesFree( tr_interface ** interfaces );
 

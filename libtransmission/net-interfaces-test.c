@@ -79,7 +79,7 @@ test1( void )
 
 	info("Network interfaces test...");
 	info(" ");
-	interfaces = tr_net_interfaces();
+	interfaces = tr_interfacesNew();
 	tr_list_interfaces(interfaces);
 	tr_interfacesFree(interfaces);
 	info("Done.");

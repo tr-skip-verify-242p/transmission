@@ -78,7 +78,7 @@ tr_interfacesFree( tr_interface ** interfaces )
 }
 
 tr_interface **
-tr_net_interfaces( void )
+tr_interfacesNew( void )
 {
 #if defined( HAVE_GETIFADDRS )
     return getInterfaces( );

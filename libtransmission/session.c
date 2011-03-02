@@ -694,7 +694,7 @@ static void tr_getNetworkInterfaces( tr_session * session )
 {
     dbgmsg( "tr_getNetworkInterfaces: Refreshing the list of network interfaces...");
     tr_interfacesFree( session->networkInterfaces );
-    session->networkInterfaces = tr_net_interfaces();
+    session->networkInterfaces = tr_interfacesNew();
     dbgmsg( "tr_getNetworkInterfaces: Refreshed.");
 }
 
