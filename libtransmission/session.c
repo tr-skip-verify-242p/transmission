@@ -730,13 +730,13 @@ refreshPublicIp( tr_session * session )
 
     if( !paddr4 )
     {
-        tr_netGetUnavailableBindAddress( &addr4 );
+        tr_netGetDummyBindAddress( &addr4 );
         paddr4 = &addr4;
     }
 
     if( !paddr6 )
     {
-        tr_netGetUnavailableBindAddress( &addr6 );
+        tr_netGetDummyBindAddress( &addr6 );
         paddr6 = &addr6;
     }
 

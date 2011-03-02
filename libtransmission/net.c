@@ -706,7 +706,7 @@ isAvailableBindAddress( const tr_address * address )
 }
 
 void
-tr_netGetUnavailableBindAddress( tr_address * addr )
+tr_netGetDummyBindAddress( tr_address * addr )
 {
     int i;
 

@@ -132,7 +132,7 @@ void tr_netInit( void );
 void tr_netBindSocketInterface( tr_session * session, int socket );
 
 /** Attempt to create a dummy private address that will disable traffic. */
-void tr_netGetUnavailableBindAddress( tr_address * setmeAddr );
+void tr_netGetDummyBindAddress( tr_address * setmeAddr );
 
 /**
  * @brief get a human-representable string representing the network error.
