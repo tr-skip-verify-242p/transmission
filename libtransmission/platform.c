@@ -426,10 +426,6 @@ tr_setConfigDir( tr_session * session, const char * configDir )
     tr_mkdirp( path, 0777 );
     session->torrentDir = path;
 
-    path = tr_buildPath( configDir, PIECE_SUBDIR, NULL );
-    tr_mkdirp( path, 0777 );
-    session->pieceDir = path;
-
     migrateFiles( session );
 }
 
@@ -449,12 +445,6 @@ const char *
 tr_getResumeDir( const tr_session * session )
 {
     return session->resumeDir;
-}
-
-const char *
-tr_getPieceDir( const tr_session * session )
-{
-    return session->pieceDir;
 }
 
 const char*
@@ -550,6 +540,12 @@ tr_getDefaultDownloadDir( void )
     }
 
     return user_dir;
+}
+
+const char *
+tr_getDefaultPieceSubDir( void )
+{
+    return PIECE_SUBDIR;
 }
 
 /***
