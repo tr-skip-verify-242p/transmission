@@ -34,16 +34,19 @@
 
 typedef struct tr_interface
 {
-	char name[IF_NAMESIZE];
-	unsigned short int af4;
-	unsigned short int af6;
-	tr_address ipv4;
-	tr_address ipv6;
+    char                  name[IF_NAMESIZE];
+    unsigned short int    af4;
+    unsigned short int    af6;
+    tr_address            ipv4;
+    tr_address            ipv6;
 } tr_interface;
 
 tr_interface ** tr_net_interfaces( void );
-void tr_interfacesFree( tr_interface ** interfaces );
-tr_interface * tr_FindInterfaceByName(tr_interface **interfaces, char * device);
+
+void            tr_interfacesFree( tr_interface ** interfaces );
+
+tr_interface *  tr_FindInterfaceByName( tr_interface ** interfaces,
+                                        char          * device );
 
 
-#endif // _TR_NET_INTERFACES_H_
+#endif /* _TR_NET_INTERFACES_H_ */
