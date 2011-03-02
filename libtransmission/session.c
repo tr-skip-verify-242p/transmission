@@ -58,15 +58,24 @@
 #include <libnetlink.h>
 
 #define RTNLGRP_MSGS \
-    (RTNLGRP_IPV4_IFADDR|RTNLGRP_IPV4_ROUTE|RTNLGRP_IPV6_IFADDR|RTNLGRP_IPV6_ROUTE)
+    ( RTNLGRP_IPV4_IFADDR | RTNLGRP_IPV4_ROUTE | \
+      RTNLGRP_IPV6_IFADDR | RTNLGRP_IPV6_ROUTE )
 
-#elif defined HAVE_FRAMEWORK_SYSTEM_CONFIGURATION
+#elif defined( HAVE_FRAMEWORK_SYSTEM_CONFIGURATION )
 #include <SystemConfiguration/SystemConfiguration.h>
 
 #endif /* HAVE_LIBNETLINK */
 
 enum
 {
+#ifdef HAVE_LIBNETLINK
+    NET_IF_POLL_INTERVAL_SECS = 30,
+#elif defined( HAVE_FRAMEWORK_SYSTEM_CONFIGURATION )
+    NET_IF_POLL_INTERVAL_SECS = 30,
+#else
+    NET_IF_POLL_INTERVAL_SECS = 3,
+#endif /* HAVE_LIBNETLINK */
+
 #ifdef TR_LIGHTWEIGHT
     DEFAULT_CACHE_SIZE_MB = 2,
     DEFAULT_PREFETCH_ENABLED = FALSE,
@@ -74,14 +83,7 @@ enum
     DEFAULT_CACHE_SIZE_MB = 4,
     DEFAULT_PREFETCH_ENABLED = TRUE,
 #endif
-    SAVE_INTERVAL_SECS = 360,
-#ifdef HAVE_LIBNETLINK
-    NET_IF_POLL_INTERVAL_SECS = 30,
-#elif defined HAVE_FRAMEWORK_SYSTEM_CONFIGURATION
-    NET_IF_POLL_INTERVAL_SECS = 30,
-#else
-    NET_IF_POLL_INTERVAL_SECS = 3,
-#endif /* HAVE_LIBNETLINK */
+    SAVE_INTERVAL_SECS = 360
 };
 
 
@@ -229,7 +231,7 @@ open_incoming_peer_port( tr_session * session )
     b = session->public_ipv4;
     b->socket = tr_netBindTCP( &b->addr, session->private_peer_port, FALSE );
     if( b->socket >= 0 ) {
-        tr_netBindSocketInterface(session, b->socket);
+        tr_netBindSocketInterface( session, b->socket );
         b->ev = event_new( session->event_base, b->socket, EV_READ | EV_PERSIST, accept_incoming_peer, session );
         event_add( b->ev, NULL );
     }
@@ -239,7 +241,7 @@ open_incoming_peer_port( tr_session * session )
         b = session->public_ipv6;
         b->socket = tr_netBindTCP( &b->addr, session->private_peer_port, FALSE );
         if( b->socket >= 0 ) {
-            tr_netBindSocketInterface(session, b->socket);
+            tr_netBindSocketInterface( session, b->socket );
             b->ev = event_new( session->event_base, b->socket, EV_READ | EV_PERSIST, accept_incoming_peer, session );
             event_add( b->ev, NULL );
         }
@@ -249,7 +251,6 @@ open_incoming_peer_port( tr_session * session )
 const tr_address*
 tr_sessionGetPublicAddress( const tr_session * session, int tr_af_type, tr_bool * is_default_value )
 {
-    /* this method is called to get the bind address */
     const char * default_value = "";
     const struct tr_bindinfo * bindinfo = NULL;
 
@@ -692,15 +693,15 @@ onNowTimer( int foo UNUSED, short bar UNUSED, void * vsession )
 
 static void tr_getNetworkInterfaces( tr_session * session )
 {
-    dbgmsg( "tr_getNetworkInterfaces: Refreshing the list of network interfaces...");
+    dbgmsg( "tr_getNetworkInterfaces: Refreshing the list of network interfaces..." );
     tr_interfacesFree( session->networkInterfaces );
-    session->networkInterfaces = tr_interfacesNew();
+    session->networkInterfaces = tr_interfacesNew( );
     dbgmsg( "tr_getNetworkInterfaces: Refreshed.");
 }
 
 static tr_interface * tr_sessionGetInterfaceNamed(char * device, tr_session * session )
 {
-    return tr_FindInterfaceByName(session->networkInterfaces, device);
+    return tr_FindInterfaceByName( session->networkInterfaces, device );
 }
 
 /**
@@ -1411,7 +1412,7 @@ peerPortChanged( void * session )
 
     while(( tor = tr_torrentNext( session, tor )))
     {
-        if (tor->isRunning)
+        if( tor->isRunning )
         {
             tr_torrentStop( tor );
             tr_torrentStart( tor );
