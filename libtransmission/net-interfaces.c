@@ -89,7 +89,7 @@ tr_net_interfaces( void )
 
 #if defined( HAVE_GETIFADDRS )
 static void
-tr_MergeOrAppendToInterfaces( tr_interface   ** interfaces,
+mergeOrAppendToInterfaces( tr_interface   ** interfaces,
                               struct ifaddrs  * ifa )
 {
     if( interfaces )
@@ -154,7 +154,7 @@ getInterfaces( void )
         interfaces = tr_new0( tr_interface *, ifcount + 1 );
         for( ifa = myaddrs; ifa; ifa = ifa->ifa_next )
             if( ifa->ifa_addr && ( ifa->ifa_flags & IFF_UP ) )
-                tr_MergeOrAppendToInterfaces( interfaces, ifa );
+                mergeOrAppendToInterfaces( interfaces, ifa );
     }
 
 OUT:
