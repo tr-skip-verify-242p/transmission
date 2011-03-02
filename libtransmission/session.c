@@ -714,65 +714,61 @@ getInterfaceByName( const char * device, tr_session * session )
  * until client restarts. We would have to add a hook funcion for GUI.
  * At the moment this is hidden setting only, so we dont bother.
  */
-static void tr_refreshPublicIp( tr_session * session )
+static void
+refreshPublicIp( tr_session * session )
 {
-    const tr_address * old4 = &session->public_ipv4->addr;
-    const tr_address * old6 = &session->public_ipv6->addr;
+    tr_address addr4, addr6, * paddr4 = NULL, * paddr6 = NULL;
+    tr_bool chng4 = FALSE, chng6 = FALSE;
+    const tr_interface * inf;
 
-    /* If user wants to bind to a specific device
-     * (ppp0, my PPTP VPN for instance).
-     */
-    if( session->publicInterface && *session->publicInterface )
+    if( !session->publicInterface || !*session->publicInterface )
+        return;
+
+    inf = getInterfaceByName( session->publicInterface, session );
+
+    /* Check that we don't accidentally bind to all interfaces. */
+    if( inf )
     {
-        tr_address addr4, addr6, * paddr4 = NULL, * paddr6 = NULL;
-        tr_interface * foundInterface;
-
-        foundInterface = getInterfaceByName( session->publicInterface, session );
-
-        if( foundInterface )
+        if( inf->af4 && !tr_compareAddresses( &tr_inaddr_any, &inf->ipv4 ) )
         {
-            /* Check that we don't accidentally bind to all
-             * interfaces (0.0.0.0 or ::). */
-            if( foundInterface->af4
-                && !tr_compareAddresses( &tr_inaddr_any, &foundInterface->ipv4 ) )
-            {
-                addr4 = foundInterface->ipv4;
-                paddr4 = &addr4;
-            }
-            if( foundInterface->af6
-                && !tr_compareAddresses( &tr_in6addr_any, &foundInterface->ipv6 ) )
-            {
-                addr6 = foundInterface->ipv6;
-                paddr6 = &addr6;
-            }
+            addr4 = inf->ipv4;
+            paddr4 = &addr4;
         }
-
-        if( paddr4 )
-            tr_getUnavailableBindAddress( paddr4 );
-        if( paddr6 )
-            tr_getUnavailableBindAddress( paddr6 );
-
-        /* if either v4 or v6 bind address has changed */
-        if( ( paddr4 && tr_compareAddresses( paddr4, old4 ) )
-            || ( paddr6 && tr_compareAddresses( paddr6, old6 ) ) )
+        if( inf->af6 && !tr_compareAddresses( &tr_in6addr_any, &inf->ipv6 ) )
         {
+            addr6 = inf->ipv6;
+            paddr6 = &addr6;
+        }
+    }
+
+    if( paddr4 )
+        tr_getUnavailableBindAddress( paddr4 );
+    if( paddr6 )
+        tr_getUnavailableBindAddress( paddr6 );
+
+    chng4 = paddr4 && tr_compareAddresses( paddr4, &session->public_ipv4->addr );
+    chng6 = paddr6 && tr_compareAddresses( paddr6, &session->public_ipv6->addr );
+
+    if( chng4 || chng6 )
+    {
+        if( chng4 )
             session->public_ipv4->addr = addr4;
+        if( chng6 )
             session->public_ipv6->addr = addr6;
 
-            /* restart future connections to bind on the new ip address */
-            if( session->isLPDEnabled )
-                tr_lpdUninit( session );
+        /* Rebind sockets to the new address. */
+        if( session->isLPDEnabled )
+            tr_lpdUninit( session );
 
-            if( session->isDHTEnabled )
-            {
-                tr_dhtUninit( session );
-                tr_dhtInit( session );
-            }
-            if( session->isLPDEnabled )
-                tr_lpdInit( session, &session->public_ipv4->addr );
-
-            peerPortChanged( session );
+        if( session->isDHTEnabled )
+        {
+            tr_dhtUninit( session );
+            tr_dhtInit( session );
         }
+        if( session->isLPDEnabled )
+            tr_lpdInit( session, &session->public_ipv4->addr );
+
+        peerPortChanged( session );
     }
 }
 
@@ -781,7 +777,7 @@ static void networkIFRefresh( tr_session * session )
     assert( tr_isSession( session ) );
 
     refreshNetworkInterfaces( session );
-    tr_refreshPublicIp( session );
+    refreshPublicIp( session );
 }
 
 /**
