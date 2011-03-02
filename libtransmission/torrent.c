@@ -1540,6 +1540,7 @@ freeTorrent( tr_torrent * tor )
     tr_bandwidthFree( tor->bandwidth );
 
     tr_metainfoFree( inf );
+    memset( tor, 0, sizeof( *tor ) );
     tr_free( tor );
 
     tr_sessionUnlock( session );
@@ -2404,7 +2405,11 @@ compareTrackerByTier( const void * va, const void * vb )
         return a->tier - b->tier;
 
     /* get the effects of a stable sort by comparing the two elements' addresses */
-    return a - b;
+    if( a < b )
+        return -1;
+    if( a > b )
+        return 1;
+    return 0;
 }
 
 tr_bool
@@ -2417,9 +2422,8 @@ tr_torrentSetAnnounceList( tr_torrent             * tor,
     tr_bool ok = TRUE;
     tr_tracker_info * trackers;
 
-    tr_torrentLock( tor );
-
     assert( tr_isTorrent( tor ) );
+    tr_torrentLock( tor );
 
     /* ensure the trackers' tiers are in ascending order */
     trackers = tr_memdup( trackers_in, sizeof( tr_tracker_info ) * trackerCount );
