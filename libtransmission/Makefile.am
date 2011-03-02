@@ -41,6 +41,7 @@ libtransmission_a_SOURCES = \
     metainfo.c \
     natpmp.c \
     net.c \
+    net-interfaces.c \
     peer-io.c \
     peer-mgr.c \
     peer-msgs.c \
@@ -97,6 +98,7 @@ noinst_HEADERS = \
     metainfo.h \
     natpmp.h \
     net.h \
+    net-interfaces.h \
     peer-common.h \
     peer-io.h \
     peer-mgr.h \
@@ -135,6 +137,7 @@ TESTS = \
     history-test \
     json-test \
     magnet-test \
+    net-interfaces-test \
     peer-msgs-test \
     rpc-test \
     test-peer-id \
@@ -150,7 +153,8 @@ test: $(TESTS)
 .PHONY: test
 
 apps_ldflags = \
-    @ZLIB_LDFLAGS@
+    @ZLIB_LDFLAGS@ \
+    @FRAMEWORK_SYSTEM_CONFIGURATION_LDFLAGS@
 
 apps_ldadd = \
     ./libtransmission.a  \
@@ -188,6 +192,10 @@ json_test_LDFLAGS = ${apps_ldflags}
 magnet_test_SOURCES = magnet-test.c
 magnet_test_LDADD = ${apps_ldadd}
 magnet_test_LDFLAGS = ${apps_ldflags}
+
+net_interfaces_test_SOURCES = net-interfaces-test.c
+net_interfaces_test_LDADD = ${apps_ldadd}
+net_interfaces_test_LDFLAGS = ${apps_ldflags}
 
 rpc_test_SOURCES = rpc-test.c
 rpc_test_LDADD = ${apps_ldadd}

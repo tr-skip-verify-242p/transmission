@@ -1543,7 +1543,7 @@ networkPage( GObject * core )
     hig_workarea_add_wide_control( t, &row, w );
 
     s = _( "Bind to network _interface" );
-    w = new_entry( TR_PREFS_KEY_PEER_SOCKET_INTERFACE, core );
+    w = new_entry( TR_PREFS_KEY_BIND_INTERFACE, core );
     tooltip = _( "Note that binding to a specific interface is only "
                  "possible if the program is run with root privileges." );
     gtr_widget_set_tooltip_text( w, tooltip );

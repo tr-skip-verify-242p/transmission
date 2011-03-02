@@ -61,6 +61,12 @@
 		4DF7500D08A103AD007B0D70 /* ToolbarInfoTemplate.png in Resources */ = {isa = PBXBuildFile; fileRef = 4DF7500808A103AD007B0D70 /* ToolbarInfoTemplate.png */; };
 		4DF7500E08A103AD007B0D70 /* ToolbarRemoveTemplate.png in Resources */ = {isa = PBXBuildFile; fileRef = 4DF7500908A103AD007B0D70 /* ToolbarRemoveTemplate.png */; };
 		4DFBC2DF09C0970D00D5C571 /* Torrent.m in Sources */ = {isa = PBXBuildFile; fileRef = 4DFBC2DE09C0970D00D5C571 /* Torrent.m */; };
+		683B1495131139360088E7D0 /* net-interfaces.h in Headers */ = {isa = PBXBuildFile; fileRef = 68FE979D11C77CE800FE4F58 /* net-interfaces.h */; };
+		683B14961311394F0088E7D0 /* net-interfaces.c in Sources */ = {isa = PBXBuildFile; fileRef = 68FE979F11C77D1200FE4F58 /* net-interfaces.c */; };
+		6880DC881317FDD3000193B3 /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 68E7ACF91316B5FA0017CB1D /* SystemConfiguration.framework */; };
+		6880DC9E1317FE33000193B3 /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 68E7ACF91316B5FA0017CB1D /* SystemConfiguration.framework */; };
+		6880DC9F1317FE37000193B3 /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 68E7ACF91316B5FA0017CB1D /* SystemConfiguration.framework */; };
+		68E7ACFA1316B5FA0017CB1D /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 68E7ACF91316B5FA0017CB1D /* SystemConfiguration.framework */; };
 		8D11072B0486CEB800E47090 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 089C165CFE840E0CC02AAC07 /* InfoPlist.strings */; };
 		8D11072D0486CEB800E47090 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 29B97316FDCFA39411CA2CEA /* main.m */; settings = {ATTRIBUTES = (); }; };
 		8D11072F0486CEB800E47090 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */; };
@@ -511,6 +517,9 @@
 		4DF7500908A103AD007B0D70 /* ToolbarRemoveTemplate.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = ToolbarRemoveTemplate.png; path = macosx/Images/ToolbarRemoveTemplate.png; sourceTree = "<group>"; };
 		4DFBC2DD09C0970D00D5C571 /* Torrent.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Torrent.h; path = macosx/Torrent.h; sourceTree = "<group>"; };
 		4DFBC2DE09C0970D00D5C571 /* Torrent.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = Torrent.m; path = macosx/Torrent.m; sourceTree = "<group>"; };
+		68E7ACF91316B5FA0017CB1D /* SystemConfiguration.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SystemConfiguration.framework; path = System/Library/Frameworks/SystemConfiguration.framework; sourceTree = SDKROOT; };
+		68FE979D11C77CE800FE4F58 /* net-interfaces.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "net-interfaces.h"; path = "libtransmission/net-interfaces.h"; sourceTree = "<group>"; };
+		68FE979F11C77D1200FE4F58 /* net-interfaces.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = "net-interfaces.c"; path = "libtransmission/net-interfaces.c"; sourceTree = "<group>"; };
 		8D1107310486CEB800E47090 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist; name = Info.plist; path = macosx/Info.plist; sourceTree = "<group>"; };
 		8D1107320486CEB800E47090 /* Transmission.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Transmission.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A200B8390A2263BA007BBB1E /* InfoWindowController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = InfoWindowController.h; path = macosx/InfoWindowController.h; sourceTree = "<group>"; };
@@ -969,6 +978,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6880DC881317FDD3000193B3 /* SystemConfiguration.framework in Frameworks */,
 				4D9A2BF009E16D21002D0FF9 /* libtransmission.a in Frameworks */,
 				4D9A2BF909E16D4F002D0FF9 /* libcrypto.0.9.7.dylib in Frameworks */,
 				A22E59A70DC11A1D00F4BE15 /* libcurl.4.dylib in Frameworks */,
@@ -992,6 +1002,7 @@
 				A2E669790F5B8E5A00B4251A /* Security.framework in Frameworks */,
 				A22CFB820FB66EF30009BD3E /* Carbon.framework in Frameworks */,
 				A221DCC8104B3660008A642D /* Quartz.framework in Frameworks */,
+				68E7ACFA1316B5FA0017CB1D /* SystemConfiguration.framework in Frameworks */,
 				A2E38540130DFECD001F501B /* libminiupnp.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1041,6 +1052,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6880DC9E1317FE33000193B3 /* SystemConfiguration.framework in Frameworks */,
 				BEFC1C040C07753100B0BB3C /* libcrypto.0.9.7.dylib in Frameworks */,
 				BEFC1C050C07753500B0BB3C /* libtransmission.a in Frameworks */,
 				A22E59A80DC11A1F00F4BE15 /* libcurl.4.dylib in Frameworks */,
@@ -1053,6 +1065,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6880DC9F1317FE37000193B3 /* SystemConfiguration.framework in Frameworks */,
 				BEFC1CF40C07822400B0BB3C /* libcrypto.0.9.7.dylib in Frameworks */,
 				BEFC1D2D0C0783D900B0BB3C /* libtransmission.a in Frameworks */,
 				A22E59A90DC11A2000F4BE15 /* libcurl.4.dylib in Frameworks */,
@@ -1417,6 +1430,8 @@
 				A2A4EA0A0DE106E8000CE197 /* ConvertUTF.c */,
 				A2A4EA0B0DE106E8000CE197 /* ConvertUTF.h */,
 				4DB74F070E8CD75100AEB1A8 /* wildmat.c */,
+				68FE979D11C77CE800FE4F58 /* net-interfaces.h */,
+				68FE979F11C77D1200FE4F58 /* net-interfaces.c */,
 			);
 			name = libtransmission;
 			sourceTree = "<group>";
@@ -1437,6 +1452,7 @@
 				4D2617F709DECE3D00D08EFA /* libcrypto.0.9.7.dylib */,
 				A29EBE700DC06068006CEE80 /* libcurl.4.dylib */,
 				A296EF3411E5605E004A2781 /* libiconv.dylib */,
+				68E7ACF91316B5FA0017CB1D /* SystemConfiguration.framework */,
 			);
 			name = Libraries;
 			sourceTree = "<group>";
@@ -1660,6 +1676,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				683B1495131139360088E7D0 /* net-interfaces.h in Headers */,
 				BEFC1E290C07861A00B0BB3C /* version.h in Headers */,
 				BEFC1E2A0C07861A00B0BB3C /* utils.h in Headers */,
 				BEFC1E2C0C07861A00B0BB3C /* upnp.h in Headers */,
@@ -1955,7 +1972,6 @@
 			};
 			buildConfigurationList = 4DF0C59A089918A300DD8943 /* Build configuration list for PBXProject "Transmission" */;
 			compatibilityVersion = "Xcode 3.2";
-			developmentRegion = English;
 			hasScannedForEncodings = 1;
 			knownRegions = (
 				English,
@@ -2163,6 +2179,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				683B14961311394F0088E7D0 /* net-interfaces.c in Sources */,
 				BEFC1E2B0C07861A00B0BB3C /* utils.c in Sources */,
 				A2AAB65F0DE0CF6200E04DDA /* rpcimpl.c in Sources */,
 				BEFC1E2D0C07861A00B0BB3C /* upnp.c in Sources */,
@@ -2644,6 +2661,8 @@
 					"-DSYS_DARWIN",
 					"-DWITH_UTP",
 					"-DHAVE_OPENSSL",
+					"-DHAVE_GETIFADDRS",
+					"-DHAVE_FRAMEWORK_SYSTEM_CONFIGURATION",
 					"-D__TRANSMISSION__",
 					"-DHAVE_STRLCPY",
 					"-DHAVE_STRLCAT",
@@ -2841,6 +2860,8 @@
 					"-DSYS_DARWIN",
 					"-DWITH_UTP",
 					"-DHAVE_OPENSSL",
+					"-DHAVE_GETIFADDRS",
+					"-DHAVE_FRAMEWORK_SYSTEM_CONFIGURATION",
 					"-D__TRANSMISSION__",
 					"-DHAVE_STRLCPY",
 					"-DHAVE_STRLCAT",
@@ -3088,6 +3109,8 @@
 					"-DSYS_DARWIN",
 					"-DWITH_UTP",
 					"-DHAVE_OPENSSL",
+					"-DHAVE_GETIFADDRS",
+					"-DHAVE_FRAMEWORK_SYSTEM_CONFIGURATION",
 					"-D__TRANSMISSION__",
 					"-DHAVE_STRLCPY",
 					"-DHAVE_STRLCAT",

@@ -36,12 +36,13 @@
  #include <ws2tcpip.h>
 #else
  #include <sys/socket.h>
- #include <net/if.h>
  #include <netinet/in.h>
  #include <netinet/tcp.h>
  #include <arpa/inet.h> /* inet_addr */
  #include <netdb.h>
  #include <fcntl.h>
+ #include <sys/ioctl.h>
+ #include <net/if.h>
 #endif
 #include <unistd.h>
 
@@ -286,14 +287,28 @@ tr_netSetCongestionControl( int s UNUSED, const char *algorithm UNUSED )
 #endif
 }
 
-int
-tr_netSetBindToDevice( int s, const char * devstr )
+void
+tr_netBindSocketInterface( tr_session * session, int socket )
 {
-    struct ifreq ifr;
-    memset( &ifr, 0, sizeof( ifr ) );
-    tr_strlcpy( ifr.ifr_name, devstr, sizeof( ifr.ifr_name ) );
-    return setsockopt( s, SOL_SOCKET, SO_BINDTODEVICE, &ifr, sizeof( ifr ) );
+    if( socket >= 0 && session->publicInterface != NULL )
+    {
+#ifdef USE_SO_BINDTODEVICE
+        struct ifreq request;
+
+        memset( &request, 0, sizeof( request ) );
+        tr_strlcpy( request.ifr_name, session->publicInterface,
+                    sizeof( request.ifr_name ) );
+        if( setsockopt( socket, SOL_SOCKET, SO_BINDTODEVICE,
+                        &request, sizeof( request ) ) < 0 )
+        {
+            int eno = sockerrno;
+            tr_err( _( "Bind socket to device \'%s\' error: \'%s\' (%d)" ),
+                    session->publicInterface, tr_strerror( eno ), eno );
+        }
+#endif
+    }
 }
+
 
 static socklen_t
 setup_sockaddr( const tr_address        * addr,
@@ -390,7 +405,6 @@ netOpenPeerSocket( tr_session        * session,
     const tr_address      * source_addr;
     socklen_t               sourcelen;
     struct sockaddr_storage source_sock;
-    const char            * bindif;
 
     assert( tr_isAddress( addr ) );
 
@@ -402,6 +416,8 @@ netOpenPeerSocket( tr_session        * session,
     if( s < 0 )
         return -1;
 
+    tr_netBindSocketInterface( session, s );
+
     /* seeds don't need much of a read buffer... */
     if( clientIsSeed ) {
         int n = 8192;
@@ -412,13 +428,6 @@ netOpenPeerSocket( tr_session        * session,
     if( evutil_make_socket_nonblocking( s ) < 0 ) {
         tr_netClose( session, s );
         return -1;
-    }
-
-    bindif = tr_sessionGetBindInterface( session );
-    if( bindif && bindif[0] != '\0' && tr_netSetBindToDevice( s, bindif ) < 0 )
-    {
-        tr_inf( "Unable to bind to interface \"%s\" for socket %d: %s",
-                bindif, s, tr_strerror( sockerrno ) );
     }
 
     addrlen = setup_sockaddr( addr, port, &sock );
@@ -763,6 +772,65 @@ tr_globalIPv6( void )
     }
 
     return have_ipv6 ? ipv6 : NULL;
+}
+
+/***
+****
+****
+***/
+
+static tr_bool
+isAvailableBindAddress( const tr_address * address )
+{
+    static const int domains[NUM_TR_AF_INET_TYPES] = { AF_INET, AF_INET6 };
+    struct sockaddr_storage source_sock;
+    int s, bindResult, bindErr;
+    socklen_t sourcelen;
+    char astr[64];
+
+    assert( tr_isAddress( address ) );
+
+    sourcelen = setup_sockaddr( address, 0, &source_sock );
+
+    s = socket( domains[address->type], SOCK_DGRAM, 0 );
+    bindResult = bind( s, (struct sockaddr *) &source_sock, sourcelen );
+    bindErr = errno;
+    tr_netCloseSocket( s );
+
+    if( bindResult == 0 )
+        return TRUE;
+
+    if( bindErr == EADDRNOTAVAIL )
+        return FALSE;
+
+    if( !tr_ntop( address, astr, sizeof( astr ) ) )
+        tr_strlcpy( astr, "<invalid>", sizeof( astr ) );
+    tr_nerr( "isAvailableBindAddress", _( "Error %d probing %s: %s" ),
+             bindErr, astr, tr_strerror( bindErr ) );
+    tr_nerr( "isAvailableBindAddress", _( "Assuming address %s can be bound"),
+             astr );
+    return TRUE;
+}
+
+void
+tr_netGetDummyBindAddress( tr_address * addr )
+{
+    int i;
+
+    assert( tr_isAddress( addr ) );
+
+    if( addr->type == TR_AF_INET )
+        tr_pton( "1.2.3.4", addr );
+    else
+        tr_pton( "fd7f:54eb:9f51:be9a:1:2:3:4", addr );
+
+    for( i = 0; i < 100 && isAvailableBindAddress( addr ); ++i )
+    {
+        if( addr->type == TR_AF_INET )
+            addr->addr.addr4.s_addr += 1;
+        else
+            addr->addr.addr6.s6_addr[0] += 1;
+    }
 }
 
 /***

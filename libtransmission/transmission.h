@@ -166,6 +166,7 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_ALT_SPEED_TIME_DAY            "alt-speed-time-day"
 #define TR_PREFS_KEY_BIND_ADDRESS_IPV4             "bind-address-ipv4"
 #define TR_PREFS_KEY_BIND_ADDRESS_IPV6             "bind-address-ipv6"
+#define TR_PREFS_KEY_BIND_INTERFACE                "bind-interface"
 #define TR_PREFS_KEY_BLOCKLIST_ENABLED             "blocklist-enabled"
 #define TR_PREFS_KEY_BLOCKLIST_URL                 "blocklist-url"
 #define TR_PREFS_KEY_MAX_CACHE_SIZE_MB             "cache-size-mb"
@@ -193,7 +194,6 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_PEER_PORT_RANDOM_LOW          "peer-port-random-low"
 #define TR_PREFS_KEY_PEER_PORT_RANDOM_HIGH         "peer-port-random-high"
 #define TR_PREFS_KEY_PEER_SOCKET_TOS               "peer-socket-tos"
-#define TR_PREFS_KEY_PEER_SOCKET_INTERFACE         "peer-socket-interface"
 #define TR_PREFS_KEY_PEER_CONGESTION_ALGORITHM     "peer-congestion-algorithm"
 #define TR_PREFS_KEY_PEX_ENABLED                   "pex-enabled"
 #define TR_PREFS_KEY_TEX_ENABLED                   "tracker-exchange-enabled"
@@ -716,9 +716,10 @@ tr_encryption_mode tr_sessionGetEncryption( tr_session * session );
 void               tr_sessionSetEncryption( tr_session * session,
                                             tr_encryption_mode    mode );
 
-const char * tr_sessionGetBindInterface( const tr_session * session );
-void         tr_sessionSetBindInterface( tr_session * session,
-                                         const char * ifname );
+const char * tr_sessionGetPublicInterface( const tr_session * session );
+void tr_sessionSetPublicInterface( tr_session * session,
+                                   const char * publicInterface );
+
 
 const char * tr_sessionGetExternalIPAddress( const tr_session * session );
 void         tr_sessionSetExternalIPAddress( tr_session * session,

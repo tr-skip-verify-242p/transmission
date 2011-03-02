@@ -271,6 +271,8 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
             tr_bencDictAddStr(&settings, TR_PREFS_KEY_BIND_ADDRESS_IPV4, [[fDefaults stringForKey: @"BindAddressIPv4"] UTF8String]);
         if ([fDefaults objectForKey: @"BindAddressIPv6"])
             tr_bencDictAddStr(&settings, TR_PREFS_KEY_BIND_ADDRESS_IPV6, [[fDefaults stringForKey: @"BindAddressIPv6"] UTF8String]);
+        if ([fDefaults objectForKey: @"BindInterface"])
+            tr_bencDictAddStr(&settings, TR_PREFS_KEY_BIND_INTERFACE, [[fDefaults stringForKey: @"BindInterface"] UTF8String]);
         
         tr_bencDictAddBool(&settings, TR_PREFS_KEY_BLOCKLIST_ENABLED, [fDefaults boolForKey: @"BlocklistNew"]);
         if ([fDefaults objectForKey: @"BlocklistURL"])

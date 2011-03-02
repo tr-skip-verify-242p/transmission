@@ -1407,6 +1407,10 @@ on_prefs_changed( TrCore * core UNUSED, const char * key, gpointer data )
     {
         tr_sessionSetPeerPort( tr, gtr_pref_int_get( key ) );
     }
+    else if( !strcmp( key, TR_PREFS_KEY_BIND_INTERFACE ) )
+    {
+        tr_sessionSetPublicInterface( tr, gtr_pref_string_get( key ) );
+    }
     else if( !strcmp( key, TR_PREFS_KEY_BLOCKLIST_ENABLED ) )
     {
         tr_blocklistSetEnabled( tr, gtr_pref_flag_get( key ) );
@@ -1472,10 +1476,6 @@ on_prefs_changed( TrCore * core UNUSED, const char * key, gpointer data )
     else if( !strcmp( key, TR_PREFS_KEY_PORT_FORWARDING ) )
     {
         tr_sessionSetPortForwardingEnabled( tr, gtr_pref_flag_get( key ) );
-    }
-    else if( !strcmp( key, TR_PREFS_KEY_PEER_SOCKET_INTERFACE ) )
-    {
-        tr_sessionSetBindInterface( tr, gtr_pref_string_get( key ) );
     }
     else if( !strcmp( key, TR_PREFS_KEY_PEX_ENABLED ) )
     {

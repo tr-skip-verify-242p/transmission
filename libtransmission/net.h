@@ -25,6 +25,7 @@
 #ifndef __TRANSMISSION__
 #error only libtransmission should #include this header.
 #endif
+#include "transmission.h"
 
 #ifndef _TR_NET_H_
 #define _TR_NET_H_
@@ -133,9 +134,6 @@ int  tr_netAccept( tr_session * session,
 int  tr_netSetTOS( int s,
                    int tos );
 
-int  tr_netSetBindToDevice( int          socket,
-                            const char * interface_name );
-
 int tr_netSetCongestionControl( int s, const char *algorithm );
 
 int tr_netSendTo( int socket, const void * buffer, size_t buflen,
@@ -146,6 +144,11 @@ void tr_netClose( tr_session * session, int s );
 void tr_netCloseSocket( int fd );
 
 void tr_netInit( void );
+
+void tr_netBindSocketInterface( tr_session * session, int socket );
+
+/** Attempt to create a dummy private address that will disable traffic. */
+void tr_netGetDummyBindAddress( tr_address * setmeAddr );
 
 /**
  * @brief get a human-representable string representing the network error.
