@@ -257,24 +257,6 @@ tr_netBindSocketInterface(tr_session *session, int socket)
 #ifdef USE_SO_BINDTODEVICE
     if ( socket >= 0 && session->publicInterface != NULL )
     {
-        /*
-         * Using the ifreq struct with setsockopt seems reasonably common
-         * among the POSIX and POSIX like platforms.
-         * The linux manpage here: http://linux.die.net/man/7/socket says:
-         *   ""The passed option is a variable-length null terminated
-         *     interface name string with the maximum size of IFNAMSIZ.""
-         *
-         * The ifreq structure contains, as it's first element, ifr_name
-         * of size IFNAMSIZ.
-         *
-         * If you find that you do not have net/if.h or the ifreq structure
-         * but you do have SO_BINDTODEVICE then you may just pass null
-         * terminated string. IFNAMSIZ is 16, quite long as net devices
-         * tend to be named eth0, eth0:1, ppp0, etc.
-         *
-         * For size you can pass either IFNAMSIZ, sizeof(struct ifreq), or the
-         * number of bytes in session->publicInterface plus the '\0'.
-         */
         struct ifreq request;
 
         memset(&request, 0, sizeof(request));
