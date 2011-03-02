@@ -2089,8 +2089,7 @@ sessionCloseImpl( void * vsession )
     event_free( session->nowTimer );
     session->nowTimer = NULL;
 
-    evtimer_del( session->networkInterfacesTimer );
-    tr_free( session->networkInterfacesTimer );
+    event_free( session->networkInterfacesTimer );
     session->networkInterfacesTimer = NULL;
 
     tr_interfacesFree( session->networkInterfaces );
