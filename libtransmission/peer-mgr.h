@@ -81,15 +81,7 @@ enum
 
 /* opaque forward declaration */
 struct peer_atom;
-
-struct tr_ptrArray;
-
-typedef struct tr_peer_extension
-{
-    char * name;
-    uint8_t id;
-}
-tr_peer_extension;
+struct peer_extensions;
 
 /**
  * State information about a connected peer.
@@ -130,8 +122,7 @@ typedef struct tr_peer
     char                   * client;
     char                   * peer_id_string;
     char                   * user_agent;
-    struct tr_ptrArray     * extensions; /* tr_peer_extension */
-    char                   * extension_string;
+    struct peer_extensions * extensions;
 
     time_t                   chokeChangedAt;
 
@@ -154,6 +145,11 @@ tr_isPex( const tr_pex * pex )
 const tr_address * tr_peerAddress( const tr_peer * );
 
 int tr_pexCompare( const void * a, const void * b );
+
+struct tr_benc;
+
+void tr_peerExtensionsUpdate( struct peer_extensions * pe,
+                              struct tr_benc * d );
 
 tr_peerMgr* tr_peerMgrNew( tr_session * );
 
