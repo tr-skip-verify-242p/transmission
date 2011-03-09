@@ -660,7 +660,7 @@ atomSetSeed( const Torrent * t, struct peer_atom * atom )
 {
     if( !atomIsSeed( atom ) )
     {
-        tordbg( t, "marking peer %s as a seed", tr_atomAddrStr( atom ) );
+        tordbg( t, "marking peer %s as a seed", tr_atomEndpointStr( atom ) );
 
         atomSetSeedProbability( atom, 100 );
     }
