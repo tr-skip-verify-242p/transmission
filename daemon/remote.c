@@ -290,6 +290,7 @@ static tr_option opts[] =
     { 952, "no-seedratio",           "Let the current torrent(s) seed regardless of ratio", "SR", 0, NULL },
     { 953, "global-seedratio",       "All torrents, unless overridden by a per-torrent setting, should seed until a specific ratio", "gsr", 1, "ratio" },
     { 954, "no-global-seedratio",    "All torrents, unless overridden by a per-torrent setting, should seed regardless of ratio", "GSR", 0, NULL },
+    { 957, "cookie-string",          "Set cookies for the torrent's web trackers", "cs", 1, "<name=value;...>" },
     { 710, "tracker-add",            "Add a tracker to a torrent", "td", 1, "<tracker>" },
     { 712, "tracker-remove",         "Remove a tracker from a torrent", "tr", 1, "<trackerId>" },
     { 's', "start",                  "Start the current torrent(s)", "s",  0, NULL },
@@ -421,6 +422,7 @@ getOptMode( int val )
         case 950: /* seedratio */
         case 951: /* seedratio-default */
         case 952: /* no-seedratio */
+        case 957: /* cookie-string */
         case 966: /* rename */
         case 984: /* honor-session */
         case 985: /* no-honor-session */
@@ -2135,6 +2137,8 @@ processArgs( const char * rpcurl, int argc, const char ** argv )
                 case 951: tr_bencDictAddInt( args, "seedRatioMode", TR_RATIOLIMIT_GLOBAL );
                           break;
                 case 952: tr_bencDictAddInt( args, "seedRatioMode", TR_RATIOLIMIT_UNLIMITED );
+                          break;
+                case 957: tr_bencDictAddStr( args, "cookieString", optarg );
                           break;
                 case 966: tr_bencDictAddStr( args, "rename", optarg );
                           break;

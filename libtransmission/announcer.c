@@ -57,6 +57,7 @@ struct stop_message
 {
     tr_tracker_type type;
     char * hostname;
+    char * cookies;
     struct evbuffer * data;
     uint64_t up;
     uint64_t down;
@@ -89,6 +90,7 @@ stopNew( tr_announcer * announcer, tr_torrent * tor, tr_tier * tier )
         url = createAnnounceURL( announcer, tor, tier, "stopped" );
         evbuffer_add_printf( s->data, "%s", url );
         tr_free( url );
+        s->cookies = tr_strdup( tr_torrentGetCookieString( tor ) );
     }
     s->hostname = tr_strdup( tracker->hostname );
     return s;
@@ -100,6 +102,7 @@ stopFree( struct stop_message * stop )
     if( stop->data )
         evbuffer_free( stop->data );
     tr_free( stop->hostname );
+    tr_free( stop->cookies );
     tr_free( stop );
 }
 
@@ -137,7 +140,8 @@ stopSend( struct stop_message * stop, tr_announcer * announcer )
     else
     {
         const char * url = (const char *) evbuffer_pullup( stop->data, -1 );
-        tr_webRun( announcer->session, url, NULL, NULL, NULL );
+        tr_webRunFull( announcer->session, url, NULL,
+                       stop->cookies, NULL, NULL, NULL );
     }
 }
 
@@ -1248,7 +1252,9 @@ tierAnnounce( tr_announcer * announcer, tr_tier * tier )
         else
         {
             char * url = createAnnounceURL( announcer, tor, tier, data->event );
-            tr_webRun( announcer->session, url, NULL, onAnnounceDone, data );
+            tr_webRunFull( announcer->session, url, NULL,
+                           tr_torrentGetCookieString( tor ),
+                           onAnnounceDone, data, NULL );
             tr_free( url );
         }
     }
@@ -1435,7 +1441,9 @@ tierScrape( tr_announcer * announcer, tr_tier * tier )
                                 strchr( scrape, '?' ) ? '&' : '?',
                                 tier->tor->info.hashEscaped );
         dbgmsg( tier, "scraping \"%s\"", url );
-        tr_webRun( announcer->session, url, NULL, onScrapeDone, data );
+        tr_webRunFull( announcer->session, url, NULL,
+                       tr_torrentGetCookieString( tier->tor ),
+                       onScrapeDone, data, NULL );
         tr_free( url );
     }
 }
