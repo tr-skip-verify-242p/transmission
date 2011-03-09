@@ -94,8 +94,9 @@ transmission_gtk_SOURCES = \
     tr-prefs.c \
     tr-torrent.c \
     tr-window.c \
-    util.c \
-    $(dbus_generated_sources)
+    util.c
+
+nodist_transmission_gtk_SOURCES = $(dbus_generated_sources)
 
 dist_man_MANS = transmission-gtk.1
 
@@ -139,9 +140,9 @@ DISTCLEANFILES = \
 
 CLEANFILES = $(dbus_generated_sources)
 
-$(srcdir)/tr-core.c: tr-core-dbus.h
+tr-core-dbus.xml: Makefile
 
-tr-core-dbus.h: $(srcdir)/tr-core-dbus.xml
+tr-core-dbus.h: tr-core-dbus.xml tr-core.c
 	$(DBUS_BINDING_TOOL) --mode=glib-server --prefix=tr_core $< > $(@F)
 
 if WIN32
@@ -150,6 +151,7 @@ transmission.res: transmission.rc
 	$(WINDRES) -J rc -i transmission.rc -O coff -o transmission.res
 
 BUILT_SOURCES = \
+	$(dbus_generated_sources) \
 	setransmission.res
 
 CLEANFILES += \
