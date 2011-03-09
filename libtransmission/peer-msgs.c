@@ -881,6 +881,7 @@ parseLtepHandshake( tr_peermsgs *     msgs,
     size_t addr_len;
     tr_pex pex;
     int8_t seedProbability = -1;
+    const char * str;
 
     memset( &pex, 0, sizeof( tr_pex ) );
 
@@ -909,6 +910,7 @@ parseLtepHandshake( tr_peermsgs *     msgs,
     msgs->peerSupportsMetadataXfer = 0;
 
     if( tr_bencDictFindDict( &val, "m", &sub ) ) {
+        tr_peerExtensionsUpdate( msgs->peer->extensions, sub );
         if( tr_bencDictFindInt( sub, "ut_pex", &i ) ) {
             msgs->peerSupportsPex = i != 0;
             msgs->ut_pex_id = (uint8_t) i;
@@ -941,6 +943,13 @@ parseLtepHandshake( tr_peermsgs *     msgs,
         pex.port = htons( (uint16_t)i );
         fireClientGotPort( msgs, pex.port );
         dbgmsg( msgs, "peer's port is now %d", (int)i );
+    }
+
+    /* get peer's user agent string */
+    if( tr_bencDictFindStr( &val, "v", &str ) )
+    {
+        tr_free( msgs->peer->user_agent );
+        msgs->peer->user_agent = tr_utf8clean( str, -1 );
     }
 
     if( tr_peerIoIsIncoming( msgs->peer->io )

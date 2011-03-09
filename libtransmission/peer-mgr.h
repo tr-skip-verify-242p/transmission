@@ -81,6 +81,7 @@ enum
 
 /* opaque forward declaration */
 struct peer_atom;
+struct peer_extensions;
 
 /**
  * State information about a connected peer.
@@ -119,6 +120,9 @@ typedef struct tr_peer
 
     /* the client name from the `v' string in LTEP's handshake dictionary */
     char                   * client;
+    char                   * peer_id_string;
+    char                   * user_agent;
+    struct peer_extensions * extensions;
 
     time_t                   chokeChangedAt;
 
@@ -143,6 +147,11 @@ const tr_address * tr_peerAddress( const tr_peer * );
 const tr_endpoint * tr_peerEndpoint( const tr_peer * );
 
 int tr_pexCompare( const void * a, const void * b );
+
+struct tr_benc;
+
+void tr_peerExtensionsUpdate( struct peer_extensions * pe,
+                              struct tr_benc * d );
 
 tr_peerMgr* tr_peerMgrNew( tr_session * );
 

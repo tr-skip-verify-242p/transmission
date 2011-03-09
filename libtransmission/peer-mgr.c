@@ -11,6 +11,7 @@
  */
 
 #include <assert.h>
+#include <ctype.h>
 #include <errno.h> /* error codes ERANGE, ... */
 #include <limits.h> /* INT_MAX */
 #include <string.h> /* memcpy, memcmp, strstr */
@@ -164,6 +165,160 @@ tr_atomEndpointStr( const struct peer_atom * atom )
 {
     return atom ? tr_peerIoEndpointStr( &atom->endpoint ) : "[no atom]";
 }
+
+/**
+***
+**/
+
+struct peer_extension
+{
+    char * name;
+    uint8_t id;
+};
+
+static void
+peerExtensionFree( struct peer_extension * e )
+{
+    if( !e )
+        return;
+    tr_free( e->name );
+    memset( e, 0, sizeof( *e ) );
+    tr_free( e );
+}
+
+static int
+peerExtensionCompare( const void * va, const void * vb )
+{
+    const struct peer_extension * a, * b;
+    a = (const struct peer_extension *) va;
+    b = (const struct peer_extension *) vb;
+    return strcmp( a->name, b->name );
+}
+
+struct peer_extensions
+{
+    tr_ptrArray exts; /* struct peer_extension; owned, sorted */
+    char * extstr;
+    tr_bool extstr_dirty;
+};
+
+static struct peer_extensions *
+peerExtensionsNew( void )
+{
+    struct peer_extensions * pe = tr_new0( struct peer_extensions, 1 );
+    pe->exts = TR_PTR_ARRAY_INIT;
+    return pe;
+}
+
+static void
+peerExtensionsFree( struct peer_extensions * pe )
+{
+    if( !pe )
+        return;
+    tr_ptrArrayDestruct( &pe->exts, (PtrArrayForeachFunc) peerExtensionFree );
+    tr_free( pe->extstr );
+    memset( pe, 0, sizeof( *pe ) );
+    tr_free( pe );
+}
+
+static void
+peerExtensionsUpdateString( struct peer_extensions * pe )
+{
+    const struct peer_extension * e;
+    int n, i = 0, nb, rem;
+    size_t len = 0;
+    char * s, * p;
+
+    if( !pe )
+        return;
+    n = tr_ptrArraySize( &pe->exts );
+    for( i = 0; i < n; ++i )
+    {
+        e = tr_ptrArrayNth( &pe->exts, i );
+        if( !e || !e->name || !e->id )
+            continue;
+        len += strlen( e->name ) + 4 + ( i == n - 1 ? 0 : 1 );
+    }
+    s = p = tr_malloc( len + 1 );
+    rem = len;
+    for( i = 0; i < n && rem > 0; ++i )
+    {
+        e = tr_ptrArrayNth( &pe->exts, i );
+        if( !e || !e->name || !e->id )
+            continue;
+        nb = tr_snprintf( p, rem, "%s=%d%s", e->name, e->id,
+                          i == n - 1 ? "" : " " );
+        p += nb;
+        rem -= nb;
+    }
+    s[len] = '\0';
+    tr_free( pe->extstr );
+    pe->extstr = s;
+    pe->extstr_dirty = FALSE;
+}
+
+static const char *
+peerExtensionsAsString( struct peer_extensions * pe )
+{
+    if( !pe )
+        return "";
+    if( pe->extstr_dirty )
+        peerExtensionsUpdateString( pe );
+    return pe->extstr ? pe->extstr : "";
+}
+
+static struct peer_extension *
+peerExtensionsGet( struct peer_extensions * pe, const char * name )
+{
+    struct peer_extension * e, key;
+    char * kname;
+    int pos;
+    tr_bool exists;
+
+    if( !pe || !name )
+        return NULL;
+    kname = tr_strdup( name );
+    key.name = kname;
+    pos = tr_ptrArrayLowerBound( &pe->exts, &key,
+                                 peerExtensionCompare, &exists );
+    if( exists )
+    {
+        tr_free( kname );
+        e = tr_ptrArrayNth( &pe->exts, pos );
+    }
+    else
+    {
+        e = tr_new0( struct peer_extension, 1 );
+        e->name = kname;
+        tr_ptrArrayInsert( &pe->exts, e, pos );
+    }
+    return e;
+}
+
+void
+tr_peerExtensionsUpdate( struct peer_extensions * pe, tr_benc * d )
+{
+    int i;
+    const char * key;
+    tr_benc * val;
+    int64_t integer;
+    struct peer_extension * e;
+
+    if( !pe || !tr_bencIsDict( d ) )
+        return;
+    for( i = 0; tr_bencDictChild( d, i, &key, &val ); ++i )
+    {
+        if( !tr_bencGetInt( val, &integer ) )
+            continue;
+        e = peerExtensionsGet( pe, key );
+        e->id = integer;
+    }
+    pe->extstr_dirty = TRUE;
+}
+
+/**
+***
+**/
 
 struct block_request
 {
@@ -391,6 +546,7 @@ peerNew( struct peer_atom * atom )
 
     peer->atom = atom;
     atom->peer = peer;
+    peer->extensions = peerExtensionsNew( );
 
     tr_historyConstruct( &peer->blocksSentToClient,  CANCEL_HISTORY_SEC, ( RECHOKE_PERIOD_MSEC / 1000 ) );
     tr_historyConstruct( &peer->blocksSentToPeer,    CANCEL_HISTORY_SEC, ( RECHOKE_PERIOD_MSEC / 1000 ) );
@@ -441,6 +597,9 @@ peerDelete( Torrent * t, tr_peer * peer )
     tr_bitsetDestruct( &peer->have );
     tr_bitfieldFree( peer->blame );
     tr_free( peer->client );
+    tr_free( peer->peer_id_string );
+    tr_free( peer->user_agent );
+    peerExtensionsFree( peer->extensions );
     peer->atom->peer = NULL;
 
     tr_free( peer );
@@ -1902,6 +2061,22 @@ getPeerCount( const Torrent * t )
     return tr_ptrArraySize( &t->peers );/* + tr_ptrArraySize( &t->outgoingHandshakes ); */
 }
 
+static char *
+makePeerIdString( const uint8_t * peer_id )
+{
+    struct evbuffer * buf;
+    int i;
+    buf = evbuffer_new( );
+    for( i = 0; i < 20; ++i )
+    {
+        if( isgraph( peer_id[i] ) )
+            evbuffer_add( buf, &peer_id[i], 1 );
+        else
+            evbuffer_add_printf( buf, "\\x%02x", peer_id[i] );
+    }
+    return evbuffer_free_to_str( buf );
+}
+
 /* FIXME: this is kind of a mess. */
 static tr_bool
 myHandshakeDoneCB( tr_handshake  * handshake,
@@ -2008,6 +2183,8 @@ myHandshakeDoneCB( tr_handshake  * handshake,
                     char client[128];
                     tr_clientForId( client, sizeof( client ), peer_id );
                     peer->client = tr_strdup( client );
+                    tr_free( peer->peer_id_string );
+                    peer->peer_id_string = makePeerIdString( peer_id );
                 }
 
                 peer->io = tr_handshakeStealIO( handshake ); /* this steals its refcount too, which is
@@ -2663,6 +2840,9 @@ tr_peerMgrPeerStats( const tr_torrent * tor, int * setmeCount )
         tr_ntop( &atom->endpoint.addr, stat->addr, sizeof( stat->addr ) );
         tr_strlcpy( stat->client, ( peer->client ? peer->client : "" ),
                    sizeof( stat->client ) );
+        stat->peer_id             = tr_strdup( peer->peer_id_string );
+        stat->user_agent          = tr_strdup( peer->user_agent );
+        stat->extensions          = tr_strdup( peerExtensionsAsString( peer->extensions ) );
         stat->port                = ntohs( peer->atom->endpoint.port );
         stat->from                = atom->fromFirst;
         stat->progress            = peer->progress;
