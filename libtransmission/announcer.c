@@ -1798,6 +1798,43 @@ tr_announcerGetVerifiedTrackers( const tr_torrent * tor,
     tr_torrentUnlock( tor );
 }
 
+static tr_tier *
+getTierForTracker( tr_torrent * tor, const char * nurl )
+{
+    tr_ptrArray * tiers_array = &tor->tiers->tiers;
+    const tr_tracker_item * tkr;
+    tr_tier * tier = NULL, * tt;
+    char * host = NULL, * th;
+    int i, j;
+
+    if( !tr_urlParse( nurl, -1, NULL, &host, NULL, NULL ) && host )
+    {
+        for( i = 0; !tier && i < tr_ptrArraySize( tiers_array ); ++i )
+        {
+            if( !( tt = tr_ptrArrayNth( tiers_array, i ) ) )
+                continue;
+            for ( j = 0; !tier && j < tr_ptrArraySize( &tt->trackers ); ++j )
+            {
+                if( !( tkr = tr_ptrArrayNth( &tt->trackers, j ) ) )
+                    continue;
+                if( tr_urlParse( tkr->announce, -1, NULL, &th, NULL, NULL ) )
+                    continue;
+                if( th && !strcmp( host, th ) )
+                    tier = tt;
+                tr_free( th );
+            }
+        }
+        tr_free( host );
+    }
+
+    if( !tier )
+    {
+        tier = tierNew( tor );
+        tr_ptrArrayAppend( tiers_array, tier );
+    }
+    return tier;
+}
+
 void
 tr_announcerAddTex( tr_torrent            * tor,
                     const tr_tracker_info * trackers,
@@ -1822,19 +1859,13 @@ tr_announcerAddTex( tr_torrent            * tor,
         char * nurl = tr_normalizeURL( it->announce );
         if( tiersAddTracker( tor->tiers, nurl ) )
         {
-            tr_tier * tier;
-            char * scrape;
-            scrape = tr_convertAnnounceToScrape( nurl );
-
-            /* FIXME: Should some trackers go into the same tier,
-             *        or tiers that already exist? */
-            tier = tierNew( tor );
-            tr_ptrArrayAppend( tiers_array, tier );
+            tr_tier * tier = getTierForTracker( tor, nurl );
+            char * scrape = tr_convertAnnounceToScrape( nurl );
 
             /* FIXME: What should the 'id' argument be? */
             tierAddTracker( tier, nurl, scrape, 0, FALSE );
             tr_free( scrape );
-            tr_ninf( _( "Tracker Exchange" ), _( "Added tracker: %s" ), nurl );
+            tr_torinf( tor, _( "Tracker-exchange added: %s" ), nurl );
         }
         tr_free( nurl );
     }
