@@ -646,7 +646,7 @@ tr_fdSocketCreate( tr_session * session, int domain, int type )
 }
 
 int
-tr_fdSocketAccept( tr_session * s, int sockfd, tr_address * addr, tr_port * port )
+tr_fdSocketAccept( tr_session * s, int sockfd, tr_endpoint * endpoint )
 {
     int fd;
     unsigned int len;
@@ -655,8 +655,7 @@ tr_fdSocketAccept( tr_session * s, int sockfd, tr_address * addr, tr_port * port
 
     assert( tr_isSession( s ) );
     assert( s->fdInfo != NULL );
-    assert( addr );
-    assert( port );
+    assert( endpoint != NULL );
 
     gFd = s->fdInfo;
 
@@ -679,9 +678,9 @@ tr_fdSocketAccept( tr_session * s, int sockfd, tr_address * addr, tr_port * port
             union { struct sockaddr_storage dummy; struct sockaddr_in si; } s;
             s.dummy = sock;
             si = &s.si;
-            addr->type = TR_AF_INET;
-            addr->addr.addr4.s_addr = si->sin_addr.s_addr;
-            *port = si->sin_port;
+            endpoint->addr.type = TR_AF_INET;
+            endpoint->addr.addr.addr4.s_addr = si->sin_addr.s_addr;
+            endpoint->port = si->sin_port;
         }
         else
         {
@@ -689,9 +688,9 @@ tr_fdSocketAccept( tr_session * s, int sockfd, tr_address * addr, tr_port * port
             union { struct sockaddr_storage dummy; struct sockaddr_in6 si; } s;
             s.dummy = sock;
             si = &s.si;
-            addr->type = TR_AF_INET6;
-            addr->addr.addr6 = si->sin6_addr;
-            *port = si->sin6_port;
+            endpoint->addr.type = TR_AF_INET6;
+            endpoint->addr.addr.addr6 = si->sin6_addr;
+            endpoint->port = si->sin6_port;
         }
         ++gFd->socket_count;
     }

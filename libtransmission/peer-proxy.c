@@ -46,8 +46,7 @@ typedef enum
 
 struct tr_peerProxy
 {
-    tr_address       address;
-    tr_port          port;
+    tr_endpoint      endpoint; /* The endpoint of the proxy. */
     tr_proxy_type    type;
     tr_bool          auth;
     char *           username;
@@ -57,9 +56,7 @@ struct tr_peerProxy
 
 
 tr_peerProxy *
-tr_peerProxyNew( const tr_session * session,
-                 const tr_address * peerAddr,
-                 tr_port            peerPort UNUSED )
+tr_peerProxyNew( const tr_session * session, const tr_endpoint * peerEndpoint )
 {
     tr_peerProxy *   proxy;
     tr_address       addr;
@@ -76,15 +73,15 @@ tr_peerProxyNew( const tr_session * session,
     }
 
     type = tr_sessionGetPeerProxyType( session );
-    if( type == TR_PROXY_SOCKS4 && peerAddr->type != TR_AF_INET )
+    if( type == TR_PROXY_SOCKS4 && peerEndpoint->addr.type != TR_AF_INET )
     {
         tr_nerr( "Proxy", "SOCKS4 Proxy does not support IPv6 peers" );
         return NULL;
     }
 
     proxy = tr_new0( tr_peerProxy, 1 );
-    proxy->address = addr;
-    proxy->port = htons( tr_sessionGetPeerProxyPort( session ) );
+    proxy->endpoint.addr = addr;
+    proxy->endpoint.port = htons( tr_sessionGetPeerProxyPort( session ) );
     proxy->type = type;
     if( tr_sessionIsPeerProxyAuthEnabled( session ) )
     {
@@ -115,18 +112,11 @@ tr_peerProxyFree( tr_peerProxy * proxy )
     tr_free( proxy );
 }
 
-const tr_address *
-tr_peerProxyGetAddress( const tr_peerProxy * proxy )
+const tr_endpoint *
+tr_peerProxyGetEndpoint( const tr_peerProxy * proxy )
 {
     assert( proxy != NULL );
-    return &proxy->address;
-}
-
-tr_port
-tr_peerProxyGetPort( const tr_peerProxy * proxy )
-{
-    assert( proxy != NULL );
-    return proxy->port;
+    return &proxy->endpoint;
 }
 
 const char *
@@ -238,16 +228,16 @@ writeProxyRequestHTTP( tr_peerIo * io )
 
     tr_peerProxy * proxy = tr_peerIoGetProxy( io );
     char buf[1024], hostHdr[256], authHdr[256], peerHost[64];
-    const tr_address * peerAddr;
-    tr_port peerPort;
-    int len;
+    const tr_endpoint * peerEndpoint;
+    int len, peerPort;
 
     if( http_minor_version > 0 )
     {
+        const tr_endpoint * endpoint = tr_peerProxyGetEndpoint( proxy );
         char proxyHost[64];
         int proxyPort;
-        tr_ntop( tr_peerProxyGetAddress( proxy ), proxyHost, sizeof( proxyHost ) );
-        proxyPort = ntohs( tr_peerProxyGetPort( proxy ) );
+        tr_ntop( &endpoint->addr, proxyHost, sizeof( proxyHost ) );
+        proxyPort = ntohs( endpoint->port );
         tr_snprintf( hostHdr, sizeof( hostHdr ), "Host: %s:%d\015\012",
                      proxyHost, proxyPort );
     }
@@ -269,8 +259,9 @@ writeProxyRequestHTTP( tr_peerIo * io )
     else
         authHdr[0] = '\0';
 
-    peerAddr = tr_peerIoGetAddress( io, &peerPort );
-    tr_ntop( peerAddr, peerHost, sizeof( peerHost ) );
+    peerEndpoint = tr_peerIoGetEndpoint( io );
+    tr_ntop( &peerEndpoint->addr, peerHost, sizeof( peerHost ) );
+    peerPort = ntohs( peerEndpoint->port );
 
     len = tr_snprintf( buf, sizeof( buf ),
                        "CONNECT %s:%d HTTP/1.%d\015\012%s%s\015\012",
@@ -286,20 +277,19 @@ writeProxyRequestSOCKS4( tr_peerIo * io )
 {
     tr_peerProxy * proxy = tr_peerIoGetProxy( io );
     uint8_t version, command, null;
-    tr_port port;
-    const tr_address * addr;
+    const tr_endpoint * endpoint;
 
     version = SOCKS4_VERSION;
     command = SOCKS4_CMD_CONNECT;
-    addr = tr_peerIoGetAddress( io, &port );
+    endpoint = tr_peerIoGetEndpoint( io );
     null = 0;
 
-    assert( addr->type == TR_AF_INET );
+    assert( endpoint->addr.type == TR_AF_INET );
 
     tr_peerIoWriteBytes( io, &version, 1, FALSE );
     tr_peerIoWriteBytes( io, &command, 1, FALSE );
-    tr_peerIoWriteBytes( io, &port, 2, FALSE );
-    tr_peerIoWriteBytes( io, &addr->addr.addr4.s_addr, 4, FALSE );
+    tr_peerIoWriteBytes( io, &endpoint->port, 2, FALSE );
+    tr_peerIoWriteBytes( io, &endpoint->addr.addr.addr4.s_addr, 4, FALSE );
 
     if( tr_peerProxyIsAuthEnabled( proxy ) )
     {
@@ -407,11 +397,14 @@ readProxyResponseSOCKS4( tr_peerIo * io, struct evbuffer * inbuf )
 static void
 writeSOCKS5ConnectCommand( tr_peerIo * io )
 {
+    const tr_endpoint * endpoint;
     const tr_address * addr;
     tr_port port;
     uint8_t version, command, reserved, address_type;
 
-    addr = tr_peerIoGetAddress( io, &port );
+    endpoint = tr_peerIoGetEndpoint( io );
+    addr = &endpoint->addr;
+    port = endpoint->port;
 
     version = SOCKS5_VERSION;
     command = SOCKS5_CMD_CONNECT;

@@ -92,8 +92,6 @@ void tr_addressUnpack( tr_address * dst, int type, const void * addr );
 void tr_addressUnpackSockaddr( tr_address * setme_addr, tr_port * setme_port,
                                const struct sockaddr_storage * ss, socklen_t sslen );
 
-tr_bool tr_isValidPeerAddress( const tr_address * addr, tr_port port );
-tr_bool tr_isValidPeerProxyAddress( const tr_address * addr, tr_port port );
 tr_bool tr_isValidTrackerAddress( const tr_address * addr );
 
 /** @return NULL on success, otherwise an error string. */
@@ -103,17 +101,34 @@ static inline tr_bool tr_isAddress( const tr_address * a ) { return ( a != NULL 
 
 tr_bool tr_net_hasIPv6( tr_port );
 
+/** @brief A network socket communication endpoint. */
+typedef struct tr_endpoint
+{
+    tr_address addr;
+    tr_port port; /** @note Network byte order. */
+}
+tr_endpoint;
+
+static inline tr_bool
+tr_isEndpoint( const tr_endpoint * e )
+{
+    return e && tr_isAddress( &e->addr ) && e->port != 0;
+}
+
+int tr_compareEndpoints( const tr_endpoint * a,
+                         const tr_endpoint * b );
+
+tr_bool tr_isValidPeerEndpoint( const tr_endpoint * endpoint );
+
 /***********************************************************************
  * Sockets
  **********************************************************************/
-int  tr_netOpenPeerSocket( tr_session       * session,
-                           const tr_address * addr,
-                           tr_port            port,
-                           tr_bool            clientIsSeed );
+int  tr_netOpenPeerSocket( tr_session        * session,
+                           const tr_endpoint * endpoint,
+                           tr_bool             clientIsSeed );
 
 int  tr_netOpenPeerProxySocket( tr_session       * session,
-                                const tr_address * proxy_addr,
-                                tr_port            proxy_port,
+                                const tr_endpoint* endpoint,
                                 tr_bool            clientIsSeed );
 
 struct UTPSocket *
@@ -126,10 +141,9 @@ int  tr_netBindTCP( const tr_address * addr,
                     tr_port            port,
                     tr_bool            suppressMsgs );
 
-int  tr_netAccept( tr_session * session,
-                   int          bound,
-                   tr_address * setme_addr,
-                   tr_port    * setme_port );
+int  tr_netAccept( tr_session  * session,
+                   int           bound,
+                   tr_endpoint * setme_endpoint );
 
 int  tr_netSetTOS( int s,
                    int tos );

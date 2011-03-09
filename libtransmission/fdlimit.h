@@ -121,8 +121,7 @@ int      tr_fdSocketCreate( tr_session * session, int domain, int type );
 
 int      tr_fdSocketAccept( tr_session  * session,
                             int           listening_sockfd,
-                            tr_address  * addr,
-                            tr_port     * port );
+                            tr_endpoint * endpoint );
 
 void     tr_fdSocketClose( tr_session * session, int s );
 

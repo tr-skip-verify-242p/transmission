@@ -84,7 +84,7 @@ guessPacketOverhead( size_t d )
 #define dbgmsg( io, ... ) \
     do { \
         if( tr_deepLoggingIsActive( ) ) \
-            tr_deepLog( __FILE__, __LINE__, tr_peerIoGetAddrStr( io ), __VA_ARGS__ ); \
+            tr_deepLog( __FILE__, __LINE__, tr_peerIoGetEndpointStr( io ), __VA_ARGS__ ); \
     } while( 0 )
 
 struct tr_datatype
@@ -209,7 +209,7 @@ tr_isPeerIo( const tr_peerIo * io )
         && ( io->magicNumber == MAGIC_NUMBER )
         && ( io->refCount >= 0 )
         && ( tr_isBandwidth( &io->bandwidth ) )
-        && ( tr_isAddress( &io->addr ) );
+        && ( tr_isEndpoint( &io->endpoint ) );
 }
 
 static void
@@ -372,19 +372,19 @@ maybeSetCongestionAlgorithm( int socket, const char * algorithm )
 
 static int
 openOutgoingPeerSocket( tr_session        * session,
-                        const tr_address  * addr,
-                        tr_port             port,
+                        const tr_endpoint * endpoint,
                         tr_bool             clientIsSeed,
                         tr_peerProxy      * proxy )
 {
     if( proxy )
     {
+        const tr_endpoint * pep;
         tr_peerProxyResetConnectionState( proxy );
-        return tr_netOpenPeerProxySocket( session, tr_peerProxyGetAddress( proxy ),
-                                          tr_peerProxyGetPort( proxy ), clientIsSeed );
+        pep = tr_peerProxyGetEndpoint( proxy );
+        return tr_netOpenPeerProxySocket( session, pep, clientIsSeed );
     }
 
-    return tr_netOpenPeerSocket( session, addr, port, clientIsSeed );
+    return tr_netOpenPeerSocket( session, endpoint, clientIsSeed );
 }
 
 #ifdef WITH_UTP
@@ -556,8 +556,7 @@ static struct UTPFunctionTable dummy_utp_function_table = {
 static tr_peerIo*
 tr_peerIoNew( tr_session       * session,
               tr_bandwidth     * parent,
-              const tr_address * addr,
-              tr_port            port,
+              const tr_endpoint* endpoint,
               const uint8_t    * torrentHash,
               tr_bool            isIncoming,
               tr_bool            isSeed,
@@ -588,9 +587,8 @@ tr_peerIoNew( tr_session       * session,
     io->crypto = tr_cryptoNew( torrentHash, isIncoming );
     io->proxy = proxy; /* Pointer ownership is transferred. */
     io->session = session;
-    io->addr = *addr;
+    io->endpoint = *endpoint;
     io->isSeed = isSeed;
-    io->port = port;
     io->socket = socket;
     io->utp_socket = utp_socket;
     io->isIncoming = isIncoming != 0;
@@ -628,23 +626,21 @@ tr_peerIoNew( tr_session       * session,
 tr_peerIo*
 tr_peerIoNewIncoming( tr_session        * session,
                       tr_bandwidth      * parent,
-                      const tr_address  * addr,
-                      tr_port             port,
+                      const tr_endpoint * endpoint,
                       int                 fd,
                       struct UTPSocket  * utp_socket )
 {
     assert( session );
-    assert( tr_isAddress( addr ) );
+    assert( tr_isEndpoint( endpoint ) );
 
-    return tr_peerIoNew( session, parent, addr, port, NULL, TRUE, FALSE,
+    return tr_peerIoNew( session, parent, endpoint, NULL, TRUE, FALSE,
                          fd, NULL, utp_socket );
 }
 
 tr_peerIo*
 tr_peerIoNewOutgoing( tr_session        * session,
                       tr_bandwidth      * parent,
-                      const tr_address  * addr,
-                      tr_port             port,
+                      const tr_endpoint * endpoint,
                       const uint8_t     * torrentHash,
                       tr_bool             isSeed,
                       tr_bool             utp )
@@ -654,21 +650,21 @@ tr_peerIoNewOutgoing( tr_session        * session,
     struct UTPSocket *utp_socket = NULL;
 
     assert( session );
-    assert( tr_isAddress( addr ) );
+    assert( tr_isEndpoint( endpoint ) );
     assert( torrentHash );
 
     if( utp )
-        utp_socket = tr_netOpenPeerUTPSocket( session, addr, port, isSeed );
+        utp_socket = tr_netOpenPeerUTPSocket( session, &endpoint->addr, endpoint->port, isSeed );
 
     if( !utp_socket )
     {
         if( tr_sessionIsPeerProxyEnabled( session ) )
         {
-            proxy = tr_peerProxyNew( session, addr, port );
+            proxy = tr_peerProxyNew( session, endpoint );
             if( proxy == NULL )
                 return NULL;
         }
-        fd = openOutgoingPeerSocket( session, addr, port, isSeed, proxy );
+        fd = openOutgoingPeerSocket( session, endpoint, isSeed, proxy );
         dbgmsg( NULL, "openOutgoingPeerSocket returned fd %d", fd );
     }
 
@@ -678,8 +674,8 @@ tr_peerIoNewOutgoing( tr_session        * session,
         return NULL;
     }
 
-    return tr_peerIoNew( session, parent, addr, port,
-                         torrentHash, FALSE, isSeed, fd, proxy, utp_socket );
+    return tr_peerIoNew( session, parent, endpoint, torrentHash, FALSE,
+                         isSeed, fd, proxy, utp_socket );
 }
 
 /***
@@ -845,32 +841,30 @@ tr_peerIoUnrefImpl( const char * file, int line, tr_peerIo * io )
         tr_peerIoFree( io );
 }
 
-const tr_address*
-tr_peerIoGetAddress( const tr_peerIo * io, tr_port   * port )
+const tr_endpoint *
+tr_peerIoGetEndpoint( const tr_peerIo * io )
 {
     assert( tr_isPeerIo( io ) );
-
-    if( port )
-        *port = io->port;
-
-    return &io->addr;
+    return &io->endpoint;
 }
 
-const char*
-tr_peerIoAddrStr( const tr_address * addr, tr_port port )
+const char *
+tr_peerIoEndpointStr( const tr_endpoint * endpoint )
 {
     static char buf[512];
 
-    if( addr->type == TR_AF_INET )
-        tr_snprintf( buf, sizeof( buf ), "%s:%u", tr_ntop_non_ts( addr ), ntohs( port ) );
+    if( endpoint->addr.type == TR_AF_INET )
+        tr_snprintf( buf, sizeof( buf ), "%s:%u",
+                     tr_ntop_non_ts( &endpoint->addr ), ntohs( endpoint->port ) );
     else
-        tr_snprintf( buf, sizeof( buf ), "[%s]:%u", tr_ntop_non_ts( addr ), ntohs( port ) );
+        tr_snprintf( buf, sizeof( buf ), "[%s]:%u",
+                     tr_ntop_non_ts( &endpoint->addr ), ntohs( endpoint->port ) );
     return buf;
 }
 
-const char* tr_peerIoGetAddrStr( const tr_peerIo * io )
+const char * tr_peerIoGetEndpointStr( const tr_peerIo * io )
 {
-    return tr_isPeerIo( io ) ? tr_peerIoAddrStr( &io->addr, io->port ) : "error";
+    return tr_isPeerIo( io ) ? tr_peerIoEndpointStr( &io->endpoint ) : "error";
 }
 
 void
@@ -909,8 +903,7 @@ tr_peerIoReconnect( tr_peerIo * io )
     event_disable( io, EV_READ | EV_WRITE );
 
     io_close_socket( io );
-
-    io->socket = openOutgoingPeerSocket( session, &io->addr, io->port,
+    io->socket = openOutgoingPeerSocket( session, &io->endpoint,
                                          io->isSeed, io->proxy );
     io->event_read = event_new( session->event_base, io->socket, EV_READ, event_read_cb, io );
     io->event_write = event_new( session->event_base, io->socket, EV_WRITE, event_write_cb, io );

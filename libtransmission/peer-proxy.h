@@ -43,15 +43,12 @@ struct evbuffer;
 
 typedef struct tr_peerProxy tr_peerProxy;
 
-tr_peerProxy * tr_peerProxyNew( const tr_session * session,
-                                const tr_address * peerAddr,
-                                tr_port            peerPort);
+tr_peerProxy * tr_peerProxyNew( const tr_session  * session,
+                                const tr_endpoint * peerEndpoint );
 
 void tr_peerProxyFree( tr_peerProxy * proxy );
 
-const tr_address * tr_peerProxyGetAddress( const tr_peerProxy * proxy );
-
-tr_port tr_peerProxyGetPort( const tr_peerProxy * proxy );
+const tr_endpoint * tr_peerProxyGetEndpoint( const tr_peerProxy * proxy );
 
 const char * tr_peerProxyGetUsername( const tr_peerProxy * proxy );
 
