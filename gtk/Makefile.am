@@ -31,7 +31,6 @@ AM_LDFLAGS = \
 
 noinst_HEADERS = \
     actions.h \
-    add-dialog.h \
     conf.h \
     details.h \
     dialogs.h \
@@ -49,10 +48,10 @@ noinst_HEADERS = \
     makemeta-ui.h \
     msgwin.h \
     notify.h \
+    open-dialog.h \
     relocate.h \
     stats.h \
     torrent-cell-renderer.h \
-    tracker-list.h \
     tr-core.h \
     tr-core-dbus.h \
     tr-icon.h \
@@ -68,7 +67,6 @@ dbus_generated_sources = tr-core-dbus.h
 
 transmission_gtk_SOURCES = \
     actions.c \
-    add-dialog.c \
     conf.c \
     details.c \
     dialogs.c \
@@ -81,17 +79,18 @@ transmission_gtk_SOURCES = \
     makemeta-ui.c \
     msgwin.c \
     notify.c \
+    open-dialog.c \
     relocate.c \
     stats.c \
     torrent-cell-renderer.c \
-    tracker-list.c \
     tr-core.c \
     tr-icon.c \
     tr-prefs.c \
     tr-torrent.c \
     tr-window.c \
-    util.c \
-    $(dbus_generated_sources)
+    util.c
+
+nodist_transmission_gtk_SOURCES = $(dbus_generated_sources)
 
 dist_man_MANS = transmission-gtk.1
 
@@ -102,6 +101,7 @@ transmission_gtk_LDADD = \
     @LIBCANBERRA_LIBS@ \
     @GCONF2_LIBS@ \
     @DHT_LIBS@ \
+    @LIBUTP_LIBS@ \
     @GTK_LIBS@ \
     @GIO_LIBS@ \
     @LIBAPPINDICATOR_LIBS@ \
@@ -134,9 +134,9 @@ DISTCLEANFILES = \
 
 CLEANFILES = $(dbus_generated_sources)
 
-$(srcdir)/tr-core.c: tr-core-dbus.h
+tr-core-dbus.xml: Makefile
 
-tr-core-dbus.h: $(srcdir)/tr-core-dbus.xml
+tr-core-dbus.h: tr-core-dbus.xml tr-core.c
 	$(DBUS_BINDING_TOOL) --mode=glib-server --prefix=tr_core $< > $(@F)
 
 if WIN32
@@ -145,6 +145,7 @@ transmission.res: transmission.rc
 	$(WINDRES) -J rc -i transmission.rc -O coff -o transmission.res
 
 BUILT_SOURCES = \
+	$(dbus_generated_sources) \
 	setransmission.res
 
 CLEANFILES += \

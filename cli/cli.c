@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2006 Transmission authors and contributors
+ * Copyright (c) Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -131,6 +131,8 @@ static tr_bool waitingOnWeb;
 
 static void
 onTorrentFileDownloaded( tr_session   * session UNUSED,
+                         tr_bool        did_connect UNUSED,
+                         tr_bool        did_timeout UNUSED,
                          long           response_code UNUSED,
                          const void   * response,
                          size_t         response_byte_count,
@@ -172,8 +174,8 @@ getStatusStr( const tr_stat * st,
             "ul to %d (%s) "
             "[%s]",
             tr_truncd( 100 * st->percentDone, 1 ),
-            st->peersSendingToUs, st->peersConnected, upStr,
-            st->peersGettingFromUs, dnStr,
+            st->peersSendingToUs, st->peersConnected, dnStr,
+            st->peersGettingFromUs, upStr,
             ratioStr );
     }
     else if( st->activity & TR_STATUS_SEED )

@@ -1,7 +1,7 @@
 /*
- * This file Copyright (C) 2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
- * This file is licensed by the GPL version 2.  Works owned by the
+ * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
  * so that the bulk of its code can remain under the MIT license.
  * This exemption does not extend to derived works not owned by
@@ -81,7 +81,7 @@ favicon_load_from_cache( const char * host )
     return pixbuf;
 }
 
-static void favicon_web_done_cb( tr_session*, long, const void*, size_t, void* );
+static void favicon_web_done_cb( tr_session*, tr_bool, tr_bool, long, const void*, size_t, void* );
 
 static gboolean
 favicon_web_done_idle_cb( gpointer vfav )
@@ -129,6 +129,8 @@ favicon_web_done_idle_cb( gpointer vfav )
 
 static void
 favicon_web_done_cb( tr_session    * session UNUSED,
+                     tr_bool         did_connect UNUSED,
+                     tr_bool         did_timeout UNUSED,
                      long            code UNUSED,
                      const void    * data,
                      size_t          len,

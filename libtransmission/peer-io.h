@@ -1,7 +1,7 @@
 /*
- * This file Copyright (C) 2007-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
- * This file is licensed by the GPL version 2.  Works owned by the
+ * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
  * so that the bulk of its code can remain under the MIT license.
  * This exemption does not extend to derived works not owned by
@@ -23,7 +23,8 @@
 
 #include <assert.h>
 
-#include <event.h>
+#include <event2/buffer.h>
+#include <event2/event.h>
 
 #include "transmission.h"
 #include "bandwidth.h"
@@ -70,11 +71,7 @@ typedef struct tr_peerIo
     tr_bool               extendedProtocolSupported;
     tr_bool               fastExtensionSupported;
     tr_bool               dhtSupported;
-
-    /* we create the socket in a nonblocking way, so this flag is initially
-     * false and then set to true when libevent says that the socket is ready
-     * for reading or writing */
-    tr_bool               hasFinishedConnecting;
+    tr_bool               utpSupported;
 
     tr_priority_t         priority;
 
@@ -87,6 +84,7 @@ typedef struct tr_peerIo
 
     tr_port               port;
     int                   socket;
+    struct UTPSocket      *utp_socket;
 
     int                   refCount;
 
@@ -109,8 +107,8 @@ typedef struct tr_peerIo
     struct evbuffer     * outbuf;
     struct tr_list      * outbuf_datatypes; /* struct tr_datatype */
 
-    struct event          event_read;
-    struct event          event_write;
+    struct event        * event_read;
+    struct event        * event_write;
 }
 tr_peerIo;
 
@@ -123,13 +121,16 @@ tr_peerIo*  tr_peerIoNewOutgoing( tr_session              * session,
                                   const struct tr_address * addr,
                                   tr_port                   port,
                                   const  uint8_t          * torrentHash,
-                                  tr_bool                   isSeed );
+                                  tr_bool                   isSeed,
+                                  tr_bool                   utp );
+
 
 tr_peerIo*  tr_peerIoNewIncoming( tr_session              * session,
                                   struct tr_bandwidth     * parent,
                                   const struct tr_address * addr,
                                   tr_port                   port,
-                                  int                       socket );
+                                  int                       socket,
+                                  struct UTPSocket *        utp_socket );
 
 void tr_peerIoRefImpl           ( const char              * file,
                                   int                       line,
@@ -173,6 +174,11 @@ static inline void tr_peerIoEnableDHT( tr_peerIo * io, tr_bool flag )
     io->dhtSupported = flag;
 }
 static inline tr_bool tr_peerIoSupportsDHT( const tr_peerIo * io )
+{
+    return io->dhtSupported;
+}
+
+static inline tr_bool tr_peerIoSupportsUTP( const tr_peerIo * io )
 {
     return io->dhtSupported;
 }
@@ -248,7 +254,7 @@ void    tr_peerIoClear           ( tr_peerIo        * io );
 ***
 **/
 
-void    tr_peerIoWrite          ( tr_peerIo         * io,
+void    tr_peerIoWriteBytes     ( tr_peerIo         * io,
                                   const void        * writeme,
                                   size_t              writemeLen,
                                   tr_bool             isPieceData );
@@ -282,28 +288,9 @@ tr_peerIoIsEncrypted( const tr_peerIo * io )
     return ( io != NULL ) && ( io->encryptionMode == PEER_ENCRYPTION_RC4 );
 }
 
-static inline void tr_peerIoWriteBytes( tr_peerIo        * io UNUSED,
-                                           struct evbuffer  * outbuf,
-                                           const void       * bytes,
-                                           size_t             byteCount )
-{
-    evbuffer_add( outbuf, bytes, byteCount );
-}
-
-static inline void  tr_peerIoWriteUint8( tr_peerIo        * io,
-                                            struct evbuffer  * outbuf,
-                                            uint8_t            writeme )
-{
-    tr_peerIoWriteBytes( io, outbuf, &writeme, sizeof( uint8_t ) );
-}
-
-void tr_peerIoWriteUint16( tr_peerIo        * io,
-                           struct evbuffer  * outbuf,
-                           uint16_t           writeme );
-
-void tr_peerIoWriteUint32( tr_peerIo        * io,
-                           struct evbuffer  * outbuf,
-                           uint32_t           writeme );
+void evbuffer_add_uint8 ( struct evbuffer * outbuf, uint8_t byte );
+void evbuffer_add_uint16( struct evbuffer * outbuf, uint16_t hs );
+void evbuffer_add_uint32( struct evbuffer * outbuf, uint32_t hl );
 
 void tr_peerIoReadBytes( tr_peerIo        * io,
                          struct evbuffer  * inbuf,
@@ -353,8 +340,7 @@ tr_peerIoHasBandwidthLeft( const tr_peerIo * io, tr_direction dir )
 {
     assert( tr_isPeerIo( io ) );
 
-    return !io->hasFinishedConnecting
-        || ( tr_bandwidthClamp( &io->bandwidth, dir, 1024 ) > 0 );
+    return tr_bandwidthClamp( &io->bandwidth, dir, 1024 ) > 0;
 }
 
 static inline unsigned int

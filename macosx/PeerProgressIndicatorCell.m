@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  * 
- * Copyright (c) 2007-2010 Transmission authors and contributors
+ * Copyright (c) 2007-2011 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -81,7 +81,8 @@
             NSImage * checkImage = [NSImage imageNamed: @"CompleteCheck.png"];
             
             const NSSize imageSize = [checkImage size];
-            const NSRect rect = NSMakeRect(NSMidX(cellFrame) - imageSize.width * 0.5, NSMidY(cellFrame) - imageSize.height * 0.5,
+            const NSRect rect = NSMakeRect(floor(NSMidX(cellFrame) - imageSize.width * 0.5),
+                                            floor(NSMidY(cellFrame) - imageSize.height * 0.5),
                                             imageSize.width, imageSize.height);
             
             if ([NSApp isOnSnowLeopardOrBetter])
