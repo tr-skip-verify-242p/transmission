@@ -139,7 +139,7 @@ stopSend( struct stop_message * stop, tr_announcer * announcer )
     else
     {
         const char * url = (const char *) evbuffer_pullup( stop->data, -1 );
-        tr_webRunFull( announcer->session, stop->url, NULL,
+        tr_webRunFull( announcer->session, url, NULL,
                        stop->cookies, NULL, NULL, NULL );
     }
 }
