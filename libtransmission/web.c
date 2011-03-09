@@ -79,6 +79,7 @@ struct tr_web_task
     struct evbuffer * freebuf;
     char * url;
     char * range;
+    char * cookies;
     tr_session * session;
     tr_web_done_func * done_func;
     void * done_func_user_data;
@@ -91,6 +92,7 @@ task_free( struct tr_web_task * task )
         evbuffer_free( task->freebuf );
     tr_free( task->range );
     tr_free( task->url );
+    tr_free( task->cookies );
     tr_free( task );
 }
 
@@ -196,6 +198,8 @@ createEasy( tr_session * s, struct tr_web_task * task )
 
     curl_easy_setopt( e, CURLOPT_AUTOREFERER, 1L );
     curl_easy_setopt( e, CURLOPT_COOKIEFILE, cookie_filename );
+    if( task->cookies && *task->cookies )
+        curl_easy_setopt( e, CURLOPT_COOKIE, task->cookies );
     curl_easy_setopt( e, CURLOPT_ENCODING, "gzip;q=1.0, deflate, identity" );
     curl_easy_setopt( e, CURLOPT_FOLLOWLOCATION, 1L );
     curl_easy_setopt( e, CURLOPT_MAXREDIRS, -1L );
@@ -262,9 +266,8 @@ tr_webRun( tr_session         * session,
            tr_web_done_func     done_func,
            void               * done_func_user_data )
 {
-    tr_webRunWithBuffer( session, url, range,
-                         done_func, done_func_user_data,
-                         NULL );
+    tr_webRunFull( session, url, range, NULL, done_func,
+                   done_func_user_data, NULL );
 }
 
 void
@@ -275,6 +278,19 @@ tr_webRunWithBuffer( tr_session         * session,
                      void               * done_func_user_data,
                      struct evbuffer    * buffer )
 {
+    tr_webRunFull( session, url, range, NULL, done_func,
+                   done_func_user_data, buffer );
+}
+
+void
+tr_webRunFull( tr_session        * session,
+               const char        * url,
+               const char        * range,
+               const char        * cookie_string,
+               tr_web_done_func    done_func,
+               void              * done_func_user_data,
+               struct evbuffer   * buffer )
+{
     struct tr_web * web = session->web;
 
     if( web != NULL )
@@ -284,6 +300,7 @@ tr_webRunWithBuffer( tr_session         * session,
         task->session = session;
         task->url = tr_strdup( url );
         task->range = tr_strdup( range );
+        task->cookies = tr_strdup( cookie_string );
         task->done_func = done_func;
         task->done_func_user_data = done_func_user_data;
         task->response = buffer ? buffer : evbuffer_new( );

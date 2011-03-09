@@ -79,6 +79,7 @@ enum
 struct stop_message
 {
     char * url;
+    char * cookies;
     uint64_t up;
     uint64_t down;
 };
@@ -87,6 +88,7 @@ static void
 stopFree( struct stop_message * stop )
 {
     tr_free( stop->url );
+    tr_free( stop->cookies );
     tr_free( stop );
 }
 
@@ -866,6 +868,7 @@ tr_announcerRemoveTorrent( tr_announcer * announcer, tr_torrent * tor )
                 s->up = tier->byteCounts[TR_ANN_UP];
                 s->down = tier->byteCounts[TR_ANN_DOWN];
                 s->url = createAnnounceURL( announcer, tor, tier, "stopped" );
+                s->cookies = tr_strdup( tr_torrentGetCookieString( tor ) );
                 tr_ptrArrayInsertSorted( &announcer->stops, s, compareStops );
             }
         }
@@ -1241,7 +1244,9 @@ tierAnnounce( tr_announcer * announcer, tr_tier * tier )
         tier->isAnnouncing = TRUE;
         tier->lastAnnounceStartTime = now;
         --announcer->slotsAvailable;
-        tr_webRun( announcer->session, url, NULL, onAnnounceDone, data );
+        tr_webRunFull( announcer->session, url, NULL,
+                       tr_torrentGetCookieString( tor ),
+                       onAnnounceDone, data, NULL );
 
         tr_free( url );
     }
@@ -1415,7 +1420,9 @@ tierScrape( tr_announcer * announcer, tr_tier * tier )
     tier->lastScrapeStartTime = tr_time( );
     --announcer->slotsAvailable;
     dbgmsg( tier, "scraping \"%s\"", url );
-    tr_webRun( announcer->session, url, NULL, onScrapeDone, data );
+    tr_webRunFull( announcer->session, url, NULL,
+                   tr_torrentGetCookieString( tier->tor ),
+                   onScrapeDone, data, NULL );
 
     tr_free( url );
 }
@@ -1429,7 +1436,8 @@ flushCloseMessages( tr_announcer * announcer )
     for( i=0; i<n; ++i )
     {
         struct stop_message * stop = tr_ptrArrayNth( &announcer->stops, i );
-        tr_webRun( announcer->session, stop->url, NULL, NULL, NULL );
+        tr_webRunFull( announcer->session, stop->url, NULL,
+                       stop->cookies, NULL, NULL, NULL );
         stopFree( stop );
     }
 

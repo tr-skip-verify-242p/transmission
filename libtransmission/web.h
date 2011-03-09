@@ -67,6 +67,14 @@ void tr_webRunWithBuffer( tr_session         * session,
                           void               * done_func_user_data,
                           struct evbuffer    * buffer );
 
+void tr_webRunFull( tr_session        * session,
+                    const char        * url,
+                    const char        * range,
+                    const char        * cookie_string,
+                    tr_web_done_func    done_func,
+                    void              * done_func_user_data,
+                    struct evbuffer   * buffer );
+
 void tr_http_escape( struct evbuffer *out, const char *str, int len, tr_bool escape_slashes );
 
 char* tr_http_unescape( const char * str, int len );

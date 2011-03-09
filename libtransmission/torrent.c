@@ -1035,6 +1035,22 @@ tr_torrentGetCurrentDir( const tr_torrent * tor )
     return tor->currentDir;
 }
 
+void
+tr_torrentSetCookieString( tr_torrent * tor, const char * cookies )
+{
+    assert( tr_isTorrent( tor ) );
+    tr_torrentLock( tor );
+    tr_free( tor->cookieString );
+    tor->cookieString = tr_strdup( cookies );
+    tr_torrentUnlock( tor );
+}
+
+const char *
+tr_torrentGetCookieString( const tr_torrent * tor )
+{
+    assert( tr_isTorrent( tor ) );
+    return tor->cookieString;
+}
 
 void
 tr_torrentChangeMyPort( tr_torrent * tor )
@@ -1508,6 +1524,7 @@ freeTorrent( tr_torrent * tor )
     tr_cpDestruct( &tor->completion );
 
     tr_announcerRemoveTorrent( session->announcer, tor );
+    tr_free( tor->cookieString );
 
     tr_free( tor->downloadDir );
     tr_free( tor->incompleteDir );

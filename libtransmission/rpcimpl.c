@@ -985,6 +985,7 @@ torrentSet( tr_session               * session,
         tr_benc *    trackers;
         tr_bool      boolVal;
         tr_torrent * tor = torrents[i];
+        const char * str;
 
         if( tr_bencDictFindInt( args_in, "bandwidthPriority", &tmp ) )
             if( tr_isPriority( tmp ) )
@@ -1019,6 +1020,8 @@ torrentSet( tr_session               * session,
             tr_torrentSetRatioLimit( tor, d );
         if( tr_bencDictFindInt( args_in, "seedRatioMode", &tmp ) )
             tr_torrentSetRatioMode( tor, tmp );
+        if( tr_bencDictFindStr( args_in, "cookieString", &str ) )
+            tr_torrentSetCookieString( tor, str );
         if( !errmsg && tr_bencDictFindList( args_in, "trackerAdd", &trackers ) )
             errmsg = addTrackerUrls( tor, trackers );
         if( !errmsg && tr_bencDictFindList( args_in, "trackerRemove", &trackers ) )
