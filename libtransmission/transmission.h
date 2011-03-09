@@ -1304,7 +1304,7 @@ char* tr_torrentGetMagnetLink( const tr_torrent * tor );
  * @param cookies A NULL-terminated string that is expected to be
  *                of the form "name1=content1; name2=content2;"
  *                (as per the libcurl CURLOPT_COOKIE option to
- *                curl_easy_setop). A value of NULL or an empty
+ *                curl_easy_setopt). A value of NULL or an empty
  *                string clears the existing value.
  *
  * @note These cookies will override those read from the
