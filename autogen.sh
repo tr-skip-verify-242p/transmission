@@ -24,8 +24,6 @@ export LIBTOOLIZE
 
 ./update-version-h.sh
 
-autoreconf -fi
-
 if test "$GETTEXTIZE"; then
   echo "Creating aclocal.m4 ..."
   test -r aclocal.m4 || touch aclocal.m4
@@ -36,6 +34,15 @@ if test "$GETTEXTIZE"; then
   echo "Running intltoolize..."
   intltoolize --copy --force --automake
 fi
+
+echo "Running aclocal..."
+aclocal --force -I m4 || exit 1
+echo "Running libtoolize..."
+libtoolize --install --copy --force || exit 1
+echo "Running autoconf..."
+autoconf --force || exit 1
+echo "Running automake..."
+automake --add-missing --copy --force-missing || exit 1
 
 cd "$ORIGDIR" || exit $?
 

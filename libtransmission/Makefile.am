@@ -7,6 +7,7 @@ AM_CPPFLAGS = \
 
 AM_CFLAGS = \
     @DHT_CFLAGS@ \
+    @LIBUTP_CFLAGS@ \
     @LIBEVENT_CFLAGS@ \
     @LIBCURL_CFLAGS@ \
     @OPENSSL_CFLAGS@ \
@@ -20,6 +21,7 @@ libtransmission_a_SOURCES = \
     bandwidth.c \
     bencode.c \
     bitfield.c \
+    bitset.c \
     blocklist.c \
     cache.c \
     clients.c \
@@ -55,6 +57,8 @@ libtransmission_a_SOURCES = \
     torrent-magnet.c \
     tr-dht.c \
     tr-lpd.c \
+    tr-udp.c \
+    tr-utp.c \
     tr-getopt.c \
     trevent.c \
     upnp.c \
@@ -106,6 +110,8 @@ noinst_HEADERS = \
     tr-getopt.h \
     transmission.h \
     tr-dht.h \
+    tr-udp.h \
+    tr-utp.h \
     tr-lpd.h \
     trevent.h \
     upnp.h \
@@ -127,7 +133,14 @@ TESTS = \
     test-peer-id \
     utils-test
 
-noinst_PROGRAMS = $(TESTS)
+EXTRA_PROGRAMS = $(TESTS)
+
+test: $(TESTS)
+	for i in $(TESTS) ; do \
+		./$$i || break ; \
+	done
+
+.PHONY: test
 
 apps_ldflags = \
     @ZLIB_LDFLAGS@
@@ -138,6 +151,7 @@ apps_ldadd = \
     $(top_builddir)/third-party/libnatpmp/libnatpmp.a \
     @INTLLIBS@ \
     @DHT_LIBS@ \
+    @LIBUTP_LIBS@ \
     @LIBCURL_LIBS@ \
     @LIBEVENT_LIBS@ \
     @OPENSSL_LIBS@ \

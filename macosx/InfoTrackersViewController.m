@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2010 Transmission authors and contributors
+ * Copyright (c) 2010-2011 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -60,6 +60,11 @@
 
 - (void) awakeFromNib
 {
+    [[fTrackerAddRemoveControl cell] setToolTip: NSLocalizedString(@"Add a tracker", "Inspector view -> tracker buttons")
+        forSegment: TRACKER_ADD_TAG];
+    [[fTrackerAddRemoveControl cell] setToolTip: NSLocalizedString(@"Remove selected trackers", "Inspector view -> tracker buttons")
+        forSegment: TRACKER_REMOVE_TAG];
+    
     const CGFloat height = [[NSUserDefaults standardUserDefaults] floatForKey: @"InspectorContentHeightTracker"];
     if (height != 0.0)
     {

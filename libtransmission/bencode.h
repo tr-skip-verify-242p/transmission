@@ -1,7 +1,7 @@
 /*
- * This file Copyright (C) 2008-2010 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
- * This file is licensed by the GPL version 2.  Works owned by the
+ * This file is licensed by the GPL version 2. Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
  * so that the bulk of its code can remain under the MIT license.
  * This exemption does not extend to derived works not owned by
@@ -27,7 +27,7 @@ struct evbuffer;
  * An object that acts like a union for
  * integers, strings, lists, dictionaries, booleans, and floating-point numbers.
  * The structure is named tr_benc due to the historical reason that it was
- * originally tightly coupled with bencoded data.  It currently supports
+ * originally tightly coupled with bencoded data. It currently supports
  * being parsed from, and serialized to, both bencoded notation and json notation.
  *
  * @{
@@ -214,6 +214,10 @@ tr_bool   tr_bencGetInt( const tr_benc * val, int64_t * setme );
     @return TRUE if successful, or FALSE if the variant could not be represented as a string  */
 tr_bool   tr_bencGetStr( const tr_benc * val, const char ** setme );
 
+/** @brief Get a raw byte array from a variant object
+    @return TRUE if successful, or FALSE if the variant could not be represented as a raw byte array */
+tr_bool   tr_bencGetRaw( const tr_benc * val, const uint8_t  ** setme_raw, size_t * setme_len );
+
 /** @brief Get a boolean from a variant object
     @return TRUE if successful, or FALSE if the variant could not be represented as a boolean  */
 tr_bool   tr_bencGetBool( const tr_benc * val, tr_bool * setme );
@@ -248,7 +252,7 @@ int tr_bencParseStr( const uint8_t *  buf,
 ***
 **/
 
-/* this is only quasi-supported.  don't rely on it too heavily outside of libT */
+/* this is only quasi-supported. don't rely on it too heavily outside of libT */
 void  tr_bencMergeDicts( tr_benc * target, const tr_benc * source );
 
 /* @} */

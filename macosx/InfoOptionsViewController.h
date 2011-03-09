@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2010 Transmission authors and contributors
+ * Copyright (c) 2010-2011 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -34,7 +34,9 @@
     IBOutlet NSPopUpButton * fPriorityPopUp, * fRatioPopUp, * fIdlePopUp;
     IBOutlet NSButton * fUploadLimitCheck, * fDownloadLimitCheck, * fGlobalLimitCheck;
     IBOutlet NSTextField * fUploadLimitField, * fDownloadLimitField, * fRatioLimitField, * fIdleLimitField,
-                        * fUploadLimitLabel, * fDownloadLimitLabel, * fIdleLimitLabel, * fPeersConnectLabel, * fPeersConnectField;
+                        * fUploadLimitLabel, * fDownloadLimitLabel, * fIdleLimitLabel,
+                        * fRatioLimitGlobalLabel, * fIdleLimitGlobalLabel,
+                        * fPeersConnectLabel, * fPeersConnectField;
     
     NSString * fInitialString;
 }

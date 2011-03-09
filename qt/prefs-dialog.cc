@@ -169,6 +169,42 @@ PrefsDialog :: lineEditNew( int key, int echoMode )
 ***/
 
 QWidget *
+PrefsDialog :: createProxyTab( )
+{
+    QWidget *l, *r;
+    HIG * hig = new HIG( );
+    hig->addSectionTitle( tr( "Tracker Proxy" ) );
+    hig->addWideControl( l = checkBoxNew( tr( "Connect to tracker via a pro&xy" ), Prefs::PROXY_ENABLED ) );
+    myUnsupportedWhenRemote << l;
+    l = hig->addRow( tr( "Proxy &server:" ), r = lineEditNew( Prefs::PROXY ) );
+    myProxyWidgets << l << r;
+    l = hig->addRow( tr( "Proxy &port:" ), r = spinBoxNew( Prefs::PROXY_PORT, 1, 65535, 1 ) );
+    myProxyWidgets << l << r;
+    QComboBox *combo = new QComboBox;
+    const QIcon noIcon;
+    combo->addItem(  noIcon, "HTTP", QVariant( TR_PROXY_HTTP ) );
+    combo->addItem(  noIcon, "SOCKS4", QVariant( TR_PROXY_SOCKS4 ) );
+    combo->addItem(  noIcon, "SOCKS5", QVariant( TR_PROXY_SOCKS5 ) );
+    combo->setCurrentIndex( combo->findData( myPrefs.getInt( Prefs :: PROXY_TYPE ) ) );
+    connect( combo, SIGNAL(activated(int)), this, SLOT(proxyTypeEdited(int)) );
+    l = hig->addRow( tr( "Proxy &type:" ), combo );
+    myProxyWidgets << l << combo;
+    hig->addWideControl( l = checkBoxNew( tr( "Use &authentication" ), Prefs::PROXY_AUTH_ENABLED ) );
+    myProxyWidgets << l;
+    l = hig->addRow( tr( "&Username:" ), r = lineEditNew( Prefs::PROXY_USERNAME ) );
+    myProxyAuthWidgets << l << r;
+    l = hig->addRow( tr( "Pass&word:" ), r = lineEditNew( Prefs::PROXY_PASSWORD, QLineEdit::Password ) );
+    myProxyAuthWidgets << l << r;
+    myUnsupportedWhenRemote << myProxyAuthWidgets;
+    hig->finish( );
+    return hig;
+}
+
+/***
+****
+***/
+
+QWidget *
 PrefsDialog :: createWebTab( Session& session )
 {
     HIG * hig = new HIG( this );
@@ -209,6 +245,12 @@ PrefsDialog :: altSpeedDaysEdited( int i )
     setPref( Prefs::ALT_SPEED_LIMIT_TIME_DAY, value );
 }
 
+void
+PrefsDialog :: proxyTypeEdited( int i )
+{
+    const int value = qobject_cast<QComboBox*>(sender())->itemData(i).toInt();
+    setPref( Prefs::PROXY_TYPE, value );
+}
 
 QWidget *
 PrefsDialog :: createSpeedTab( )
@@ -354,6 +396,13 @@ PrefsDialog :: createNetworkTab( )
     hig->addSectionTitle( tr( "Limits" ) );
     hig->addRow( tr( "Maximum peers per &torrent:" ), spinBoxNew( Prefs::PEER_LIMIT_TORRENT, 1, 300, 5 ) );
     hig->addRow( tr( "Maximum peers &overall:" ), spinBoxNew( Prefs::PEER_LIMIT_GLOBAL, 1, 3000, 5 ) );
+
+    hig->addSectionDivider( );
+    hig->addSectionTitle( tr( "Options" ) );
+
+    QWidget * w;
+    hig->addWideControl( w = checkBoxNew( tr( "Enable &uTP for peer connections" ), Prefs::UTP_ENABLED ) );
+    w->setToolTip( tr( "uTP is a tool for reducing network congestion." ) );
 
     hig->finish( );
     return hig;
@@ -601,6 +650,7 @@ PrefsDialog :: PrefsDialog( Session& session, Prefs& prefs, QWidget * parent ):
     t->addTab( createNetworkTab( ),      tr( "Network" ) );
     t->addTab( createDesktopTab( ),      tr( "Desktop" ) );
     t->addTab( createWebTab( session ),  tr( "Web" ) );
+    t->addTab( createProxyTab( ),        tr( "Proxy" ) );
     myLayout->addWidget( t );
 
     QDialogButtonBox * buttons = new QDialogButtonBox( QDialogButtonBox::Close, Qt::Horizontal, this );
@@ -612,6 +662,7 @@ PrefsDialog :: PrefsDialog( Session& session, Prefs& prefs, QWidget * parent ):
 
     QList<int> keys;
     keys << Prefs :: RPC_ENABLED
+         << Prefs :: PROXY_ENABLED
          << Prefs :: ALT_SPEED_LIMIT_ENABLED
          << Prefs :: ALT_SPEED_LIMIT_TIME_ENABLED
          << Prefs :: ENCRYPTION
@@ -619,7 +670,8 @@ PrefsDialog :: PrefsDialog( Session& session, Prefs& prefs, QWidget * parent ):
          << Prefs :: DIR_WATCH
          << Prefs :: DOWNLOAD_DIR
          << Prefs :: INCOMPLETE_DIR
-         << Prefs :: INCOMPLETE_DIR_ENABLED;
+         << Prefs :: INCOMPLETE_DIR_ENABLED
+         << Prefs :: SCRIPT_TORRENT_DONE_FILENAME;
     foreach( int key, keys )
         refreshPref( key );
 
@@ -658,7 +710,7 @@ void
 PrefsDialog :: updateBlocklistLabel( )
 {
     const int n = mySession.blocklistSize( );
-    myBlocklistLabel->setText( tr( "<i>Blocklist contains %Ln rules)", 0, n ) );
+    myBlocklistLabel->setText( tr( "<i>Blocklist contains %Ln rules</i>", 0, n ) );
 }
 
 void
@@ -678,6 +730,15 @@ PrefsDialog :: refreshPref( int key )
             break;
         }
 
+        case Prefs :: PROXY_ENABLED:
+        case Prefs :: PROXY_AUTH_ENABLED: {
+            const bool enabled( myPrefs.getBool( Prefs::PROXY_ENABLED ) );
+            const bool auth( myPrefs.getBool( Prefs::PROXY_AUTH_ENABLED ) );
+            foreach( QWidget * w, myProxyAuthWidgets ) w->setEnabled( enabled && auth );
+            foreach( QWidget * w, myProxyWidgets ) w->setEnabled( enabled );
+            break;
+        }
+
         case Prefs :: ALT_SPEED_LIMIT_TIME_ENABLED: {
             const bool enabled = myPrefs.getBool( key );
             foreach( QWidget * w, mySchedWidgets ) w->setEnabled( enabled );
@@ -693,6 +754,12 @@ PrefsDialog :: refreshPref( int key )
         case Prefs :: DIR_WATCH:
             myWatchButton->setText( QFileInfo(myPrefs.getString(Prefs::DIR_WATCH)).fileName() );
             break;
+
+        case Prefs :: SCRIPT_TORRENT_DONE_FILENAME: {
+            const QString path( myPrefs.getString( key ) );
+            myTorrentDoneScriptButton->setText( QFileInfo(path).fileName() );
+            break;
+        }
 
         case Prefs :: PEER_PORT:
             myPortLabel->setText( tr( "Status unknown" ) );
