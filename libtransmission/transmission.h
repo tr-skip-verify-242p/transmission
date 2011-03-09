@@ -178,7 +178,6 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_IDLE_LIMIT_ENABLED            "idle-seeding-limit-enabled"
 #define TR_PREFS_KEY_INCOMPLETE_DIR                "incomplete-dir"
 #define TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED        "incomplete-dir-enabled"
-#define TR_PREFS_KEY_LAZY_BITFIELD                 "lazy-bitfield-enabled"
 #define TR_PREFS_KEY_MSGLEVEL                      "message-level"
 #define TR_PREFS_KEY_OPEN_FILE_LIMIT               "open-file-limit"
 #define TR_PREFS_KEY_PEER_LIMIT_GLOBAL             "peer-limit-global"
@@ -1164,11 +1163,11 @@ enum
  * will be clobberred s.t. additional files being added will be saved
  * to the torrent's downloadDir.
  */
-void tr_torrentSetLocation( tr_torrent  * torrent,
-                            const char  * location,
-                            tr_bool       move_from_previous_location,
-                            double      * setme_progress,
-                            int         * setme_state );
+void tr_torrentSetLocation( tr_torrent       * torrent,
+                            const char       * location,
+                            tr_bool            move_from_previous_location,
+                            volatile double  * setme_progress,
+                            volatile int     * setme_state );
 
 uint64_t tr_torrentGetBytesLeftToAllocate( const tr_torrent * torrent );
 
