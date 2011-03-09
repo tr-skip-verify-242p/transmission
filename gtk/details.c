@@ -1805,14 +1805,11 @@ buildTrackerSummary( const char * key, const tr_tracker_stat * st, gboolean show
     /* hostname */
     {
         const char * host = st->host;
-        const char * pch = strstr( host, "://" );
-        if( pch )
-            host = pch + 3;
         g_string_append( gstr, st->isBackup ? "<i>" : "<b>" );
         if( key )
-            str = g_markup_printf_escaped( "%s - %s", host, key );
+            str = g_markup_printf_escaped( "%s %s - %s", st->protocol, host, key );
         else
-            str = g_markup_printf_escaped( "%s", host );
+            str = g_markup_printf_escaped( "%s %s", st->protocol, host );
         g_string_append( gstr, str );
         g_free( str );
         g_string_append( gstr, st->isBackup ? "</i>" : "</b>" );
