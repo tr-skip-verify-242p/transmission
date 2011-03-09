@@ -1581,7 +1581,6 @@ tr_announcerStats( const tr_torrent * torrent,
     int tierCount;
     tr_tracker_stat * ret;
     const time_t now = tr_time( );
-    char * p;
 
     assert( tr_isTorrent( torrent ) );
     assert( tr_torrentIsLocked( torrent ) );
@@ -1606,6 +1605,7 @@ tr_announcerStats( const tr_torrent * torrent,
         {
             const tr_tracker_item * tracker = tr_ptrArrayNth( (tr_ptrArray*)&tier->trackers, j );
             tr_tracker_stat * st = ret + out++;
+            char * p;
 
             st->id = tracker->id;
             tr_strlcpy( st->host, tracker->hostname, sizeof( st->host ) );
