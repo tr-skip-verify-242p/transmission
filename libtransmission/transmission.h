@@ -1534,7 +1534,7 @@ typedef struct
     /* whether or not we've ever scraped to this tracker */
     tr_bool hasScraped;
 
-    /* ex: http://www.legaltorrents.com:7070 */
+    /* ex: www.legaltorrents.com:7070 */
     char host[1024];
 
     /* the full announce URL */
