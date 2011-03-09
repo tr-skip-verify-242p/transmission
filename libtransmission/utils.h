@@ -75,6 +75,14 @@ extern "C" {
  #endif
 #endif
 
+#ifndef TR_GNUC_PACKED
+ #ifdef __GNUC__
+  #define TR_GNUC_PACKED __attribute__ ( ( packed ) )
+ #else
+  #define TR_GNUC_PACKED
+ #endif
+#endif
+
 #if __GNUC__ > 2 || ( __GNUC__ == 2 && __GNUC_MINOR__ >= 96 )
  #define TR_GNUC_PURE __attribute__ ( ( __pure__ ) )
  #define TR_GNUC_MALLOC __attribute__ ( ( __malloc__ ) )
@@ -520,6 +528,11 @@ char* tr_strtruncd( char * buf, double x, int precision, size_t buflen );
 /** @brief Portability wrapper for localtime_r() that uses the system implementation if available */
 struct tm * tr_localtime_r( const time_t *_clock, struct tm *_result );
 
+/** @brief Portability wrapper for htonll(). */
+uint64_t tr_htonll( uint64_t x );
+
+/** @brief Portability wrapper for ntohll(). */
+uint64_t tr_ntohll( uint64_t x );
 
 /**
  * @brief move a file
