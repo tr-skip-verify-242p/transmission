@@ -395,8 +395,7 @@ netOpenPeerSocket( tr_session        * session,
 
     assert( tr_isEndpoint( endpoint ) );
 
-    if( ( isPeerProxy && !tr_isValidPeerProxyAddress( &endpoint->addr, endpoint->port ) )
-        || ( !isPeerProxy && !tr_isValidPeerEndpoint( endpoint ) ) )
+    if( !isPeerProxy && !tr_isValidPeerEndpoint( endpoint ) )
         return -EINVAL;
 
     s = tr_fdSocketCreate( session, domains[endpoint->addr.type], SOCK_STREAM );
@@ -829,10 +828,4 @@ tr_isValidTrackerAddress( const tr_address * addr )
         && !isIPv6LinkLocalAddress( addr )
         && !isIPv4MappedAddress( addr )
         && !isMartianAddr( addr );
-}
-
-tr_bool
-tr_isValidPeerProxyAddress( const tr_address * addr, tr_port port )
-{
-    return port != 0 && tr_isAddress( addr );
 }

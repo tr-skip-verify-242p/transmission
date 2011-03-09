@@ -92,7 +92,6 @@ void tr_addressUnpackSockaddr( tr_address * setme_addr, tr_port * setme_port,
                                const struct sockaddr_storage * ss, socklen_t sslen );
 
 tr_bool tr_isValidTrackerAddress( const tr_address * addr );
-tr_bool tr_isValidPeerProxyAddress( const tr_address * addr, tr_port port );
 
 /** @return NULL on success, otherwise an error string. */
 const char * tr_netGetAddress( const char * node, const char * service, tr_address * addr );
