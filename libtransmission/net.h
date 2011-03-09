@@ -92,6 +92,7 @@ void tr_addressUnpackSockaddr( tr_address * setme_addr, tr_port * setme_port,
                                const struct sockaddr_storage * ss, socklen_t sslen );
 
 tr_bool tr_isValidTrackerAddress( const tr_address * addr );
+tr_bool tr_isValidPeerProxyAddress( const tr_address * addr, tr_port port );
 
 /** @return NULL on success, otherwise an error string. */
 const char * tr_netGetAddress( const char * node, const char * service, tr_address * addr );
@@ -125,6 +126,11 @@ tr_bool tr_isValidPeerEndpoint( const tr_endpoint * endpoint );
 int  tr_netOpenPeerSocket( tr_session        * session,
                            const tr_endpoint * endpoint,
                            tr_bool             clientIsSeed );
+
+int  tr_netOpenPeerProxySocket( tr_session       * session,
+                                const tr_address * proxy_addr,
+                                tr_port            proxy_port,
+                                tr_bool            clientIsSeed );
 
 struct UTPSocket *
 tr_netOpenPeerUTPSocket( tr_session        * session,

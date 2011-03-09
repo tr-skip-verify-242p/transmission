@@ -35,6 +35,7 @@
 #include "net.h"
 #include "peer-common.h" /* MAX_BLOCK_SIZE */
 #include "peer-io.h"
+#include "peer-proxy.h"
 #include "trevent.h" /* tr_runInEventThread() */
 #include "utils.h"
 
@@ -369,6 +370,23 @@ maybeSetCongestionAlgorithm( int socket, const char * algorithm )
     }
 }
 
+static int
+openOutgoingPeerSocket( tr_session        * session,
+                        const tr_address  * addr,
+                        tr_port             port,
+                        tr_bool             clientIsSeed,
+                        tr_peerProxy      * proxy )
+{
+    if( proxy )
+    {
+        tr_peerProxyResetConnectionState( proxy );
+        return tr_netOpenPeerProxySocket( session, tr_peerProxyGetAddress( proxy ),
+                                          tr_peerProxyGetPort( proxy ), clientIsSeed );
+    }
+
+    return tr_netOpenPeerSocket( session, addr, port, clientIsSeed );
+}
+
 #ifdef WITH_UTP
 /* UTP callbacks */
 
@@ -543,7 +561,8 @@ tr_peerIoNew( tr_session       * session,
               tr_bool            isIncoming,
               tr_bool            isSeed,
               int                socket,
-              struct UTPSocket * utp_socket)
+              tr_peerProxy     * proxy,
+              struct UTPSocket * utp_socket )
 {
     tr_peerIo * io;
 
@@ -566,6 +585,7 @@ tr_peerIoNew( tr_session       * session,
     io->magicNumber = MAGIC_NUMBER;
     io->refCount = 1;
     io->crypto = tr_cryptoNew( torrentHash, isIncoming );
+    io->proxy = proxy; /* Pointer ownership is transferred. */
     io->session = session;
     io->endpoint = *endpoint;
     io->isSeed = isSeed;
@@ -614,7 +634,7 @@ tr_peerIoNewIncoming( tr_session        * session,
     assert( tr_isEndpoint( endpoint ) );
 
     return tr_peerIoNew( session, parent, endpoint, NULL, TRUE, FALSE,
-                         fd, utp_socket );
+                         fd, NULL, utp_socket );
 }
 
 tr_peerIo*
@@ -625,6 +645,7 @@ tr_peerIoNewOutgoing( tr_session        * session,
                       tr_bool             isSeed,
                       tr_bool             utp )
 {
+    tr_peerProxy * proxy = NULL;
     int fd = -1;
     struct UTPSocket *utp_socket = NULL;
 
@@ -635,16 +656,26 @@ tr_peerIoNewOutgoing( tr_session        * session,
     if( utp )
         utp_socket = tr_netOpenPeerUTPSocket( session, &endpoint->addr, endpoint->port, isSeed );
 
-    if( !utp_socket ) {
-        fd = tr_netOpenPeerSocket( session, endpoint, isSeed );
-        dbgmsg( NULL, "tr_netOpenPeerSocket returned fd %d", fd );
+    if( !utp_socket )
+    {
+        if( tr_sessionIsPeerProxyEnabled( session ) )
+        {
+            proxy = tr_peerProxyNew( session, addr, port );
+            if( proxy == NULL )
+                return NULL;
+        }
+        fd = openOutgoingPeerSocket( session, endpoint, isSeed, proxy );
+        dbgmsg( NULL, "openOutgoingPeerSocket returned fd %d", fd );
     }
 
     if( fd < 0 && utp_socket == NULL )
+    {
+        tr_peerProxyFree( proxy );
         return NULL;
+    }
 
-    return tr_peerIoNew( session, parent, endpoint,
-                         torrentHash, FALSE, isSeed, fd, utp_socket );
+    return tr_peerIoNew( session, parent, endpoint, torrentHash, FALSE,
+                         isSeed, fd, proxy, utp_socket );
 }
 
 /***
@@ -767,6 +798,7 @@ io_dtor( void * vio )
     evbuffer_free( io->inbuf );
     io_close_socket( io );
     tr_cryptoFree( io->crypto );
+    tr_peerProxyFree( io->proxy );
     tr_list_free( &io->outbuf_datatypes, tr_free );
 
     memset( io, ~0, sizeof( tr_peerIo ) );
@@ -871,8 +903,8 @@ tr_peerIoReconnect( tr_peerIo * io )
     event_disable( io, EV_READ | EV_WRITE );
 
     io_close_socket( io );
-
-    io->socket = tr_netOpenPeerSocket( session, &io->endpoint, io->isSeed );
+    io->socket = openOutgoingPeerSocket( session, &io->endpoint,
+                                         io->isSeed, io->proxy );
     io->event_read = event_new( session->event_base, io->socket, EV_READ, event_read_cb, io );
     io->event_write = event_new( session->event_base, io->socket, EV_WRITE, event_write_cb, io );
 

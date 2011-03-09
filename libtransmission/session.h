@@ -94,6 +94,8 @@ struct tr_session
     tr_bool                      isBlocklistEnabled;
     tr_bool                      isProxyEnabled;
     tr_bool                      isProxyAuthEnabled;
+    tr_bool                      isPeerProxyEnabled;
+    tr_bool                      isPeerProxyAuthEnabled;
     tr_bool                      isPrefetchEnabled;
     tr_bool                      isTorrentDoneScriptEnabled;
     tr_bool                      isClosed;
@@ -152,6 +154,7 @@ struct tr_session
     tr_port                      randomPortHigh;
 
     int                          proxyPort;
+    int                          peerProxyPort;
     int                          peerSocketTOS;
     char *                       peer_congestion_algorithm;
 
@@ -173,6 +176,10 @@ struct tr_session
     char *                       proxy;
     char *                       proxyUsername;
     char *                       proxyPassword;
+    tr_proxy_type                peerProxyType;
+    char *                       peerProxy;
+    char *                       peerProxyUsername;
+    char *                       peerProxyPassword;
 
     struct tr_list *             blocklists;
     struct tr_peerMgr *          peerMgr;

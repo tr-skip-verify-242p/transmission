@@ -342,6 +342,13 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PROXY_PORT,               80 );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PROXY_TYPE,               TR_PROXY_HTTP );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_PROXY_USERNAME,           "" );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_PROXY,               "" );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_PEER_PROXY_AUTH_ENABLED,  FALSE );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_PEER_PROXY_ENABLED,       FALSE );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_PROXY_PASSWORD,      "" );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PROXY_PORT,          80 );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PROXY_TYPE,          TR_PROXY_HTTP );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_PROXY_USERNAME,      "" );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PREFETCH_ENABLED,         DEFAULT_PREFETCH_ENABLED );
     tr_bencDictAddReal( d, TR_PREFS_KEY_RATIO,                    2.0 );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RATIO_ENABLED,            FALSE );
@@ -414,6 +421,13 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PROXY_PORT,               s->proxyPort );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PROXY_TYPE,               s->proxyType );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_PROXY_USERNAME,           s->proxyUsername );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_PROXY,               s->peerProxy );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_PEER_PROXY_AUTH_ENABLED,  s->isPeerProxyAuthEnabled );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_PEER_PROXY_ENABLED,       s->isPeerProxyEnabled );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_PROXY_PASSWORD,      s->peerProxyPassword );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PROXY_PORT,          s->peerProxyPort );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PROXY_TYPE,          s->peerProxyType );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_PROXY_USERNAME,      s->peerProxyUsername );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PREFETCH_ENABLED,         s->isPrefetchEnabled );
     tr_bencDictAddReal( d, TR_PREFS_KEY_RATIO,                    s->desiredRatio );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RATIO_ENABLED,            s->isRatioLimited );
@@ -824,6 +838,20 @@ sessionSetImpl( void * vdata )
         tr_sessionSetProxyUsername( session, str );
     if( tr_bencDictFindStr( settings, TR_PREFS_KEY_PROXY_PASSWORD, &str ) )
         tr_sessionSetProxyPassword( session, str );
+    if( tr_bencDictFindBool( settings, TR_PREFS_KEY_PEER_PROXY_ENABLED, &boolVal ) )
+        tr_sessionSetPeerProxyEnabled( session, boolVal );
+    if( tr_bencDictFindStr( settings, TR_PREFS_KEY_PEER_PROXY, &str ) )
+        tr_sessionSetPeerProxy( session, str );
+    if( tr_bencDictFindInt( settings, TR_PREFS_KEY_PEER_PROXY_PORT, &i ) )
+        tr_sessionSetPeerProxyPort( session, i );
+    if( tr_bencDictFindInt( settings, TR_PREFS_KEY_PEER_PROXY_TYPE, &i ) )
+        tr_sessionSetPeerProxyType( session, i );
+    if( tr_bencDictFindBool( settings, TR_PREFS_KEY_PEER_PROXY_AUTH_ENABLED, &boolVal ) )
+        tr_sessionSetPeerProxyAuthEnabled( session, boolVal );
+    if( tr_bencDictFindStr( settings, TR_PREFS_KEY_PEER_PROXY_USERNAME, &str ) )
+        tr_sessionSetPeerProxyUsername( session, str );
+    if( tr_bencDictFindStr( settings, TR_PREFS_KEY_PEER_PROXY_PASSWORD, &str ) )
+        tr_sessionSetPeerProxyPassword( session, str );
 
     /* rpc server */
     if( session->rpcServer != NULL ) /* close the old one */
@@ -1882,6 +1910,9 @@ tr_sessionClose( tr_session * session )
     tr_free( session->proxy );
     tr_free( session->proxyUsername );
     tr_free( session->proxyPassword );
+    tr_free( session->peerProxy );
+    tr_free( session->peerProxyUsername );
+    tr_free( session->peerProxyPassword );
     tr_free( session->blocklist_url );
     tr_free( session->peer_congestion_algorithm );
     tr_free( session );
@@ -2638,7 +2669,7 @@ tr_sessionGetProxy( const tr_session * session )
     return session->proxy;
 }
 
-tr_port
+int
 tr_sessionGetProxyPort( const tr_session * session )
 {
     assert( tr_isSession( session ) );
@@ -2661,7 +2692,7 @@ tr_sessionSetProxy( tr_session * session,
 
 void
 tr_sessionSetProxyPort( tr_session * session,
-                        tr_port      port )
+                        int          port )
 {
     assert( tr_isSession( session ) );
 
@@ -2725,6 +2756,139 @@ tr_sessionSetProxyPassword( tr_session * session,
     {
         tr_free( session->proxyPassword );
         session->proxyPassword = tr_strdup( password );
+    }
+}
+
+tr_bool
+tr_sessionIsPeerProxyEnabled( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+
+    return session->isPeerProxyEnabled;
+}
+
+void
+tr_sessionSetPeerProxyEnabled( tr_session * session,
+                               tr_bool      isEnabled )
+{
+    assert( tr_isSession( session ) );
+    assert( tr_isBool( isEnabled ) );
+
+    session->isPeerProxyEnabled = isEnabled != 0;
+}
+
+tr_proxy_type
+tr_sessionGetPeerProxyType( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+
+    return session->peerProxyType;
+}
+
+void
+tr_sessionSetPeerProxyType( tr_session *  session,
+                            tr_proxy_type type )
+{
+    assert( tr_isSession( session ) );
+
+    session->peerProxyType = type;
+}
+
+const char*
+tr_sessionGetPeerProxy( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+
+    return session->peerProxy;
+}
+
+int
+tr_sessionGetPeerProxyPort( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+
+    return session->peerProxyPort;
+}
+
+void
+tr_sessionSetPeerProxy( tr_session * session,
+                        const char * proxy )
+{
+    assert( tr_isSession( session ) );
+
+    if( proxy != session->peerProxy )
+    {
+        tr_free( session->peerProxy );
+        session->peerProxy = tr_strdup( proxy );
+    }
+}
+
+void
+tr_sessionSetPeerProxyPort( tr_session * session,
+                            int          port )
+{
+    assert( tr_isSession( session ) );
+
+    session->peerProxyPort = port;
+}
+
+tr_bool
+tr_sessionIsPeerProxyAuthEnabled( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+
+    return session->isPeerProxyAuthEnabled;
+}
+
+void
+tr_sessionSetPeerProxyAuthEnabled( tr_session * session,
+                                   tr_bool      isEnabled )
+{
+    assert( tr_isSession( session ) );
+    assert( tr_isBool( isEnabled ) );
+
+    session->isPeerProxyAuthEnabled = isEnabled != 0;
+}
+
+const char*
+tr_sessionGetPeerProxyUsername( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+
+    return session->peerProxyUsername;
+}
+
+void
+tr_sessionSetPeerProxyUsername( tr_session * session,
+                                const char * username )
+{
+    assert( tr_isSession( session ) );
+
+    if( username != session->peerProxyUsername )
+    {
+        tr_free( session->peerProxyUsername );
+        session->peerProxyUsername = tr_strdup( username );
+    }
+}
+
+const char*
+tr_sessionGetPeerProxyPassword( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+
+    return session->peerProxyPassword;
+}
+
+void
+tr_sessionSetPeerProxyPassword( tr_session * session,
+                                const char * password )
+{
+    assert( tr_isSession( session ) );
+
+    if( password != session->peerProxyPassword )
+    {
+        tr_free( session->peerProxyPassword );
+        session->peerProxyPassword = tr_strdup( password );
     }
 }
 

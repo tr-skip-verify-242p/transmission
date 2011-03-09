@@ -1543,6 +1543,34 @@ on_prefs_changed( TrCore * core UNUSED, const char * key, gpointer data )
     {
         tr_sessionSetProxyPort( tr, gtr_pref_int_get( key ) );
     }
+    else if( !strcmp( key, TR_PREFS_KEY_PEER_PROXY ) )
+    {
+        tr_sessionSetPeerProxy( tr, gtr_pref_string_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_PEER_PROXY_TYPE ) )
+    {
+        tr_sessionSetPeerProxyType( tr, gtr_pref_int_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_PEER_PROXY_ENABLED ) )
+    {
+        tr_sessionSetPeerProxyEnabled( tr, gtr_pref_flag_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_PEER_PROXY_AUTH_ENABLED ) )
+    {
+        tr_sessionSetPeerProxyAuthEnabled( tr, gtr_pref_flag_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_PEER_PROXY_USERNAME ) )
+    {
+        tr_sessionSetPeerProxyUsername( tr, gtr_pref_string_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_PEER_PROXY_PASSWORD ) )
+    {
+        tr_sessionSetPeerProxyPassword( tr, gtr_pref_string_get( key ) );
+    }
+    else if( !strcmp( key, TR_PREFS_KEY_PEER_PROXY_PORT ) )
+    {
+        tr_sessionSetPeerProxyPort( tr, gtr_pref_int_get( key ) );
+    }
     else if( !strcmp( key, TR_PREFS_KEY_ALT_SPEED_UP_KBps ) )
     {
         tr_sessionSetAltSpeed_KBps( tr, TR_UP, gtr_pref_int_get( key ) );

@@ -379,10 +379,11 @@ tr_netSendTo( int socket, const void * buffer, size_t buflen,
     return rv;
 }
 
-int
-tr_netOpenPeerSocket( tr_session        * session,
-                      const tr_endpoint * endpoint,
-                      tr_bool             clientIsSeed )
+static int
+netOpenPeerSocket( tr_session        * session,
+                   const tr_endpoint * endpoint,
+                   tr_bool             clientIsSeed,
+                   tr_bool             isPeerProxy )
 {
     static const int domains[NUM_TR_AF_INET_TYPES] = { AF_INET, AF_INET6 };
     int                     s;
@@ -394,7 +395,8 @@ tr_netOpenPeerSocket( tr_session        * session,
 
     assert( tr_isEndpoint( endpoint ) );
 
-    if( !tr_isValidPeerEndpoint( endpoint ) )
+    if( ( isPeerProxy && !tr_isValidPeerProxyAddress( addr, port ) )
+        || ( !isPeerProxy && !tr_isValidPeerEndpoint( endpoint ) ) )
         return -EINVAL;
 
     s = tr_fdSocketCreate( session, domains[endpoint->addr.type], SOCK_STREAM );
@@ -444,10 +446,28 @@ tr_netOpenPeerSocket( tr_session        * session,
         s = -tmperrno;
     }
 
-    tr_deepLog( __FILE__, __LINE__, NULL, "New OUTGOING connection %d (%s)",
-               s, tr_peerIoEndpointStr( endpoint ) );
+    tr_deepLog( __FILE__, __LINE__, NULL, "New OUTGOING %s connection %d (%s)",
+                isPeerProxy ? "proxy" : "peer", s, tr_peerIoEndpointStr( endpoint ) );
 
     return s;
+}
+
+int
+tr_netOpenPeerProxySocket( tr_session        * session,
+                           const tr_address  * proxy_addr,
+                           tr_port             proxy_port,
+                           tr_bool             clientIsSeed )
+{
+    return netOpenPeerSocket( session, proxy_addr, proxy_port, clientIsSeed, TRUE );
+}
+
+int
+tr_netOpenPeerSocket( tr_session        * session,
+                      const tr_address  * addr,
+                      tr_port             port,
+                      tr_bool             clientIsSeed )
+{
+    return netOpenPeerSocket( session, addr, port, clientIsSeed, FALSE );
 }
 
 struct UTPSocket *
@@ -811,4 +831,10 @@ tr_isValidTrackerAddress( const tr_address * addr )
         && !isIPv6LinkLocalAddress( addr )
         && !isIPv4MappedAddress( addr )
         && !isMartianAddr( addr );
+}
+
+tr_bool
+tr_isValidPeerProxyAddress( const tr_address * addr, tr_port port )
+{
+    return port != 0 && tr_isAddress( addr );
 }

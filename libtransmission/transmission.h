@@ -198,6 +198,13 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_PROXY                         "proxy"
 #define TR_PREFS_KEY_PROXY_TYPE                    "proxy-type"
 #define TR_PREFS_KEY_PROXY_USERNAME                "proxy-auth-username"
+#define TR_PREFS_KEY_PEER_PROXY_ENABLED            "peer-proxy-enabled"
+#define TR_PREFS_KEY_PEER_PROXY                    "peer-proxy"
+#define TR_PREFS_KEY_PEER_PROXY_PORT               "peer-proxy-port"
+#define TR_PREFS_KEY_PEER_PROXY_TYPE               "peer-proxy-type"
+#define TR_PREFS_KEY_PEER_PROXY_AUTH_ENABLED       "peer-proxy-auth-enabled"
+#define TR_PREFS_KEY_PEER_PROXY_USERNAME           "peer-proxy-auth-username"
+#define TR_PREFS_KEY_PEER_PROXY_PASSWORD           "peer-proxy-auth-password"
 #define TR_PREFS_KEY_RATIO                         "ratio-limit"
 #define TR_PREFS_KEY_RATIO_ENABLED                 "ratio-limit-enabled"
 #define TR_PREFS_KEY_RENAME_PARTIAL_FILES          "rename-partial-files"
@@ -561,7 +568,7 @@ tr_bool       tr_sessionIsProxyAuthEnabled( const tr_session * );
 
 const char*   tr_sessionGetProxy( const tr_session * );
 
-tr_port       tr_sessionGetProxyPort( const tr_session * );
+int           tr_sessionGetProxyPort( const tr_session * );
 
 tr_proxy_type tr_sessionGetProxyType( const tr_session * );
 
@@ -579,7 +586,7 @@ void          tr_sessionSetProxy( tr_session * session,
                                   const char * proxy );
 
 void          tr_sessionSetProxyPort( tr_session * session,
-                                      tr_port      port );
+                                      int          port );
 
 void          tr_sessionSetProxyType( tr_session    * session,
                                       tr_proxy_type   proxy_type );
@@ -589,6 +596,41 @@ void          tr_sessionSetProxyUsername( tr_session * session,
 
 void          tr_sessionSetProxyPassword( tr_session * session,
                                           const char * password );
+
+tr_bool       tr_sessionIsPeerProxyEnabled( const tr_session * );
+
+tr_bool       tr_sessionIsPeerProxyAuthEnabled( const tr_session * );
+
+const char*   tr_sessionGetPeerProxy( const tr_session * );
+
+int           tr_sessionGetPeerProxyPort( const tr_session * );
+
+tr_proxy_type tr_sessionGetPeerProxyType( const tr_session * );
+
+const char*   tr_sessionGetPeerProxyUsername( const tr_session * );
+
+const char*   tr_sessionGetPeerProxyPassword( const tr_session * );
+
+void          tr_sessionSetPeerProxyEnabled( tr_session * session,
+                                             tr_bool      isEnabled );
+
+void          tr_sessionSetPeerProxyAuthEnabled( tr_session * session,
+                                                 tr_bool      isEnabled );
+
+void          tr_sessionSetPeerProxy( tr_session * session,
+                                      const char * proxy );
+
+void          tr_sessionSetPeerProxyPort( tr_session * session,
+                                          int          port );
+
+void          tr_sessionSetPeerProxyType( tr_session    * session,
+                                          tr_proxy_type   proxy_type );
+
+void          tr_sessionSetPeerProxyUsername( tr_session * session,
+                                              const char * username );
+
+void          tr_sessionSetPeerProxyPassword( tr_session * session,
+                                              const char * password );
 
 /**
 ***
