@@ -1380,9 +1380,16 @@ printTrackersImpl( tr_benc * trackerStats )
             tr_bencDictFindInt ( t, "tier", &tier ) )
         {
             const time_t now = time( NULL );
+            char proto[20];
+            const char * protocol;
+
+            if( tr_bencDictFindStr( t, "protocol", &protocol ) )
+                tr_snprintf( proto, sizeof( proto ), "%s ", protocol );
+            else
+                proto[0] = '\0';
 
             printf( "\n" );
-            printf( "  Tracker %d: %s\n", (int)(id), host );
+            printf( "  Tracker %d: %s%s\n", (int)(id), proto, host );
             if( isBackup )
                 printf( "  Backup on tier %d\n", (int)tier );
             else

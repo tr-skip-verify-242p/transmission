@@ -1664,10 +1664,16 @@ tr_announcerStats( const tr_torrent * torrent,
         {
             const tr_tracker_item * tracker = tr_ptrArrayNth( (tr_ptrArray*)&tier->trackers, j );
             tr_tracker_stat * st = ret + out++;
+            char * p;
 
             st->id = tracker->id;
             tr_strlcpy( st->host, tracker->hostname, sizeof( st->host ) );
             tr_strlcpy( st->announce, tracker->announce, sizeof( st->announce ) );
+            tr_strlcpy( st->protocol, tracker->announce, sizeof( st->protocol ) );
+            if( ( p = strstr( st->protocol, "://" ) ) )
+                *p = '\0';
+            else
+                st->protocol[0] = '\0';
             st->tier = i;
             st->isBackup = tracker != tier->currentTracker;
             st->lastScrapeStartTime = tier->lastScrapeStartTime;
