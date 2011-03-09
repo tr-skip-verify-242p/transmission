@@ -10,10 +10,11 @@
  * $Id$
  */
 
-#include <libtransmission/transmission.h>
-
 #include <glib/gi18n.h>
 #include <gtk/gtk.h>
+
+#include <libtransmission/transmission.h>
+#include <libtransmission/utils.h>
 
 #include "conf.h" /* gtr_pref_string_get */
 #include "hig.h"
@@ -192,6 +193,123 @@ gtr_relocate_dialog_new( GtkWindow * parent,
     data->torrent_ids = torrent_ids;
     data->chooser_dialog = d;
     g_object_set_data_full( G_OBJECT( d ), DATA_KEY, data, data_free );
+
+    return d;
+}
+
+static void
+onRenameEntryActivate( GtkEntry * e UNUSED, gpointer vdialog )
+{
+    GtkDialog * d = GTK_DIALOG( vdialog );
+    gtk_dialog_response( d, GTK_RESPONSE_APPLY );
+}
+
+static void
+onRenameResponse( GtkDialog * d, gint response_id, gpointer user_data )
+{
+    TrCore * core = user_data;
+    tr_session * session = tr_core_session( core );
+    tr_torrent * tor;
+    GtkWidget * entry, * label;
+    int id;
+    gpointer idp;
+
+    idp = g_object_get_data( G_OBJECT( d ), "torrent-id" );
+    g_assert( idp != NULL );
+    id = GPOINTER_TO_INT( idp );
+
+    entry = g_object_get_data( G_OBJECT( d ), "rename-entry" );
+    g_assert( entry != NULL );
+
+    label = g_object_get_data( G_OBJECT( d ), "status-label" );
+    g_assert( label != NULL );
+
+    if( response_id == GTK_RESPONSE_APPLY && session
+        && ( tor = tr_torrentFindFromId( session, id ) ) )
+    {
+        const char * newname = gtk_entry_get_text( GTK_ENTRY( entry ) );
+        int err = tr_torrentRename( tor, newname );
+        if( err )
+        {
+            char * msg = g_strdup_printf(
+                _( "Rename failed: %s" ), tr_strerror( err ) );
+            char * markup = g_strdup_printf(
+                "<span color=\"red\">%s</span>", msg );
+            gtk_label_set_markup( GTK_LABEL( label ), markup );
+            g_free( msg );
+            g_free( markup );
+            return;
+        }
+    }
+    gtk_widget_destroy( GTK_WIDGET( d ) );
+}
+
+GtkWidget *
+gtr_rename_dialog_new( GtkWindow  * parent,
+                       TrCore     * core,
+                       tr_torrent * tor )
+{
+    const tr_info * info = tr_torrentInfo( tor );
+    GtkWidget * d, * e, * t, * l;
+    const char * s;
+    int row = 0;
+
+    if( !tr_torrentHasMetadata( tor ) )
+    {
+        d = gtk_message_dialog_new( parent,
+            GTK_DIALOG_DESTROY_WITH_PARENT | GTK_DIALOG_MODAL,
+            GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE,
+            "%s", _( "Cannot Rename Torrent" ) );
+        gtk_message_dialog_format_secondary_text(
+            GTK_MESSAGE_DIALOG( d ), "%s",
+            _( "The torrent does not have anything to rename yet "
+               "because its metadata has not been fully received." ) );
+        g_signal_connect_swapped( d, "response",
+            G_CALLBACK( gtk_widget_destroy ), d );
+        return d;
+    }
+
+    d = gtk_dialog_new_with_buttons(
+        _( "Rename Torrent" ), parent,
+        GTK_DIALOG_DESTROY_WITH_PARENT | GTK_DIALOG_MODAL,
+        GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
+        GTK_STOCK_APPLY, GTK_RESPONSE_APPLY,
+        NULL );
+    gtk_dialog_set_default_response(
+        GTK_DIALOG( d ), GTK_RESPONSE_CANCEL );
+    gtk_dialog_set_alternative_button_order(
+        GTK_DIALOG( d ), GTK_RESPONSE_APPLY, GTK_RESPONSE_CANCEL, -1 );
+    g_object_set_data( G_OBJECT( d ), "torrent-id",
+        GINT_TO_POINTER( tr_torrentId( tor ) ) );
+    g_signal_connect( d, "response",
+        G_CALLBACK( onRenameResponse ), core );
+
+    t = hig_workarea_create( );
+    if( info->fileCount == 1 )
+        s = _( "Rename File" );
+    else
+        s = _( "Rename Directory" );
+    hig_workarea_add_section_title( t, &row, s );
+
+    l = g_object_new( GTK_TYPE_LABEL,
+        "selectable", TRUE, "ellipsize", PANGO_ELLIPSIZE_END, NULL );
+    gtk_label_set_text( GTK_LABEL( l ), info->name );
+    hig_workarea_add_row( t, &row, _( "Original name:" ), l, NULL );
+
+    l = gtk_label_new( _( "Enter the new name:" ) );
+    g_object_set_data( G_OBJECT( d ), "status-label", l );
+    hig_workarea_add_wide_control( t, &row, l );
+
+    e = gtk_entry_new( );
+    gtk_entry_set_width_chars( GTK_ENTRY( e ), 64 );
+    gtk_entry_set_text( GTK_ENTRY( e ), tr_torrentName( tor ) );
+    g_object_set_data( G_OBJECT( d ), "rename-entry", e );
+    g_signal_connect( e, "activate",
+        G_CALLBACK( onRenameEntryActivate ), d );
+    hig_workarea_add_wide_control( t, &row, e );
+
+    hig_workarea_finish( t, &row );
+    gtr_dialog_set_content( GTK_DIALOG( d ), t );
 
     return d;
 }

@@ -1089,6 +1089,13 @@ tr_torrent * tr_torrentNew( const tr_ctor   * ctor,
 /** @addtogroup tr_torrent Torrents
     @{ */
 
+/**
+ * The current name that should be shown for the torrent.
+ *
+ * @note This function is mainly intended for clients.
+ */
+const char * tr_torrentName( const tr_torrent * tor );
+
 /** @brief Frees memory allocated by tr_torrentNew().
            Running torrents are stopped first. */
 void tr_torrentFree( tr_torrent * torrent );
@@ -1126,6 +1133,38 @@ void tr_torrentSetLocation( tr_torrent       * torrent,
                             tr_bool            move_from_previous_location,
                             volatile double  * setme_progress,
                             volatile int     * setme_state );
+
+/**
+ * Rename the toplevel directory in a torrent. If the current toplevel
+ * directory already exists, it will be moved along with any files to
+ * the new location.
+ *
+ * For single file torrents, the file itself will be renamed to
+ * @a newname.
+ *
+ * If the torrent has incomplete metadata, @a ENOENT is returned.
+ *
+ * If no errors occur, the new name will be accessible via
+ * tr_torrentName() while the original will be in @a torrent->info.name.
+ *
+ * @param newname The new name to use. It may not contain path
+ *                delimiters or be equal to "." or "..". NULL and
+ *                zero-length strings are also rejected.
+ *
+ * @return 0 on success, otherwise an errno value.
+ *
+ * @note This function assumes that if the torrent has a toplevel
+ *       directory, all of its files will be in it, i.e.
+ *       @a torrent->info.files[n].name have the same directory
+ *       prefix for all @a n.
+ *
+ * @note This function may modify @a torrent->info.files and
+ *       @a torrent->info.rename.
+ *
+ * @see tr_torrentName()
+ * @see tr_torrentHasMetadata()
+ */
+int tr_torrentRename( tr_torrent * torrent, const char * newname );
 
 uint64_t tr_torrentGetBytesLeftToAllocate( const tr_torrent * torrent );
 
@@ -1728,6 +1767,9 @@ struct tr_info
 
     /* the torrent's name */
     char             * name;
+
+    /** If non-NULL this is the value set by tr_torrentRename(). */
+    char             * rename;
 
     /* Path to torrent Transmission's internal copy of the .torrent file. */
     char             * torrent;

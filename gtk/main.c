@@ -1855,6 +1855,16 @@ gtr_actions_handler( const char * action_name, gpointer user_data )
             gtk_widget_show( w );
         }
     }
+    else if( !strcmp( action_name, "rename-torrent" ) )
+    {
+        tr_torrent * tor;
+        if( ( tor = getFirstSelectedTorrent( data ) ) )
+        {
+            GtkWidget * w;
+            w = gtr_rename_dialog_new( data->wind, data->core, tor );
+            gtr_window_present( GTK_WINDOW( w ) );
+        }
+    }
     else if( !strcmp( action_name, "start-torrent" ) )
     {
         changed |= rpcOnSelectedTorrents( data, "torrent-start" );

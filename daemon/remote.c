@@ -258,6 +258,7 @@ static tr_option opts[] =
     { 'l', "list",                   "List all torrents", "l",  0, NULL },
     { 960, "move",                   "Move current torrent's data to a new folder", NULL, 1, "<path>" },
     { 961, "find",                   "Tell Transmission where to find a torrent's data", NULL, 1, "<path>" },
+    { 966, "rename",                 "Rename torrent", "rn", 1, "<new name>" },
     { 'm', "portmap",                "Enable portmapping via NAT-PMP or UPnP", "m",  0, NULL },
     { 'M', "no-portmap",             "Disable portmapping", "M",  0, NULL },
     { 'n', "auth",                   "Set username and password", "n",  1, "<user:pw>" },
@@ -410,6 +411,7 @@ getOptMode( int val )
         case 951: /* seedratio-default */
         case 952: /* no-seedratio */
         case 957: /* cookie-string */
+        case 966: /* rename */
         case 984: /* honor-session */
         case 985: /* no-honor-session */
             return MODE_TORRENT_SET;
@@ -2093,6 +2095,8 @@ processArgs( const char * rpcurl, int argc, const char ** argv )
                 case 952: tr_bencDictAddInt( args, "seedRatioMode", TR_RATIOLIMIT_UNLIMITED );
                           break;
                 case 957: tr_bencDictAddStr( args, "cookieString", optarg );
+                          break;
+                case 966: tr_bencDictAddStr( args, "rename", optarg );
                           break;
                 case 984: tr_bencDictAddBool( args, "honorsSessionLimits", TRUE );
                           break;
