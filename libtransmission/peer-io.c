@@ -372,19 +372,19 @@ maybeSetCongestionAlgorithm( int socket, const char * algorithm )
 
 static int
 openOutgoingPeerSocket( tr_session        * session,
-                        const tr_address  * addr,
-                        tr_port             port,
+                        const tr_endpoint * endpoint,
                         tr_bool             clientIsSeed,
                         tr_peerProxy      * proxy )
 {
     if( proxy )
     {
+        const tr_endpoint * pep;
         tr_peerProxyResetConnectionState( proxy );
-        return tr_netOpenPeerProxySocket( session, tr_peerProxyGetAddress( proxy ),
-                                          tr_peerProxyGetPort( proxy ), clientIsSeed );
+        pep = tr_peerProxyGetEndpoint( proxy );
+        return tr_netOpenPeerProxySocket( session, pep, clientIsSeed );
     }
 
-    return tr_netOpenPeerSocket( session, addr, port, clientIsSeed );
+    return tr_netOpenPeerSocket( session, endpoint, clientIsSeed );
 }
 
 #ifdef WITH_UTP
@@ -660,7 +660,7 @@ tr_peerIoNewOutgoing( tr_session        * session,
     {
         if( tr_sessionIsPeerProxyEnabled( session ) )
         {
-            proxy = tr_peerProxyNew( session, addr, port );
+            proxy = tr_peerProxyNew( session, endpoint );
             if( proxy == NULL )
                 return NULL;
         }

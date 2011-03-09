@@ -128,8 +128,7 @@ int  tr_netOpenPeerSocket( tr_session        * session,
                            tr_bool             clientIsSeed );
 
 int  tr_netOpenPeerProxySocket( tr_session       * session,
-                                const tr_address * proxy_addr,
-                                tr_port            proxy_port,
+                                const tr_endpoint* endpoint,
                                 tr_bool            clientIsSeed );
 
 struct UTPSocket *

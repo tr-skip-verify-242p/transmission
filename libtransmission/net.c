@@ -395,7 +395,7 @@ netOpenPeerSocket( tr_session        * session,
 
     assert( tr_isEndpoint( endpoint ) );
 
-    if( ( isPeerProxy && !tr_isValidPeerProxyAddress( addr, port ) )
+    if( ( isPeerProxy && !tr_isValidPeerProxyAddress( &endpoint->addr, endpoint->port ) )
         || ( !isPeerProxy && !tr_isValidPeerEndpoint( endpoint ) ) )
         return -EINVAL;
 
@@ -454,20 +454,18 @@ netOpenPeerSocket( tr_session        * session,
 
 int
 tr_netOpenPeerProxySocket( tr_session        * session,
-                           const tr_address  * proxy_addr,
-                           tr_port             proxy_port,
+                           const tr_endpoint * endpoint,
                            tr_bool             clientIsSeed )
 {
-    return netOpenPeerSocket( session, proxy_addr, proxy_port, clientIsSeed, TRUE );
+    return netOpenPeerSocket( session, endpoint, clientIsSeed, TRUE );
 }
 
 int
 tr_netOpenPeerSocket( tr_session        * session,
-                      const tr_address  * addr,
-                      tr_port             port,
+                      const tr_endpoint * endpoint,
                       tr_bool             clientIsSeed )
 {
-    return netOpenPeerSocket( session, addr, port, clientIsSeed, FALSE );
+    return netOpenPeerSocket( session, endpoint, clientIsSeed, FALSE );
 }
 
 struct UTPSocket *
