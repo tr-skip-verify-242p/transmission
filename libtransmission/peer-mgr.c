@@ -3850,7 +3850,7 @@ isPeerCandidate( const tr_torrent * tor, struct peer_atom * atom, const time_t n
     /* not if they're blocklisted */
     if( isAtomBlocklisted( tor->session, atom ) )
     {
-        tr_torinf( tor, "Rejecting blocklisted peer \"%s\"", tr_atomAddrStr( atom ) );
+        tr_torinf( tor, "Rejecting blocklisted peer \"%s\"", tr_atomEndpointStr( atom ) );
         return FALSE;
     }
 
