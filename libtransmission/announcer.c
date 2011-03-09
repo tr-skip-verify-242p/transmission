@@ -1581,6 +1581,7 @@ tr_announcerStats( const tr_torrent * torrent,
     int tierCount;
     tr_tracker_stat * ret;
     const time_t now = tr_time( );
+    char * p;
 
     assert( tr_isTorrent( torrent ) );
     assert( tr_torrentIsLocked( torrent ) );
@@ -1609,6 +1610,11 @@ tr_announcerStats( const tr_torrent * torrent,
             st->id = tracker->id;
             tr_strlcpy( st->host, tracker->hostname, sizeof( st->host ) );
             tr_strlcpy( st->announce, tracker->announce, sizeof( st->announce ) );
+            tr_strlcpy( st->protocol, tracker->announce, sizeof( st->protocol ) );
+            if( ( p = strstr( st->protocol, "://" ) ) )
+                *p = '\0';
+            else
+                st->protocol[0] = '\0';
             st->tier = i;
             st->isBackup = tracker != tier->currentTracker;
             st->lastScrapeStartTime = tier->lastScrapeStartTime;

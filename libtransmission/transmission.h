@@ -1534,6 +1534,9 @@ typedef struct
     /* whether or not we've ever scraped to this tracker */
     tr_bool hasScraped;
 
+    /* the tracker protocol as a string (e.g. "http") */
+    char protocol[16];
+
     /* ex: www.legaltorrents.com:7070 */
     char host[1024];
 
