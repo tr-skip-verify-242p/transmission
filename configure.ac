@@ -189,7 +189,7 @@ AC_CHECK_LIB([rt],
              [libutp_extra_libs="-lrt"],
              [libutp_extra_libs=""])
 
-AC_MSG_CHECKING([µTP])
+AC_MSG_CHECKING([uTP])
 build_utp="no"
 if test "x$CXX" = "x" ; then
     have_utp="no"
@@ -197,7 +197,7 @@ else
     have_utp="yes"
 fi
 AC_ARG_ENABLE([utp],
-              AS_HELP_STRING([--enable-utp],[build µTP support]),
+              AS_HELP_STRING([--enable-utp],[build uTP support]),
               [want_utp=${enableval}],
               [want_utp=${have_utp}])
 if test "x$want_utp" = "xyes" ; then
@@ -506,7 +506,7 @@ Configuration:
    Build libtransmission:                             yes
 
       * optimized for low-resource systems:           ${enable_lightweight}
-      * µTP enabled:                                  ${build_utp}
+      * uTP enabled:                                  ${build_utp}
 
    Build Command-Line client:                         ${build_cli}
 
