@@ -1883,10 +1883,10 @@ tr_sessionClose( tr_session * session )
     tr_free( session->torrentDir );
     tr_free( session->downloadDir );
     tr_free( session->incompleteDir );
+    tr_proxy_acl_free( session->proxyACL );
     tr_free( session->proxy );
     tr_free( session->proxyUsername );
     tr_free( session->proxyPassword );
-    tr_proxy_acl_free( session->proxyACL );
     tr_free( session->blocklist_url );
     tr_free( session->peer_congestion_algorithm );
     tr_free( session );

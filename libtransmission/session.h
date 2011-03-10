@@ -170,11 +170,11 @@ struct tr_session
 
     char *                       blocklist_url;
 
+    struct tr_proxy_acl *        proxyACL;
     tr_proxy_type                proxyType;
     char *                       proxy;
     char *                       proxyUsername;
     char *                       proxyPassword;
-    struct tr_proxy_acl *        proxyACL;
 
     struct tr_list *             blocklists;
     struct tr_peerMgr *          peerMgr;
