@@ -166,6 +166,15 @@ tr_atomEndpointStr( const struct peer_atom * atom )
     return atom ? tr_peerIoEndpointStr( &atom->endpoint ) : "[no atom]";
 }
 
+static tr_port
+atomGetListenPort( const struct peer_atom * atom )
+{
+    assert( tr_isAtom( atom ) );
+    if( atom->peer && atom->peer->listen_port )
+        return atom->peer->listen_port;
+    return atom->endpoint.port;
+}
+
 /**
 ***
 **/
@@ -1834,7 +1843,7 @@ peerCallbackFunc( tr_peer * peer, const tr_peer_event * e, void * vt )
             break;
 
         case TR_PEER_CLIENT_GOT_PORT:
-            peer->atom->endpoint.port = e->port;
+            peer->listen_port = e->port;
             break;
 
         case TR_PEER_CLIENT_GOT_SUGGEST:
@@ -2503,7 +2512,7 @@ tr_peerMgrGetPeers( tr_torrent   * tor,
         {
             assert( tr_isEndpoint( &atom->endpoint ) );
             walk->addr = atom->endpoint.addr;
-            walk->port = atom->endpoint.port;
+            walk->port = atomGetListenPort( atom );
             walk->flags = atom->flags;
             ++count;
             ++walk;
@@ -2843,7 +2852,7 @@ tr_peerMgrPeerStats( const tr_torrent * tor, int * setmeCount )
         stat->peer_id             = tr_strdup( peer->peer_id_string );
         stat->user_agent          = tr_strdup( peer->user_agent );
         stat->extensions          = tr_strdup( peerExtensionsAsString( peer->extensions ) );
-        stat->port                = ntohs( peer->atom->endpoint.port );
+        stat->port                = ntohs( atomGetListenPort( peer->atom ) );
         stat->from                = atom->fromFirst;
         stat->progress            = peer->progress;
         stat->isUTP               = peer->io->utp_socket != NULL;

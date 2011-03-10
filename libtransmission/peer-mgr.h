@@ -111,6 +111,7 @@ typedef struct tr_peer
 
     struct tr_peerIo       * io;
     struct peer_atom       * atom;
+    tr_port                  listen_port; /* for TR_PEER_CLIENT_GOT_PORT */
 
     struct tr_bitfield     * blame;
     struct tr_bitset         have;
