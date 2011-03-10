@@ -172,16 +172,6 @@ AC_TRY_LINK([#include <stdarg.h>], [va_list ap1, ap2; va_copy(ap1, ap2);],
 ])
 
 
-dnl libevent likes to link against librt if possible
-dnl for clock_gettime() and clock_settime()
-dnl TODO(libevent2): this can probably be removed after
-dnl we switch to libevent2, since it will have PKG_CONFIG
-AC_CHECK_LIB([rt],
-             [clock_gettime],
-             [libevent_extra_libs="-lrt"],
-             [libevent_extra_libs=""])
-
-
 dnl ----------------------------------------------------------------------------
 dnl
 dnl  SO_BINDTODEVICE support
@@ -274,7 +264,12 @@ dnl ----------------------------------------------------------------------------
 dnl
 dnl  utp
 
-AC_MSG_CHECKING([µTP])
+AC_CHECK_LIB([rt],
+             [clock_gettime],
+             [libutp_extra_libs="-lrt"],
+             [libutp_extra_libs=""])
+
+AC_MSG_CHECKING([uTP])
 build_utp="no"
 if test "x$CXX" = "x" ; then
     have_utp="no"
@@ -282,13 +277,16 @@ else
     have_utp="yes"
 fi
 AC_ARG_ENABLE([utp],
-              AS_HELP_STRING([--enable-utp],[build µTP support]),
+              AS_HELP_STRING([--enable-utp],[build uTP support]),
               [want_utp=${enableval}],
               [want_utp=${have_utp}])
 if test "x$want_utp" = "xyes" ; then
     if test "x$have_utp" = "xyes"; then 
         LIBUTP_CFLAGS="-I\$(top_srcdir)/third-party/"
-        LIBUTP_LIBS="\$(top_builddir)/third-party/libutp/libutp.a -lrt"
+        LIBUTP_LIBS="\$(top_builddir)/third-party/libutp/libutp.a"
+        if test "x$libutp_extra_libs" != "x" ; then
+            LIBUTP_LIBS="$LIBUTP_LIBS $libutp_extra_libs"
+        fi
         AC_DEFINE([WITH_UTP],[1])
         build_utp="yes"
     else 
@@ -588,7 +586,7 @@ Configuration:
    Build libtransmission:                             yes
 
       * optimized for low-resource systems:           ${enable_lightweight}
-      * µTP enabled:                                  ${build_utp}
+      * uTP enabled:                                  ${build_utp}
 
    Build Command-Line client:                         ${build_cli}
 

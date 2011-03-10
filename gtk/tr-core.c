@@ -979,6 +979,7 @@ add_ctor( TrCore * core, tr_ctor * ctor, gboolean doPrompt, gboolean doNotify )
             if( !tr_ctorGetSourceFile(ctor) || !core->priv->adding_from_watch_dir )
                 tr_core_errsig( core, err, inf.name );
             tr_metainfoFree( &inf );
+            tr_ctorFree( ctor );
             break;
 
         default:
@@ -989,6 +990,7 @@ add_ctor( TrCore * core, tr_ctor * ctor, gboolean doPrompt, gboolean doNotify )
                 TrTorrent * gtor = tr_torrent_new_ctor( session, ctor, &err );
                 if( !err )
                     tr_core_add_torrent( core, gtor, doNotify );
+                tr_ctorFree( ctor );
             }
             tr_metainfoFree( &inf );
             break;
