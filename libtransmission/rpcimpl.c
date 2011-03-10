@@ -1403,7 +1403,9 @@ torrentAdd( tr_session               * session,
             struct add_torrent_idle_data * d = tr_new0( struct add_torrent_idle_data, 1 );
             d->data = idle_data;
             d->ctor = ctor;
-            tr_webRun( session, filename, NULL, gotMetadataFromURL, d );
+            tr_webRunFull( session, filename, NULL,
+                           tr_ctorGetCookieString( ctor ),
+                           gotMetadataFromURL, d, NULL );
         }
         else
         {
