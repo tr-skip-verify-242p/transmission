@@ -18,14 +18,21 @@
 #include "utils.h"
 
 #define FLOOR 32
+#define PTR_ARRAY_MAGIC 0xff1a2b3c
 
-const tr_ptrArray TR_PTR_ARRAY_INIT = { NULL, 0, 0 };
+const tr_ptrArray TR_PTR_ARRAY_INIT = { PTR_ARRAY_MAGIC, NULL, 0, 0 };
+
+tr_bool
+tr_isPtrArray( const tr_ptrArray * a )
+{
+    return ( a != NULL && a->magic == PTR_ARRAY_MAGIC
+             && ( a->items != NULL || ( a->n_items == 0 && a->n_alloc == 0 ) ) );
+}
 
 void
 tr_ptrArrayDestruct( tr_ptrArray * p, PtrArrayForeachFunc func )
 {
-    assert( p );
-    assert( p->items || !p->n_items );
+    assert( tr_isPtrArray( p ) );
 
     if( func )
         tr_ptrArrayForeach( p, func );
@@ -41,8 +48,7 @@ tr_ptrArrayForeach( tr_ptrArray *       t,
 {
     int i;
 
-    assert( t );
-    assert( t->items || !t->n_items );
+    assert( tr_isPtrArray( t ) );
     assert( func );
 
     for( i = 0; i < t->n_items; ++i )
@@ -53,6 +59,7 @@ void**
 tr_ptrArrayPeek( tr_ptrArray * t,
                  int *         size )
 {
+    assert( tr_isPtrArray( t ) );
     *size = t->n_items;
     return t->items;
 }
@@ -61,7 +68,7 @@ void*
 tr_ptrArrayNth( tr_ptrArray* t,
                 int          i )
 {
-    assert( t );
+    assert( tr_isPtrArray( t ) );
     assert( i >= 0 );
     assert( i < t->n_items );
 
@@ -73,6 +80,7 @@ tr_ptrArrayInsert( tr_ptrArray * t,
                    void        * ptr,
                    int           pos )
 {
+    assert( tr_isPtrArray( t ) );
     if( t->n_items >= t->n_alloc )
     {
         t->n_alloc = MAX( FLOOR, t->n_alloc * 2 );
@@ -96,6 +104,8 @@ tr_ptrArrayPop( tr_ptrArray* t )
 {
     void * ret = NULL;
 
+    assert( tr_isPtrArray( t ) );
+
     if( t->n_items )
         ret = t->items[--t->n_items];
 
@@ -107,6 +117,7 @@ tr_ptrArrayErase( tr_ptrArray * t,
                   int           begin,
                   int           end )
 {
+    assert( tr_isPtrArray( t ) );
     assert( begin >= 0 );
     if( end < 0 ) end = t->n_items;
     assert( begin < end );
@@ -130,8 +141,10 @@ tr_ptrArrayLowerBound( const tr_ptrArray *                t,
                                                     const void * ),
                        tr_bool *                    exact_match )
 {
-    int len = t->n_items;
-    int first = 0;
+    int len, first = 0;
+
+    assert( tr_isPtrArray( t ) );
+    len = t->n_items;
 
     while( len > 0 )
     {
@@ -170,6 +183,7 @@ assertSortedAndUnique( const tr_ptrArray * t,
                     int compare(const void*, const void*) )
 {
     int i;
+    assert( tr_isPtrArray( t ) );
 
     for( i = 0; i < t->n_items - 2; ++i )
         assert( compare( t->items[i], t->items[i + 1] ) <= 0 );
@@ -181,8 +195,10 @@ tr_ptrArrayInsertSorted( tr_ptrArray * t,
                          void *        ptr,
                          int           compare(const void*, const void*) )
 {
-    const int pos = tr_ptrArrayLowerBound( t, ptr, compare, NULL );
-    const int ret = tr_ptrArrayInsert( t, ptr, pos );
+    int pos, ret;
+    assert( tr_isPtrArray( t ) );
+    pos = tr_ptrArrayLowerBound( t, ptr, compare, NULL );
+    ret = tr_ptrArrayInsert( t, ptr, pos );
 
     //assertSortedAndUnique( t, compare );
     return ret;
@@ -194,7 +210,10 @@ tr_ptrArrayFindSorted( tr_ptrArray * t,
                        int           compare(const void*, const void*) )
 {
     tr_bool   match;
-    const int pos = tr_ptrArrayLowerBound( t, ptr, compare, &match );
+    int pos;
+
+    assert( tr_isPtrArray( t ) );
+    pos = tr_ptrArrayLowerBound( t, ptr, compare, &match );
 
     return match ? t->items[pos] : NULL;
 }
@@ -206,7 +225,10 @@ tr_ptrArrayRemoveSorted( tr_ptrArray * t,
 {
     void *    ret = NULL;
     tr_bool   match;
-    const int pos = tr_ptrArrayLowerBound( t, ptr, compare, &match );
+    int pos;
+
+    assert( tr_isPtrArray( t ) );
+    pos = tr_ptrArrayLowerBound( t, ptr, compare, &match );
 
     if( match )
     {

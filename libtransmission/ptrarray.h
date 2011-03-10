@@ -17,6 +17,8 @@
 #ifndef _TR_PTR_ARRAY_H_
 #define _TR_PTR_ARRAY_H_
 
+#include <assert.h>
+
 #include "transmission.h"
 
 /**
@@ -29,6 +31,7 @@
  */
 typedef struct tr_ptrArray
 {
+    uint32_t magic;
     void ** items;
     int     n_items;
     int     n_alloc;
@@ -38,6 +41,8 @@ tr_ptrArray;
 typedef void ( *PtrArrayForeachFunc )( void * );
 
 extern const tr_ptrArray TR_PTR_ARRAY_INIT;
+
+tr_bool tr_isPtrArray( const tr_ptrArray * a );
 
 /** @brief Destructor to free a tr_ptrArray's internal memory */
 void tr_ptrArrayDestruct( tr_ptrArray*, PtrArrayForeachFunc func );
@@ -61,6 +66,7 @@ void* tr_ptrArrayPop( tr_ptrArray * array );
     @see tr_ptrArrayPop() */
 static inline void* tr_ptrArrayBack( tr_ptrArray * array )
 {
+    assert( tr_isPtrArray( array ) );
     return array->n_items > 0 ? tr_ptrArrayNth( array, array->n_items - 1 )
                               : NULL;
 }
@@ -81,11 +87,13 @@ int tr_ptrArrayInsert( tr_ptrArray * array, void * insertMe, int pos );
 /** @brief Append a pointer into the array */
 static inline int tr_ptrArrayAppend( tr_ptrArray * array, void * appendMe )
 {
+    assert( tr_isPtrArray( array ) );
     return tr_ptrArrayInsert( array, appendMe, -1 );
 }
 
 static inline void** tr_ptrArrayBase( const tr_ptrArray * a )
 {
+    assert( tr_isPtrArray( a ) );
     return a->items;
 }
 
@@ -93,6 +101,7 @@ static inline void** tr_ptrArrayBase( const tr_ptrArray * a )
     @return the number of items in the array */
 static inline int tr_ptrArraySize( const tr_ptrArray *  a )
 {
+    assert( tr_isPtrArray( a ) );
     return a->n_items;
 }
 
@@ -100,6 +109,7 @@ static inline int tr_ptrArraySize( const tr_ptrArray *  a )
     @return True if the array has no pointers */
 static inline tr_bool tr_ptrArrayEmpty( const tr_ptrArray * a )
 {
+    assert( tr_isPtrArray( a ) );
     return tr_ptrArraySize(a) == 0;
 }
 
