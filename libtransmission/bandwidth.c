@@ -102,7 +102,7 @@ tr_bandwidthDestruct( tr_bandwidth * b )
     tr_bandwidthSetParent( b, NULL );
     tr_ptrArrayDestruct( &b->children, NULL );
 
-    memset( b, ~0, sizeof( tr_bandwidth ) );
+    memset( b, 0, sizeof( tr_bandwidth ) );
     return b;
 }
 

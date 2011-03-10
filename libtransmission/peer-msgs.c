@@ -2378,7 +2378,7 @@ tr_peerMsgsFree( tr_peermsgs* msgs )
         tr_free( msgs->pex6 );
         tr_free( msgs->pex );
 
-        memset( msgs, ~0, sizeof( tr_peermsgs ) );
+        memset( msgs, 0, sizeof( tr_peermsgs ) );
         tr_free( msgs );
     }
 }

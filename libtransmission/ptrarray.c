@@ -32,7 +32,7 @@ tr_ptrArrayDestruct( tr_ptrArray * p, PtrArrayForeachFunc func )
 
     tr_free( p->items );
 
-    memset( p, ~0, sizeof( tr_ptrArray ) );
+    memset( p, 0, sizeof( tr_ptrArray ) );
 }
 
 void
