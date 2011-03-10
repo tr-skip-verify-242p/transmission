@@ -200,7 +200,7 @@ tr_ptrArrayInsertSorted( tr_ptrArray * t,
     pos = tr_ptrArrayLowerBound( t, ptr, compare, NULL );
     ret = tr_ptrArrayInsert( t, ptr, pos );
 
-    //assertSortedAndUnique( t, compare );
+    assertSortedAndUnique( t, compare );
     return ret;
 }
 
