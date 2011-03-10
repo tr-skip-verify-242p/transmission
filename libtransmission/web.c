@@ -169,7 +169,7 @@ getTimeoutFromURL( const struct tr_web_task * task )
 static tr_ptrArray proxy_acl;
 
 static void
-clear_proxy_acl( )
+clear_proxy_acl( void )
 {
     if( tr_ptrArraySize( &proxy_acl ) )
     {
