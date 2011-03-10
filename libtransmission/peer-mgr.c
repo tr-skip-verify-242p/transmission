@@ -439,6 +439,7 @@ peerDelete( Torrent * t, tr_peer * peer )
     tr_free( peer->client );
     peer->atom->peer = NULL;
 
+    memset( peer, 0, sizeof( *peer ) );
     tr_free( peer );
 }
 
