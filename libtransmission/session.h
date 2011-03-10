@@ -44,6 +44,7 @@ struct tr_bandwidth;
 struct tr_bindsockets;
 struct tr_cache;
 struct tr_fdInfo;
+struct tr_proxy_acl;
 
 typedef void ( tr_web_config_func )( tr_session * session, void * curl_pointer, const char * url );
 
@@ -173,6 +174,7 @@ struct tr_session
     char *                       proxy;
     char *                       proxyUsername;
     char *                       proxyPassword;
+    struct tr_proxy_acl *        proxyACL;
 
     struct tr_list *             blocklists;
     struct tr_peerMgr *          peerMgr;
