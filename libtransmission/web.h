@@ -79,6 +79,13 @@ void tr_http_escape( struct evbuffer *out, const char *str, int len, tr_bool esc
 
 char* tr_http_unescape( const char * str, int len );
 
+
+struct tr_proxy_acl;
+
+struct tr_proxy_acl * tr_proxy_acl_new( tr_session * session );
+
+void tr_proxy_acl_free( struct tr_proxy_acl * p );
+
 #ifdef __cplusplus
 }
 #endif

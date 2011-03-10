@@ -1100,6 +1100,8 @@ tr_sessionInitImpl( void * vdata )
     if( session->isLPDEnabled )
         tr_lpdInit( session, &session->public_ipv4->addr );
 
+    session->proxyACL = tr_proxy_acl_new( session );
+
     /* cleanup */
     tr_bencFree( &settings );
     data->done = TRUE;
@@ -2398,6 +2400,7 @@ tr_sessionClose( tr_session * session )
     tr_free( session->torrentDir );
     tr_free( session->downloadDir );
     tr_free( session->incompleteDir );
+    tr_proxy_acl_free( session->proxyACL );
     tr_free( session->proxy );
     tr_free( session->proxyUsername );
     tr_free( session->proxyPassword );

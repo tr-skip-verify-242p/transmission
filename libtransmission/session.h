@@ -51,6 +51,7 @@ struct tr_bandwidth;
 struct tr_bindsockets;
 struct tr_cache;
 struct tr_fdInfo;
+struct tr_proxy_acl;
 
 typedef void ( tr_web_config_func )( tr_session * session, void * curl_pointer, const char * url );
 
@@ -189,6 +190,7 @@ struct tr_session
 
     char *                       blocklist_url;
 
+    struct tr_proxy_acl *        proxyACL;
     tr_proxy_type                proxyType;
     char *                       proxy;
     char *                       proxyUsername;
