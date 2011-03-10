@@ -409,7 +409,6 @@ getOptMode( int val )
         case 950: /* seedratio */
         case 951: /* seedratio-default */
         case 952: /* no-seedratio */
-        case 957: /* cookie-string */
         case 984: /* honor-session */
         case 985: /* no-honor-session */
             return MODE_TORRENT_SET;
@@ -426,6 +425,7 @@ getOptMode( int val )
         case 900: /* file priority-high */
         case 901: /* file priority-normal */
         case 902: /* file priority-low */
+        case 957: /* cookie-string */
             return MODE_TORRENT_SET | MODE_TORRENT_ADD;
 
         case 961: /* find */
@@ -2092,8 +2092,6 @@ processArgs( const char * rpcurl, int argc, const char ** argv )
                           break;
                 case 952: tr_bencDictAddInt( args, "seedRatioMode", TR_RATIOLIMIT_UNLIMITED );
                           break;
-                case 957: tr_bencDictAddStr( args, "cookieString", optarg );
-                          break;
                 case 984: tr_bencDictAddBool( args, "honorsSessionLimits", TRUE );
                           break;
                 case 985: tr_bencDictAddBool( args, "honorsSessionLimits", FALSE );
@@ -2122,6 +2120,8 @@ processArgs( const char * rpcurl, int argc, const char ** argv )
                 case 901: addFiles( args, "priority-normal", optarg );
                           break;
                 case 902: addFiles( args, "priority-low", optarg );
+                          break;
+                case 957: tr_bencDictAddStr( args, "cookieString", optarg );
                           break;
                 case 700: tr_bencDictAddInt( args, "bandwidthPriority",  1 );
                           break;
