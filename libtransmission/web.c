@@ -170,7 +170,7 @@ getTimeoutFromURL( const struct tr_web_task * task )
 typedef struct tr_proxy_acl
 {
     tr_session * session;
-    tr_ptrArray exclude;
+    tr_ptrArray exclude; /* allocated strings */
 }
 tr_proxy_acl;
 
