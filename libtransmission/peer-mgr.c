@@ -1608,7 +1608,7 @@ peerCallbackFunc( tr_peer * peer, const tr_peer_event * e, void * vt )
     torrentLock( t );
 
     assert( peer != NULL );
-    assert( peer->atom != NULL );
+    /* NB: peer->atom is NULL for webseeds. */
 
     switch( e->eventType )
     {
@@ -1630,7 +1630,7 @@ peerCallbackFunc( tr_peer * peer, const tr_peer_event * e, void * vt )
                 tr_statsAddUploaded( tor->session, e->length );
 
             /* update our atom */
-            if( e->wasPieceData )
+            if( peer->atom && e->wasPieceData )
                 peer->atom->piece_data_time = now;
 
             break;
@@ -1671,7 +1671,8 @@ peerCallbackFunc( tr_peer * peer, const tr_peer_event * e, void * vt )
             break;
 
         case TR_PEER_CLIENT_GOT_PORT:
-            peer->atom->port = e->port;
+            if( peer->atom )
+                peer->atom->port = e->port;
             break;
 
         case TR_PEER_CLIENT_GOT_SUGGEST:
@@ -1699,7 +1700,7 @@ peerCallbackFunc( tr_peer * peer, const tr_peer_event * e, void * vt )
                 tr_statsAddDownloaded( tor->session, e->length );
 
             /* update our atom */
-            if( e->wasPieceData )
+            if( peer->atom && e->wasPieceData )
                 peer->atom->piece_data_time = now;
 
             break;
@@ -1730,7 +1731,8 @@ peerCallbackFunc( tr_peer * peer, const tr_peer_event * e, void * vt )
 
             tr_ptrArrayDestruct( &peerArr, FALSE );
 
-            tr_historyAdd( &peer->blocksSentToClient, tr_time( ), 1 );
+            if( peer->atom )
+                tr_historyAdd( &peer->blocksSentToClient, tr_time( ), 1 );
 
             if( tr_cpBlockIsComplete( &tor->completion, block ) )
             {
