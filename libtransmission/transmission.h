@@ -370,6 +370,18 @@ void tr_ctorSetBandwidthPriority( tr_ctor * ctor, tr_priority_t priority );
  */
 tr_priority_t tr_ctorGetBandwidthPriority( const tr_ctor * ctor );
 
+/**
+ * @brief Set the torrent's cookie string.
+ * @see tr_torrentSetCookieString
+ */
+void tr_ctorSetCookieString( tr_ctor * ctor, const char * cookies );
+
+/**
+ * @brief Get the torrent's cookie string.
+ * @see tr_torrentSetCookieString
+ */
+const char * tr_ctorGetCookieString( const tr_ctor * ctor );
+
 
 /**
  * @brief set the per-session incomplete download folder.
