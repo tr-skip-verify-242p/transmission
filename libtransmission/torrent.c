@@ -854,6 +854,7 @@ torrentInit( tr_torrent * tor, const tr_ctor * ctor )
     tor->bandwidth = tr_bandwidthNew( session, session->bandwidth );
 
     tor->bandwidth->priority = tr_ctorGetBandwidthPriority( ctor );
+    tr_torrentSetCookieString( tor, tr_ctorGetCookieString( ctor ) );
 
     tor->error = TR_STAT_OK;
 

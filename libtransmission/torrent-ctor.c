@@ -39,6 +39,7 @@ struct tr_ctor
     tr_bool                 doDelete;
 
     tr_priority_t           bandwidthPriority;
+    char                  * cookies;
     tr_bool                 isSet_metainfo;
     tr_bool                 isSet_delete;
     tr_benc                 metainfo;
@@ -444,6 +445,23 @@ tr_ctorGetBandwidthPriority( const tr_ctor * ctor )
 ****
 ***/
 
+void
+tr_ctorSetCookieString( tr_ctor * ctor, const char * cookies )
+{
+    tr_free( ctor->cookies );
+    ctor->cookies = tr_strdup( cookies );
+}
+
+const char *
+tr_ctorGetCookieString( const tr_ctor * ctor )
+{
+    return ctor->cookies;
+}
+
+/***
+****
+***/
+
 tr_ctor*
 tr_ctorNew( const tr_session * session )
 {
@@ -469,6 +487,7 @@ tr_ctorFree( tr_ctor * ctor )
     tr_free( ctor->optionalArgs[1].downloadDir );
     tr_free( ctor->optionalArgs[0].downloadDir );
     tr_free( ctor->incompleteDir );
+    tr_free( ctor->cookies );
     tr_free( ctor->want );
     tr_free( ctor->notWant );
     tr_free( ctor->low );

@@ -359,6 +359,7 @@
    "paused"             | boolean     if true, don't start the torrent
    "peer-limit"         | number      maximum number of peers
    "bandwidthPriority"  | number      torrent's bandwidth tr_priority_t 
+   "cookieString"       | string      libcurl-style cookie string for trackers
    "files-wanted"       | array       indices of file(s) to download
    "files-unwanted"     | array       indices of file(s) to not download
    "priority-high"      | array       indices of high-priority file(s)
