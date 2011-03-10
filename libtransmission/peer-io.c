@@ -801,7 +801,7 @@ io_dtor( void * vio )
     tr_peerProxyFree( io->proxy );
     tr_list_free( &io->outbuf_datatypes, tr_free );
 
-    memset( io, ~0, sizeof( tr_peerIo ) );
+    memset( io, 0, sizeof( tr_peerIo ) );
     tr_free( io );
 }
 
