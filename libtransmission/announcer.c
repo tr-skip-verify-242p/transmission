@@ -1232,6 +1232,7 @@ tierAnnounce( tr_announcer * announcer, tr_tier * tier )
         struct announce_data * data;
         const tr_torrent * tor = tier->tor;
         const time_t now = tr_time( );
+        tr_web_run_opts opts = TR_WEB_RUN_OPTS_INIT;
 
         data = tr_new0( struct announce_data, 1 );
         data->torrentId = tr_torrentId( tor );
@@ -1244,9 +1245,9 @@ tierAnnounce( tr_announcer * announcer, tr_tier * tier )
         tier->isAnnouncing = TRUE;
         tier->lastAnnounceStartTime = now;
         --announcer->slotsAvailable;
-        tr_webRunFull( announcer->session, url, NULL,
-                       tr_torrentGetCookieString( tor ),
-                       onAnnounceDone, data, NULL );
+        opts.cookie_string = tr_torrentGetCookieString( tor );
+        tr_webRunFull( announcer->session, url, &opts,
+                       onAnnounceDone, data );
 
         tr_free( url );
     }
@@ -1399,6 +1400,7 @@ tierScrape( tr_announcer * announcer, tr_tier * tier )
     char * url;
     const char * scrape;
     struct announce_data * data;
+    tr_web_run_opts opts = TR_WEB_RUN_OPTS_INIT;
 
     assert( tier );
     assert( !tier->isScraping );
@@ -1420,9 +1422,9 @@ tierScrape( tr_announcer * announcer, tr_tier * tier )
     tier->lastScrapeStartTime = tr_time( );
     --announcer->slotsAvailable;
     dbgmsg( tier, "scraping \"%s\"", url );
-    tr_webRunFull( announcer->session, url, NULL,
-                   tr_torrentGetCookieString( tier->tor ),
-                   onScrapeDone, data, NULL );
+    opts.cookie_string = tr_torrentGetCookieString( tier->tor );
+    tr_webRunFull( announcer->session, url, &opts,
+                   onScrapeDone, data );
 
     tr_free( url );
 }
@@ -1436,8 +1438,9 @@ flushCloseMessages( tr_announcer * announcer )
     for( i=0; i<n; ++i )
     {
         struct stop_message * stop = tr_ptrArrayNth( &announcer->stops, i );
-        tr_webRunFull( announcer->session, stop->url, NULL,
-                       stop->cookies, NULL, NULL, NULL );
+        tr_web_run_opts opts = TR_WEB_RUN_OPTS_INIT;
+        opts.cookie_string = stop->cookies;
+        tr_webRunFull( announcer->session, stop->url, &opts, NULL, NULL );
         stopFree( stop );
     }
 

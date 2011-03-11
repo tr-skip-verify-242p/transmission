@@ -1400,12 +1400,12 @@ torrentAdd( tr_session               * session,
 
         if( isCurlURL( filename ) )
         {
+            tr_web_run_opts opts = TR_WEB_RUN_OPTS_INIT;
             struct add_torrent_idle_data * d = tr_new0( struct add_torrent_idle_data, 1 );
             d->data = idle_data;
             d->ctor = ctor;
-            tr_webRunFull( session, filename, NULL,
-                           tr_ctorGetCookieString( ctor ),
-                           gotMetadataFromURL, d, NULL );
+            opts.cookie_string = tr_ctorGetCookieString( ctor );
+            tr_webRunFull( session, filename, &opts, gotMetadataFromURL, d );
         }
         else
         {
