@@ -102,7 +102,6 @@
    "seedIdleMode"        | number     which seeding inactivity to use.  See tr_inactvelimit
    "seedRatioLimit"      | double     torrent-level seeding ratio
    "seedRatioMode"       | number     which ratio to use.  See tr_ratiolimit
-   "cookieString"        | string     libcurl-style cookie string for web trackers
    "trackerAdd"          | array      strings of announce URLs to add
    "trackerRemove"       | array      ids of trackers to remove
    "trackerReplace"      | array      pairs of <trackerId/new announce URLs>
@@ -355,7 +354,7 @@
    "paused"             | boolean     if true, don't start the torrent
    "peer-limit"         | number      maximum number of peers
    "bandwidthPriority"  | number      torrent's bandwidth tr_priority_t 
-   "cookieString"       | string      libcurl-style cookie string for web requests
+   "cookieString"       | string      cookies to use for URL downloads (see below)
    "files-wanted"       | array       indices of file(s) to download
    "files-unwanted"     | array       indices of file(s) to not download
    "priority-high"      | array       indices of high-priority file(s)
@@ -364,6 +363,9 @@
 
    Either "filename" OR "metainfo" MUST be included.
    All other arguments are optional.
+
+   The cookie string is expected to consist of one or more name value pairs
+   separated by semicolons, for example "name1=value1; name2=value2".
 
    Response arguments: on success, a "torrent-added" object in the
                        form of one of 3.3's tr_info objects with the

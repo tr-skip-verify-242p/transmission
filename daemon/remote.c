@@ -285,7 +285,7 @@ static tr_option opts[] =
     { 952, "no-seedratio",           "Let the current torrent(s) seed regardless of ratio", "SR", 0, NULL },
     { 953, "global-seedratio",       "All torrents, unless overridden by a per-torrent setting, should seed until a specific ratio", "gsr", 1, "ratio" },
     { 954, "no-global-seedratio",    "All torrents, unless overridden by a per-torrent setting, should seed regardless of ratio", "GSR", 0, NULL },
-    { 957, "cookie-string",          "Set cookies for web requests (url downloads and web trackers)", "cs", 1, "<name=value;...>" },
+    { 957, "cookie-string",          "Set cookies for torrent url download", "cs", 1, "<name=value;...>" },
     { 710, "tracker-add",            "Add a tracker to a torrent", "td", 1, "<tracker>" },
     { 712, "tracker-remove",         "Remove a tracker from a torrent", "tr", 1, "<trackerId>" },
     { 's', "start",                  "Start the current torrent(s)", "s",  0, NULL },
@@ -416,6 +416,9 @@ getOptMode( int val )
         case 920: /* session-info */
             return MODE_SESSION_GET;
 
+        case 957: /* cookie-string */
+            return MODE_TORRENT_ADD;
+
         case 'g': /* get */
         case 'G': /* no-get */
         case 700: /* torrent priority-high */
@@ -425,7 +428,6 @@ getOptMode( int val )
         case 900: /* file priority-high */
         case 901: /* file priority-normal */
         case 902: /* file priority-low */
-        case 957: /* cookie-string */
             return MODE_TORRENT_SET | MODE_TORRENT_ADD;
 
         case 961: /* find */
@@ -2100,6 +2102,18 @@ processArgs( const char * rpcurl, int argc, const char ** argv )
                           break;
             }
         }
+        else if( stepMode == MODE_TORRENT_ADD )
+        {
+            tr_benc * args = tr_bencDictFind( tadd, ARGUMENTS );
+
+            switch( c )
+            {
+                case 957: tr_bencDictAddStr( args, "cookieString", optarg );
+                          break;
+                default:  assert( "unhandled value" && 0 );
+                          break;
+            }
+        }
         else if( stepMode == ( MODE_TORRENT_SET | MODE_TORRENT_ADD ) )
         {
             tr_benc * args;
@@ -2120,8 +2134,6 @@ processArgs( const char * rpcurl, int argc, const char ** argv )
                 case 901: addFiles( args, "priority-normal", optarg );
                           break;
                 case 902: addFiles( args, "priority-low", optarg );
-                          break;
-                case 957: tr_bencDictAddStr( args, "cookieString", optarg );
                           break;
                 case 700: tr_bencDictAddInt( args, "bandwidthPriority",  1 );
                           break;

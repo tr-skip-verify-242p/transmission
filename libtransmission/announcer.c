@@ -79,7 +79,6 @@ enum
 struct stop_message
 {
     char * url;
-    char * cookies;
     uint64_t up;
     uint64_t down;
 };
@@ -88,7 +87,6 @@ static void
 stopFree( struct stop_message * stop )
 {
     tr_free( stop->url );
-    tr_free( stop->cookies );
     tr_free( stop );
 }
 
@@ -868,7 +866,6 @@ tr_announcerRemoveTorrent( tr_announcer * announcer, tr_torrent * tor )
                 s->up = tier->byteCounts[TR_ANN_UP];
                 s->down = tier->byteCounts[TR_ANN_DOWN];
                 s->url = createAnnounceURL( announcer, tor, tier, "stopped" );
-                s->cookies = tr_strdup( tr_torrentGetCookieString( tor ) );
                 tr_ptrArrayInsertSorted( &announcer->stops, s, compareStops );
             }
         }
@@ -1232,7 +1229,6 @@ tierAnnounce( tr_announcer * announcer, tr_tier * tier )
         struct announce_data * data;
         const tr_torrent * tor = tier->tor;
         const time_t now = tr_time( );
-        tr_web_run_opts opts = TR_WEB_RUN_OPTS_INIT;
 
         data = tr_new0( struct announce_data, 1 );
         data->torrentId = tr_torrentId( tor );
@@ -1245,9 +1241,7 @@ tierAnnounce( tr_announcer * announcer, tr_tier * tier )
         tier->isAnnouncing = TRUE;
         tier->lastAnnounceStartTime = now;
         --announcer->slotsAvailable;
-        opts.cookie_string = tr_torrentGetCookieString( tor );
-        tr_webRunFull( announcer->session, url, &opts,
-                       onAnnounceDone, data );
+        tr_webRun( announcer->session, url, NULL, onAnnounceDone, data );
 
         tr_free( url );
     }
@@ -1400,7 +1394,6 @@ tierScrape( tr_announcer * announcer, tr_tier * tier )
     char * url;
     const char * scrape;
     struct announce_data * data;
-    tr_web_run_opts opts = TR_WEB_RUN_OPTS_INIT;
 
     assert( tier );
     assert( !tier->isScraping );
@@ -1422,9 +1415,7 @@ tierScrape( tr_announcer * announcer, tr_tier * tier )
     tier->lastScrapeStartTime = tr_time( );
     --announcer->slotsAvailable;
     dbgmsg( tier, "scraping \"%s\"", url );
-    opts.cookie_string = tr_torrentGetCookieString( tier->tor );
-    tr_webRunFull( announcer->session, url, &opts,
-                   onScrapeDone, data );
+    tr_webRun( announcer->session, url, NULL, onScrapeDone, data );
 
     tr_free( url );
 }
@@ -1438,9 +1429,7 @@ flushCloseMessages( tr_announcer * announcer )
     for( i=0; i<n; ++i )
     {
         struct stop_message * stop = tr_ptrArrayNth( &announcer->stops, i );
-        tr_web_run_opts opts = TR_WEB_RUN_OPTS_INIT;
-        opts.cookie_string = stop->cookies;
-        tr_webRunFull( announcer->session, stop->url, &opts, NULL, NULL );
+        tr_webRun( announcer->session, stop->url, NULL, NULL, NULL );
         stopFree( stop );
     }
 
