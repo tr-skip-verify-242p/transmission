@@ -340,9 +340,12 @@ au_transaction_error_full( au_transaction * t, int line,
     evutil_vsnprintf( buf, sizeof( buf ), fmt, ap );
     va_end( ap );
 
-    tr_free( t->errstr );
-    t->errstr = tr_strdup( buf );
-    au_transaction_log_full( t, TR_MSG_ERR, line, "%s", t->errstr );
+    if( t )
+    {
+        tr_free( t->errstr );
+        t->errstr = tr_strdup( buf );
+    }
+    au_transaction_log_full( t, TR_MSG_ERR, line, "%s", buf );
 }
 
 static tr_bool
