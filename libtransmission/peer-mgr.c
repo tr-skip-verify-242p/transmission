@@ -1887,7 +1887,28 @@ peerCallbackFunc( tr_peer * peer, const tr_peer_event * e, void * vt )
             break;
 
         case TR_PEER_CLIENT_GOT_REJ:
-            removeRequestFromTables( t, _tr_block( t->tor, e->pieceIndex, e->offset ), peer );
+            if( !tr_torrentHasMetadata( t->tor ) )
+                break;
+            if( e->pieceIndex >= t->tor->info.pieceCount )
+            {
+                tr_torerr( t->tor, "Peer %s sent invalid REJECT message: " \
+                           "piece index %u out of range [0, %u)",
+                           tr_atomEndpointStr( peer->atom ),
+                           e->pieceIndex, t->tor->info.pieceCount );
+            }
+            else if( e->offset >= tr_torPieceCountBytes( t->tor, e->pieceIndex ) )
+            {
+                tr_torerr( t->tor, "Peer %s sent invalid REJECT message: " \
+                           "piece offset %u out of range [0, %u)",
+                           tr_atomEndpointStr( peer->atom ), e->offset,
+                           tr_torPieceCountBytes( t->tor, e->pieceIndex ) );
+            }
+            else
+            {
+                tr_block_index_t bi;
+                bi = _tr_block( t->tor, e->pieceIndex, e->offset );
+                removeRequestFromTables( t, bi, peer );
+            }
             break;
 
         case TR_PEER_CLIENT_GOT_CHOKE:
