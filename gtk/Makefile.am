@@ -66,8 +66,6 @@ noinst_HEADERS = \
 
 bin_PROGRAMS = transmission-gtk
 
-dbus_generated_sources = tr-core-dbus.h
-
 transmission_gtk_SOURCES = \
     actions.c \
     conf.c \
@@ -95,8 +93,6 @@ transmission_gtk_SOURCES = \
     tr-torrent.c \
     tr-window.c \
     util.c
-
-nodist_transmission_gtk_SOURCES = $(dbus_generated_sources)
 
 dist_man_MANS = transmission-gtk.1
 
@@ -135,32 +131,21 @@ EXTRA_DIST = \
     tr-core-dbus.xml \
     transmission.png
 
-DISTCLEANFILES = \
-    transmission-gtk.desktop
-
-CLEANFILES = $(dbus_generated_sources)
-
-tr-core-dbus.xml: Makefile
-
-tr-core-dbus.h: tr-core-dbus.xml tr-core.c
-	$(DBUS_BINDING_TOOL) --mode=glib-server --prefix=tr_core $< > $(@F)
+DISTCLEANFILES = transmission-gtk.desktop
+nodist_transmission_gtk_SOURCES = tr-core-dbus.h
+BUILT_SOURCES = tr-core-dbus.h
+CLEANFILES = tr-core-dbus.h
 
 if WIN32
-
 transmission.res: transmission.rc
 	$(WINDRES) -J rc -i transmission.rc -O coff -o transmission.res
 
-BUILT_SOURCES = \
-	$(dbus_generated_sources) \
-	setransmission.res
-
-CLEANFILES += \
-	transmission.res
-
-transmission_gtk_LDADD += \
-	transmission.res
-
-transmission_gtk_LDFLAGS = \
-	-mwindows
-
+BUILT_SOURCES += transmission.res
+CLEANFILES += transmission.res
+transmission_gtk_LDADD += transmission.res
+transmission_gtk_LDFLAGS = -mwindows
 endif
+
+tr-core-dbus.h: Makefile tr-core-dbus.xml
+	$(DBUS_BINDING_TOOL) --mode=glib-server --prefix=tr_core tr-core-dbus.xml > $(@F)
+
