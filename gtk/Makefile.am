@@ -146,7 +146,7 @@ transmission.res: transmission.rc
 
 BUILT_SOURCES = \
 	$(dbus_generated_sources) \
-	setransmission.res
+	transmission.res
 
 CLEANFILES += \
 	transmission.res
