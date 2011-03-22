@@ -219,9 +219,6 @@ struct tr_torrent
 
     struct tr_torrent_tiers  * tiers;
 
-    /** @see tr_torrentSetCookieString */
-    char                     * cookieString;
-
     time_t                     dhtAnnounceAt;
     time_t                     dhtAnnounce6At;
     tr_bool                    dhtAnnounceInProgress;

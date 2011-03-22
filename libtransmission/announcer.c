@@ -57,7 +57,6 @@ struct stop_message
 {
     tr_tracker_type type;
     char * hostname;
-    char * cookies;
     struct evbuffer * data;
     uint64_t up;
     uint64_t down;
@@ -102,7 +101,6 @@ stopFree( struct stop_message * stop )
     if( stop->data )
         evbuffer_free( stop->data );
     tr_free( stop->hostname );
-    tr_free( stop->cookies );
     tr_free( stop );
 }
 

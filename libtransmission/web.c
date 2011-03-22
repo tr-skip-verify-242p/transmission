@@ -381,8 +381,9 @@ tr_webRun( tr_session         * session,
            tr_web_done_func     done_func,
            void               * done_func_user_data )
 {
-    tr_webRunFull( session, url, range, NULL, done_func,
-                   done_func_user_data, NULL );
+    tr_web_run_opts opts = TR_WEB_RUN_OPTS_INIT;
+    opts.range = range;
+    tr_webRunFull( session, url, &opts, done_func, done_func_user_data );
 }
 
 void
@@ -393,18 +394,18 @@ tr_webRunWithBuffer( tr_session         * session,
                      void               * done_func_user_data,
                      struct evbuffer    * buffer )
 {
-    tr_webRunFull( session, url, range, NULL, done_func,
-                   done_func_user_data, buffer );
+    tr_web_run_opts opts = TR_WEB_RUN_OPTS_INIT;
+    opts.range = range;
+    opts.buffer = buffer;
+    tr_webRunFull( session, url, &opts, done_func, done_func_user_data );
 }
 
 void
 tr_webRunFull( tr_session        * session,
                const char        * url,
-               const char        * range,
-               const char        * cookie_string,
+               tr_web_run_opts   * opts,
                tr_web_done_func    done_func,
-               void              * done_func_user_data,
-               struct evbuffer   * buffer )
+               void              * done_func_user_data )
 {
     struct tr_web * web = session->web;
 
@@ -414,12 +415,12 @@ tr_webRunFull( tr_session        * session,
 
         task->session = session;
         task->url = tr_strdup( url );
-        task->range = tr_strdup( range );
-        task->cookies = tr_strdup( cookie_string );
+        task->range = tr_strdup( opts->range );
+        task->cookies = tr_strdup( opts->cookie_string );
         task->done_func = done_func;
         task->done_func_user_data = done_func_user_data;
-        task->response = buffer ? buffer : evbuffer_new( );
-        task->freebuf = buffer ? NULL : task->response;
+        task->response = opts->buffer ? opts->buffer : evbuffer_new( );
+        task->freebuf = opts->buffer ? NULL : task->response;
 
         tr_lockLock( web->taskLock );
         tr_list_append( &web->tasks, task );
