@@ -1047,6 +1047,7 @@ torrentSet( tr_session               * session,
     {
         int64_t      tmp;
         double       d;
+        const char * str;
         tr_benc *    files;
         tr_benc *    trackers;
         tr_bool      boolVal;

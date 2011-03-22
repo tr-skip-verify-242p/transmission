@@ -89,7 +89,6 @@ stopNew( tr_announcer * announcer, tr_torrent * tor, tr_tier * tier )
         url = createAnnounceURL( announcer, tor, tier, "stopped" );
         evbuffer_add_printf( s->data, "%s", url );
         tr_free( url );
-        s->cookies = tr_strdup( tr_torrentGetCookieString( tor ) );
     }
     s->hostname = tr_strdup( tracker->hostname );
     return s;
@@ -138,8 +137,7 @@ stopSend( struct stop_message * stop, tr_announcer * announcer )
     else
     {
         const char * url = (const char *) evbuffer_pullup( stop->data, -1 );
-        tr_webRunFull( announcer->session, url, NULL,
-                       stop->cookies, NULL, NULL, NULL );
+        tr_webRun( announcer->session, url, NULL, NULL, NULL );
     }
 }
 
@@ -1251,9 +1249,7 @@ tierAnnounce( tr_announcer * announcer, tr_tier * tier )
         else
         {
             char * url = createAnnounceURL( announcer, tor, tier, data->event );
-            tr_webRunFull( announcer->session, url, NULL,
-                           tr_torrentGetCookieString( tor ),
-                           onAnnounceDone, data, NULL );
+            tr_webRun( announcer->session, url, NULL, onAnnounceDone, data );
             tr_free( url );
         }
     }
@@ -1440,9 +1436,7 @@ tierScrape( tr_announcer * announcer, tr_tier * tier )
                                 strchr( scrape, '?' ) ? '&' : '?',
                                 tier->tor->info.hashEscaped );
         dbgmsg( tier, "scraping \"%s\"", url );
-        tr_webRunFull( announcer->session, url, NULL,
-                       tr_torrentGetCookieString( tier->tor ),
-                       onScrapeDone, data, NULL );
+        tr_webRun( announcer->session, url, NULL, onScrapeDone, data );
         tr_free( url );
     }
 }
