@@ -244,10 +244,16 @@ au_transaction_new( au_state * s, struct evbuffer * pkt )
     return t;
 }
 
+static tr_bool
+au_transaction_is_valid( const au_transaction * t )
+{
+    return t && t->id && t->state;
+}
+
 static void
 au_transaction_free( au_transaction * t )
 {
-    if( !t )
+    if( !au_transaction_is_valid( t ) )
         return;
     if( t->pkt )
         evbuffer_free( t->pkt );
@@ -268,12 +274,6 @@ au_transaction_cmp( const void * va, const void * vb )
     return 0;
 }
 
-static tr_bool
-au_transaction_is_valid( const au_transaction * t )
-{
-    return t && t->id != 0 && t->state != 0;
-}
-
 static int
 au_transaction_get_action( au_transaction * t )
 {
@@ -292,16 +292,16 @@ au_transaction_log_full( au_transaction * t, tr_msg_level lev,
                          int line, const char * fmt, ... )
 {
     char buf[1024], loc[256];
-    const char * endpoint, * mfmt;
+    const char * mfmt;
     va_list ap;
 
     va_start( ap, fmt );
     evutil_vsnprintf( buf, sizeof( buf ), fmt, ap );
     va_end( ap );
 
-    endpoint = t ? au_state_get_endpoint( t->state ) : NULL;
-    if( endpoint )
+    if( au_transaction_is_valid( t ) )
     {
+        const char * endpoint = au_state_get_endpoint( t->state );
         tr_snprintf( loc, sizeof( loc ),
                      _( "UDP Announcer (%s)" ), endpoint );
     }
@@ -326,7 +326,8 @@ au_transaction_log_full( au_transaction * t, tr_msg_level lev,
             break;
     }
 
-    tr_msg( __FILE__, line, lev, loc, mfmt, t ? t->id : 0, buf );
+    tr_msg( __FILE__, line, lev, loc, mfmt,
+            au_transaction_is_valid( t ) ? t->id : 0, buf );
 }
 
 static void
@@ -340,7 +341,7 @@ au_transaction_error_full( au_transaction * t, int line,
     evutil_vsnprintf( buf, sizeof( buf ), fmt, ap );
     va_end( ap );
 
-    if( t )
+    if( au_transaction_is_valid( t ) )
     {
         tr_free( t->errstr );
         t->errstr = tr_strdup( buf );
@@ -375,7 +376,7 @@ au_transaction_notify( au_transaction * t, const void * data, size_t len )
     int code;
     tr_bool toflag, conflag;
 
-    if( !t->callback )
+    if( !au_transaction_is_valid( t ) || !t->callback )
         return;
 
     if( au_transaction_has_error( t ) )
@@ -804,6 +805,8 @@ au_context_add_transaction( au_context * c, au_transaction * t )
 static void
 au_context_remove_transaction( au_context * c, au_transaction * t )
 {
+    if( !au_transaction_is_valid( t ) )
+        return;
     tr_ptrArrayRemoveSorted( &c->transactions, t, au_transaction_cmp );
 }
 
