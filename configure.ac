@@ -542,7 +542,7 @@ AM_CONDITIONAL(WIN32, test "x$have_msw" = "xyes")
 
 dnl  Setup CFLAGS after all compilation tests
 if test "x$GCC" = "xyes" ; then
-    CFLAGS="$CFLAGS -std=gnu99 -ggdb3 -Wall -Werror -Wextra"
+    CFLAGS="$CFLAGS -std=gnu99 -ggdb3 -Wall -Werror -Wextra -fno-strict-aliasing"
 fi
 
 dnl ----------------------------------------------------------------------------
