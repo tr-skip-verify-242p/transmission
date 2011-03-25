@@ -346,7 +346,7 @@ on_selection_changed( GtkTreeSelection * s UNUSED, gpointer gdata )
 ***/
 
 static void appsetup( TrWindow       * wind,
-                      GSList         * args,
+                      const GSList   * args,
                       struct cbdata  * cbdata,
                       gboolean         paused,
                       gboolean         minimized );
@@ -753,7 +753,7 @@ int
 main( int argc, char ** argv )
 {
     char * err = NULL;
-    GSList * argfiles;
+    GSList * argfiles = NULL;
     GError * gerr;
     gboolean didinit = FALSE;
     gboolean didlock = FALSE;
@@ -914,8 +914,6 @@ main( int argc, char ** argv )
 
         /* if there's no magnet link handler registered, register us */
         registerMagnetLinkHandler( );
-
-        gtk_main( );
     }
     else if( err )
     {
@@ -925,9 +923,10 @@ main( int argc, char ** argv )
         g_signal_connect( w, "response", G_CALLBACK(gtk_main_quit), NULL );
         gtk_widget_show( w );
         g_free( err );
-        gtk_main( );
     }
+    gtr_slist_free_full( argfiles, g_free );
 
+    gtk_main( );
     return 0;
 }
 
@@ -939,7 +938,7 @@ on_core_busy( TrCore * core UNUSED, gboolean busy, struct cbdata * c )
 
 static void
 appsetup( TrWindow      * wind,
-          GSList        * torrentFiles,
+          const GSList  * torrentFiles,
           struct cbdata * cbdata,
           gboolean        forcepause,
           gboolean        isIconified )
@@ -964,7 +963,6 @@ appsetup( TrWindow      * wind,
     /* add torrents from command-line and saved state */
     tr_core_load( cbdata->core, forcepause );
     tr_core_add_list( cbdata->core, torrentFiles, doStart, doPrompt, doNotify );
-    torrentFiles = NULL;
     tr_core_torrents_added( cbdata->core );
 
     /* set up main window */
@@ -1117,15 +1115,15 @@ on_drag_data_received( GtkWidget         * widget          UNUSED,
         }
         g_free( filename );
     }
+    g_strfreev( uris );
 
+    filenames = g_slist_reverse( filenames );
     if( filenames )
-        tr_core_add_list_defaults( data->core, g_slist_reverse( filenames ), TRUE );
+        tr_core_add_list_defaults( data->core, filenames, TRUE );
+    gtr_slist_free_full( filenames, g_free );
 
     tr_core_torrents_added( data->core );
     gtk_drag_finish( drag_context, success, FALSE, time_ );
-
-    /* cleanup */
-    g_strfreev( uris );
 }
 
 static void

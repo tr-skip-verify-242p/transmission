@@ -792,6 +792,17 @@ gtr_dialog_set_content( GtkDialog * dialog, GtkWidget * content )
     gtk_widget_show_all( content );
 }
 
+void
+gtr_slist_free_full( GSList * list, GDestroyNotify free_func )
+{
+#if GLIB_CHECK_VERSION( 2, 28, 0 )
+    g_slist_free_full( list, free_func );
+#else
+    g_slist_foreach( list, (GFunc) free_func, NULL );
+    g_slist_free( list );
+#endif
+}
+
 /***
 ****
 ***/
