@@ -632,10 +632,12 @@ gtr_file_list_set_torrent( GtkWidget * w, int torrentId )
     }
 
     data->filter = gtk_tree_model_filter_new( data->model, NULL );
+    g_object_unref( G_OBJECT( data->model ) );
     filter = GTK_TREE_MODEL_FILTER( data->filter );
     gtk_tree_model_filter_set_visible_column( filter, FC_VISIBLE );
 
     gtk_tree_view_set_model( GTK_TREE_VIEW( data->view ), data->filter );
+    g_object_unref( G_OBJECT( data->filter ) );
     gtk_tree_view_expand_all( GTK_TREE_VIEW( data->view ) );
 }
 

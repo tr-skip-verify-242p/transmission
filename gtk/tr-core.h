@@ -106,13 +106,13 @@ void tr_core_load( TrCore * self, gboolean forcepaused );
  * May trigger one or more "error" signals with TR_CORE_ERR_ADD_TORRENT
  */
 void tr_core_add_list( TrCore *    self,
-                       GSList *    torrentFiles,
+                       const GSList * torrentFiles,
                        gboolean    doStart,
                        gboolean    doPrompt,
                        gboolean    doNotify );
 
 void tr_core_add_list_defaults( TrCore    * core,
-                                GSList    * torrentFiles,
+                                const GSList * torrentFiles,
                                 gboolean    doNotify );
 
 

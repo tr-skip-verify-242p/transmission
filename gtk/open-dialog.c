@@ -415,6 +415,7 @@ onOpenDialogResponse( GtkDialog * dialog, int response, gpointer core )
         GSList * l = gtk_file_chooser_get_filenames( chooser );
 
         tr_core_add_list( core, l, doStart, doPrompt, doNotify );
+        gtr_slist_free_full( l, g_free );
     }
 
     gtk_widget_destroy( GTK_WIDGET( dialog ) );

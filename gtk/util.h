@@ -169,6 +169,9 @@ const gchar* gtr_ngettext( const gchar*, const gchar*, gulong );
 
 void gtr_dialog_set_content( GtkDialog * dialog, GtkWidget * content );
 
+/* backwards-comparible wrapper around g_slist_free_full() */
+void gtr_slist_free_full( GSList * list, GDestroyNotify free_func );
+
 /***
 ****
 ***/
