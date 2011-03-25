@@ -583,6 +583,7 @@ gtr_file_list_set_torrent( GtkWidget * w, int torrentId )
     }
 
     gtk_tree_view_set_model( GTK_TREE_VIEW( data->view ), data->model );
+    g_object_unref( G_OBJECT( data->model ) );
     gtk_tree_view_expand_all( GTK_TREE_VIEW( data->view ) );
 }
 
