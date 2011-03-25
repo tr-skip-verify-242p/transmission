@@ -1629,10 +1629,11 @@ updatemodel( gpointer gdata )
     return !done;
 }
 
-static void
+static gboolean
 onUriClicked( GtkAboutDialog * u UNUSED, const gchar * uri, gpointer u2 UNUSED )
 {
     gtr_open_uri( uri );
+    return TRUE;
 }
 
 static void
@@ -1645,8 +1646,6 @@ about( GtkWindow * parent )
         "Mitchell Livingston (Backend; OS X)",
         NULL
     };
-
-    gtk_about_dialog_set_url_hook( onUriClicked, NULL, NULL );
 
     d = g_object_new( GTK_TYPE_ABOUT_DIALOG,
                       "authors", authors,
@@ -1667,6 +1666,7 @@ about( GtkWindow * parent )
 #endif
                       NULL );
     gtk_window_set_transient_for( GTK_WINDOW( d ), parent );
+    g_signal_connect( d, "activate-link", G_CALLBACK( onUriClicked ), NULL );
     g_signal_connect_swapped( d, "response", G_CALLBACK (gtk_widget_destroy), d );
     gtk_widget_show( d );
 }
