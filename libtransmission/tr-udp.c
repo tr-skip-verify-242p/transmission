@@ -218,7 +218,7 @@ event_callback(int s, short type UNUSED, void *sv)
     rc = recvfrom(s, buf, 4096 - 1, 0,
                   (struct sockaddr*)&from, &fromlen);
     if(rc <= 0)
-        return;
+        goto out;
 
     if( check_udp_tracker( sv, buf, rc, &from, fromlen ) )
     {
@@ -235,6 +235,7 @@ event_callback(int s, short type UNUSED, void *sv)
             tr_ndbg("UDP", "Unexpected UDP packet");
     }
 
+out:
     free(buf);
 }    
 
