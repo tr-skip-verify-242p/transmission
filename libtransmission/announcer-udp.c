@@ -168,6 +168,10 @@ typedef uint32_t annkey_t;
 typedef struct au_transaction au_transaction;
 typedef struct au_state au_state;
 
+typedef uint32_t au_typetag_t;
+#define AUC_TRANSACTION_TYPETAG 0xa11bbbed
+#define AUC_STATE_TYPETAG 0xfae7b0a1
+
 static void au_transaction_log_full( au_transaction * t,
                                      tr_msg_level lev,
                                      int line,
@@ -190,6 +194,7 @@ static void au_state_error( au_state * s,
     au_transaction_error_full( t, __LINE__, __VA_ARGS__ ); \
 } while( 0 )
 
+static tr_bool au_state_is_valid( const au_state * s );
 static void au_state_send( au_state * s, au_transaction * t );
 static tr_bool au_state_connect( au_state * s );
 static tr_bool au_state_is_connected( const au_state * s );
@@ -215,6 +220,7 @@ static tr_session * au_context_get_session( const au_context * c );
 
 struct au_transaction
 {
+     au_typetag_t typetag;
      tnid_t id;
      au_state * state; /* not owned */
      struct evbuffer * pkt;
@@ -234,6 +240,7 @@ au_transaction_new( au_state * s, struct evbuffer * pkt )
     assert( evbuffer_get_length( pkt ) >= sizeof( *hdr ) );
 
     t = tr_new0( au_transaction, 1 );
+    t->typetag = AUC_TRANSACTION_TYPETAG;
     tr_cryptoRandBuf( &t->id, sizeof( t->id ) );
     t->state = s;
     t->pkt = pkt; /* transfer ownership */
@@ -247,7 +254,7 @@ au_transaction_new( au_state * s, struct evbuffer * pkt )
 static tr_bool
 au_transaction_is_valid( const au_transaction * t )
 {
-    return t && t->id && t->state;
+    return t && t->typetag == AUC_TRANSACTION_TYPETAG;
 }
 
 static void
@@ -299,7 +306,7 @@ au_transaction_log_full( au_transaction * t, tr_msg_level lev,
     evutil_vsnprintf( buf, sizeof( buf ), fmt, ap );
     va_end( ap );
 
-    if( au_transaction_is_valid( t ) )
+    if( au_transaction_is_valid( t ) && au_state_is_valid( t->state ) )
     {
         const char * endpoint = au_state_get_endpoint( t->state );
         tr_snprintf( loc, sizeof( loc ),
@@ -455,6 +462,7 @@ au_transaction_set_callback( au_transaction   * t,
 
 struct au_state
 {
+    au_typetag_t typetag;
     au_context * context; /* not owned */
     char * endpoint;
     tr_bool resolved;
@@ -472,16 +480,23 @@ static au_state *
 au_state_new( au_context * c, const char * tracker_host_port )
 {
     au_state * s = tr_new0( au_state, 1 );
+    s->typetag = AUC_STATE_TYPETAG;
     s->context = c;
     s->endpoint = tr_strdup( tracker_host_port );
     tr_cryptoRandBuf( &s->key, sizeof( s->key ) );
     return s;
 }
 
+static tr_bool
+au_state_is_valid( const au_state * s )
+{
+  return s && s->typetag == AUC_STATE_TYPETAG;
+}
+
 static void
 au_state_free( au_state * s )
 {
-    if( !s )
+    if( !au_state_is_valid( s ) )
         return;
     tr_free( s->endpoint );
     tr_list_free( &s->queue, NULL );
