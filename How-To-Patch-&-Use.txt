@@ -1,0 +1,39 @@
+
+
+get patch file for transmission 2.42+ r13183 Skip verify here:
+
+https://github.com/tr-skip-verify-242p/transmission/downloads
+
+
+
+
+
+
+also patched is skip verify empty/new torrent's files
+
+
+
+
+to skip verify
+
+use web client
+
+select torrent(s)
+
+right click
+
+fourth option down --> Skip Verify
+
+
+!!!!   Caution !! Read Below !!!!
+
+
+"If any files enabled for download contain only partially "
+    
+"complete data, it will be sent to peers and could result "
+    
+"in your client being disconnected. Only use this operation "
+
+"if you know for certain that the files enabled for download 
+     
+"in the selected torrents are verified and correct." );
